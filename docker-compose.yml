@@ -62,7 +62,7 @@ services:
       - mongo_data:/data/db
     restart: unless-stopped
 
-  nats:
+  NATS:
     image: nats:2.10-alpine
     ports:
       - "4222:4222"
