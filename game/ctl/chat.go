@@ -2,6 +2,7 @@ package ctl
 
 import (
 	"fmt"
+
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/game/app"
 	pb "github.com/gogu-x/gogs/pb/game"
