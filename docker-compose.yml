@@ -19,10 +19,14 @@ services:
     environment:
       - ETCD_ENDPOINTS=etcd:2379
       - GRPC_HOST=game-1
+      - MONGO_URL=mongodb://mongodb:27017
+      - NATS_URL=nats://nats:4222
     ports:
       - "9001:9001"
     depends_on:
       - etcd
+      - mongodb
+      - nats
     restart: unless-stopped
 
   game-2:
@@ -33,10 +37,14 @@ services:
     environment:
       - ETCD_ENDPOINTS=etcd:2379
       - GRPC_HOST=game-2
+      - MONGO_URL=mongodb://mongodb:27017
+      - NATS_URL=nats://nats:4222
     ports:
       - "9002:9002"
     depends_on:
       - etcd
+      - mongodb
+      - nats
     restart: unless-stopped
 
   etcd:
@@ -45,3 +53,22 @@ services:
       - ALLOW_NONE_AUTHENTICATION=yes
     ports:
       - "2379:2379"
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["--jetstream"]
+    restart: unless-stopped
+
+volumes:
+  mongo_data:

@@ -24,6 +24,12 @@ var (
 
 	// game 进程对外暴露的 host（容器内需设为容器名或IP）
 	GrpcHost = env("GRPC_HOST", "127.0.0.1")
+
+	// MongoDB 连接地址
+	MongoURL = env("MONGO_URL", "mongodb://localhost:27017")
+
+	// NATS 连接地址
+	NatsURL = env("NATS_URL", "nats://localhost:4222")
 )
 
 func GrpcAddr() string {
