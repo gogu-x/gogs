@@ -1,0 +1,47 @@
+services:
+  gate:
+    build:
+      context: .
+      dockerfile: Dockerfile.gate
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+    ports:
+      - "8080:8080"
+    depends_on:
+      - etcd
+    restart: unless-stopped
+
+  game-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.game
+    command: ["--server-id", "1"]
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - GRPC_HOST=game-1
+    ports:
+      - "9001:9001"
+    depends_on:
+      - etcd
+    restart: unless-stopped
+
+  game-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.game
+    command: ["--server-id", "2"]
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - GRPC_HOST=game-2
+    ports:
+      - "9002:9002"
+    depends_on:
+      - etcd
+    restart: unless-stopped
+
+  etcd:
+    image: bitnami/etcd:3.5
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+    ports:
+      - "2379:2379"
