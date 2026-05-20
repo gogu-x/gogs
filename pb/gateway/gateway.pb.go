@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v4.25.1
-// source: gateway.proto
+// source: gateway/gateway.proto
 
 package gateway
 
@@ -35,7 +35,7 @@ type Frame struct {
 
 func (x *Frame) Reset() {
 	*x = Frame{}
-	mi := &file_gateway_proto_msgTypes[0]
+	mi := &file_gateway_gateway_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +47,7 @@ func (x *Frame) String() string {
 func (*Frame) ProtoMessage() {}
 
 func (x *Frame) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_proto_msgTypes[0]
+	mi := &file_gateway_gateway_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,7 +60,7 @@ func (x *Frame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Frame.ProtoReflect.Descriptor instead.
 func (*Frame) Descriptor() ([]byte, []int) {
-	return file_gateway_proto_rawDescGZIP(), []int{0}
+	return file_gateway_gateway_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Frame) GetUid() uint64 {
@@ -98,37 +98,205 @@ func (x *Frame) GetMsgType() string {
 	return ""
 }
 
-var File_gateway_proto protoreflect.FileDescriptor
+type LoginReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Uid           uint64                 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	ServerId      int32                  `protobuf:"varint,3,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"` // 玩家所在区服
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
 
-const file_gateway_proto_rawDesc = "" +
+func (x *LoginReq) Reset() {
+	*x = LoginReq{}
+	mi := &file_gateway_gateway_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginReq) ProtoMessage() {}
+
+func (x *LoginReq) ProtoReflect() protoreflect.Message {
+	mi := &file_gateway_gateway_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginReq.ProtoReflect.Descriptor instead.
+func (*LoginReq) Descriptor() ([]byte, []int) {
+	return file_gateway_gateway_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *LoginReq) GetUid() uint64 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+func (x *LoginReq) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *LoginReq) GetServerId() int32 {
+	if x != nil {
+		return x.ServerId
+	}
+	return 0
+}
+
+type LoginResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginResp) Reset() {
+	*x = LoginResp{}
+	mi := &file_gateway_gateway_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginResp) ProtoMessage() {}
+
+func (x *LoginResp) ProtoReflect() protoreflect.Message {
+	mi := &file_gateway_gateway_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginResp.ProtoReflect.Descriptor instead.
+func (*LoginResp) Descriptor() ([]byte, []int) {
+	return file_gateway_gateway_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *LoginResp) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *LoginResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
+type LogoutReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Uid           uint64                 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutReq) Reset() {
+	*x = LogoutReq{}
+	mi := &file_gateway_gateway_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutReq) ProtoMessage() {}
+
+func (x *LogoutReq) ProtoReflect() protoreflect.Message {
+	mi := &file_gateway_gateway_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutReq.ProtoReflect.Descriptor instead.
+func (*LogoutReq) Descriptor() ([]byte, []int) {
+	return file_gateway_gateway_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *LogoutReq) GetUid() uint64 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+var File_gateway_gateway_proto protoreflect.FileDescriptor
+
+const file_gateway_gateway_proto_rawDesc = "" +
 	"\n" +
-	"\rgateway.proto\"\x84\x01\n" +
+	"\x15gateway/gateway.proto\"\x84\x01\n" +
 	"\x05Frame\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x1b\n" +
 	"\tserver_id\x18\x02 \x01(\tR\bserverId\x12\x17\n" +
 	"\aconn_id\x18\x04 \x01(\x04R\x06connId\x12\x18\n" +
 	"\apayload\x18\x05 \x01(\fR\apayload\x12\x19\n" +
-	"\bmsg_type\x18\x06 \x01(\tR\amsgType2'\n" +
+	"\bmsg_type\x18\x06 \x01(\tR\amsgType\"O\n" +
+	"\bLoginReq\x12\x10\n" +
+	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\x12\x1b\n" +
+	"\tserver_id\x18\x03 \x01(\x05R\bserverId\"1\n" +
+	"\tLoginResp\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
+	"\x03msg\x18\x02 \x01(\tR\x03msg\"\x1d\n" +
+	"\tLogoutReq\x12\x10\n" +
+	"\x03uid\x18\x01 \x01(\x04R\x03uid2'\n" +
 	"\aGateway\x12\x1c\n" +
-	"\x06Stream\x12\x06.Frame\x1a\x06.Frame(\x010\x01B\x14Z\x12github.com/gogu-x/gogs/pb/gatewayb\x06proto3"
+	"\x06Stream\x12\x06.Frame\x1a\x06.Frame(\x010\x01B#Z!github.com/gogu-x/gogs/pb/gatewayb\x06proto3"
 
 var (
-	file_gateway_proto_rawDescOnce sync.Once
-	file_gateway_proto_rawDescData []byte
+	file_gateway_gateway_proto_rawDescOnce sync.Once
+	file_gateway_gateway_proto_rawDescData []byte
 )
 
-func file_gateway_proto_rawDescGZIP() []byte {
-	file_gateway_proto_rawDescOnce.Do(func() {
-		file_gateway_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_gateway_proto_rawDesc), len(file_gateway_proto_rawDesc)))
+func file_gateway_gateway_proto_rawDescGZIP() []byte {
+	file_gateway_gateway_proto_rawDescOnce.Do(func() {
+		file_gateway_gateway_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_gateway_gateway_proto_rawDesc), len(file_gateway_gateway_proto_rawDesc)))
 	})
-	return file_gateway_proto_rawDescData
+	return file_gateway_gateway_proto_rawDescData
 }
 
-var file_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_gateway_proto_goTypes = []any{
-	(*Frame)(nil), // 0: Frame
+var file_gateway_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_gateway_gateway_proto_goTypes = []any{
+	(*Frame)(nil),     // 0: Frame
+	(*LoginReq)(nil),  // 1: LoginReq
+	(*LoginResp)(nil), // 2: LoginResp
+	(*LogoutReq)(nil), // 3: LogoutReq
 }
-var file_gateway_proto_depIdxs = []int32{
+var file_gateway_gateway_proto_depIdxs = []int32{
 	0, // 0: Gateway.Stream:input_type -> Frame
 	0, // 1: Gateway.Stream:output_type -> Frame
 	1, // [1:2] is the sub-list for method output_type
@@ -138,26 +306,26 @@ var file_gateway_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_gateway_proto_init() }
-func file_gateway_proto_init() {
-	if File_gateway_proto != nil {
+func init() { file_gateway_gateway_proto_init() }
+func file_gateway_gateway_proto_init() {
+	if File_gateway_gateway_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gateway_proto_rawDesc), len(file_gateway_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gateway_gateway_proto_rawDesc), len(file_gateway_gateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_gateway_proto_goTypes,
-		DependencyIndexes: file_gateway_proto_depIdxs,
-		MessageInfos:      file_gateway_proto_msgTypes,
+		GoTypes:           file_gateway_gateway_proto_goTypes,
+		DependencyIndexes: file_gateway_gateway_proto_depIdxs,
+		MessageInfos:      file_gateway_gateway_proto_msgTypes,
 	}.Build()
-	File_gateway_proto = out.File
-	file_gateway_proto_goTypes = nil
-	file_gateway_proto_depIdxs = nil
+	File_gateway_gateway_proto = out.File
+	file_gateway_gateway_proto_goTypes = nil
+	file_gateway_gateway_proto_depIdxs = nil
 }

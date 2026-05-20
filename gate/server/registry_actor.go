@@ -2,12 +2,11 @@ package server
 
 import (
 	"context"
+	"log"
+
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
-	"log"
 )
-
-type etcdEvent = cluster.Event
 
 type RegistryActor struct {
 	cancel context.CancelFunc

@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/common";
+
+message User {
+  string query           = 1;
+  int32  page_number     = 2;
+  int32  results_per_page = 3;
+}

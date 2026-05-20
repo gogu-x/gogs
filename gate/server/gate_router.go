@@ -2,19 +2,20 @@ package server
 
 import (
 	"fmt"
-	pb "github.com/gogu-x/gogs/pb/game"
 	"log"
+
+	"github.com/gogu-x/gogs/pb/gateway"
 
 	actor "github.com/gogu-x/bigTree"
 )
 
 func initGateRouter(c *ConnActor) {
-	c.router.Register(&pb.LoginReq{}, func(ctx actor.ActorContext, msg interface{}) {
-		handleLogin(c, ctx, msg.(*pb.LoginReq))
+	c.router.Register(&gateway.LoginReq{}, func(ctx actor.ActorContext, msg interface{}) {
+		handleLogin(c, ctx, msg.(*gateway.LoginReq))
 	})
 }
 
-func handleLogin(c *ConnActor, ctx actor.ActorContext, req *pb.LoginReq) {
+func handleLogin(c *ConnActor, ctx actor.ActorContext, req *gateway.LoginReq) {
 	if req.Token == "" {
 		log.Printf("ConnActor[%d]: invalid token", c.connID)
 		ctx.Stop()
@@ -24,5 +25,5 @@ func handleLogin(c *ConnActor, ctx actor.ActorContext, req *pb.LoginReq) {
 	c.serverID = fmt.Sprintf("%d", req.ServerId)
 
 	log.Printf("ConnActor[%d]: login success uid=%d server=%s", c.connID, c.uid, c.serverID)
-	c.Reply(&pb.LoginResp{Code: 0, Msg: "ok"})
+	c.Reply(&gateway.LoginResp{Code: 0, Msg: "ok"})
 }

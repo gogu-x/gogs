@@ -2,9 +2,9 @@
 
 import (
 	actor "github.com/gogu-x/bigTree"
+	"github.com/gogu-x/bigTree/timer"
 	"github.com/gogu-x/gogs/game/app"
 	"github.com/gogu-x/gogs/game/router"
-	"github.com/gogu-x/bigTree/timer"
 )
 
 type GameActor struct {
@@ -27,6 +27,6 @@ func (g *GameActor) OnStop(ctx actor.ActorContext) {
 }
 
 func (g *GameActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
-	msgs := msg.(*inboundMsg)
-	g.Router.Route(app.WrapContext(ctx, msgs.uid, msgs.connID), msgs.msg)
+	message := msg.(*inboundMsg)
+	g.Router.Route(app.WrapContext(ctx, message.uid, message.connID), message.msg)
 }

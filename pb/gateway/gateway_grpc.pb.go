@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v4.25.1
-// source: gateway.proto
+// source: gateway/gateway.proto
 
 package gateway
 
@@ -25,8 +25,6 @@ const (
 // GatewayClient is the client API for Gateway service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-//
-// 网关 <-> 游戏进程 双向流服务
 type GatewayClient interface {
 	Stream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Frame, Frame], error)
 }
@@ -55,8 +53,6 @@ type Gateway_StreamClient = grpc.BidiStreamingClient[Frame, Frame]
 // GatewayServer is the server API for Gateway service.
 // All implementations must embed UnimplementedGatewayServer
 // for forward compatibility.
-//
-// 网关 <-> 游戏进程 双向流服务
 type GatewayServer interface {
 	Stream(grpc.BidiStreamingServer[Frame, Frame]) error
 	mustEmbedUnimplementedGatewayServer()
@@ -115,5 +111,5 @@ var Gateway_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "gateway.proto",
+	Metadata: "gateway/gateway.proto",
 }

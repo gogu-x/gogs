@@ -3,12 +3,10 @@ package main
 import (
 	"log"
 
+	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/gate/server"
-	_ "github.com/gogu-x/gogs/pb/game"
-
-	actor "github.com/gogu-x/bigTree"
 )
 
 func main() {
