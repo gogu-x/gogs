@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="go build github.com/gogu-x/gogs/gate" type="GoApplicationRunConfiguration" factoryName="Go Application" nameIsGenerated="true">
+    <module name="gogs" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="--gate-id 1" />
+    <kind value="DIRECTORY" />
+    <package value="github.com/gogu-x/gogs" />
+    <directory value="$PROJECT_DIR$/gate" />
+    <filePath value="$PROJECT_DIR$" />
+    <method v="2" />
+  </configuration>
+</component>

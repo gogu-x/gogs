@@ -1,32 +1,36 @@
-﻿package model
+package model
 
 import (
+	"log"
+
 	actor "github.com/gogu-x/bigTree"
-	"github.com/gogu-x/bigTree/timer"
-	"github.com/gogu-x/gogs/game/app"
-	"github.com/gogu-x/gogs/game/router"
 )
 
-type GameActor struct {
-	Router actor.Router
-	app    *app.App
-	timer  *timer.TimeWheel
-}
+// PlayerSupervisor 管理所有 PlayerActor 的生命周期，并启动全局公共 Actor
+type PlayerSupervisor struct{}
 
-func (g *GameActor) OnInit(ctx actor.ActorContext) {
-	g.timer = timer.NewTimeWheel(10240)
-	g.app = app.New()
-	router.Init(&g.Router, g.app)
-
-}
-
-func (g *GameActor) OnStop(ctx actor.ActorContext) {
-	if g.timer != nil {
-		g.timer.Stop()
+func (s *PlayerSupervisor) OnInit(ctx actor.ActorContext) {
+	Consumer = &NatsConsumer{}
+	if err := Consumer.Start(ctx.Self()); err != nil {
+		log.Fatalf("PlayerSupervisor: nats consumer start error: %v", err)
 	}
 }
 
-func (g *GameActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
-	message := msg.(*inboundMsg)
-	g.Router.Route(app.WrapContext(ctx, message.uid, message.connID), message.msg)
+func (s *PlayerSupervisor) OnStop(ctx actor.ActorContext) {
+	if Consumer != nil {
+		Consumer.Stop()
+	}
+}
+
+func (s *PlayerSupervisor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
+	m, ok := msg.(*inboundMsg)
+	if !ok {
+		return
+	}
+	name := playerActorName(m.uid)
+	pid, exists := ctx.Lookup(name)
+	if !exists {
+		pid = actor.Spawn(name, newPlayerActor(m.uid, m.connID))
+	}
+	ctx.Send(pid, m)
 }

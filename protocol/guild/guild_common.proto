@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/protoGuild";
+
+// 工会职位
+enum GuildRole {
+  MEMBER  = 0; // 普通成员
+  OFFICER = 1; // 副会长
+  LEADER  = 2; // 会长
+}
+
+// 工会成员快照
+message GuildMember {
+  uint64    uid   = 1;
+  string    name  = 2;
+  uint32    level = 3;
+  GuildRole role  = 4;
+}
+
+// 工会信息
+message GuildInfo {
+  uint64               guild_id = 1;
+  string               name     = 2;
+  string               notice   = 3;
+  uint64               leader   = 4;
+  repeated GuildMember members  = 5;
+}

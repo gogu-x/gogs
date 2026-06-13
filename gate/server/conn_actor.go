@@ -2,11 +2,12 @@ package server
 
 import (
 	"fmt"
-	actor "github.com/gogu-x/bigTree"
-	msgcodec "github.com/gogu-x/gogs/codec"
-	"github.com/gogu-x/gogs/pb/gateway"
 	"log"
 	"reflect"
+
+	actor "github.com/gogu-x/bigTree"
+	msgcodec "github.com/gogu-x/gogs/codec"
+	"github.com/gogu-x/gogs/pb/protoGateway"
 
 	"google.golang.org/protobuf/proto"
 
@@ -46,7 +47,7 @@ func (c *ConnActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 	switch m := msg.(type) {
 	case *WsMsg:
 		c.handleWsMsg(ctx, m.Data)
-	case *gateway.Frame:
+	case *protoGateway.Frame:
 		if len(m.Payload) == 0 {
 			return
 		}
@@ -66,34 +67,34 @@ func (c *ConnActor) handleWsMsg(ctx actor.ActorContext, data []byte) {
 		return
 	}
 
-	c.router.Route(ctx, inner)
-
-	c.serverID = "1"
 	c.router.SetFallback(func(ctx actor.ActorContext, msg interface{}) {
-		protoMsg, ok := inner.(proto.Message)
-		if !ok {
-			log.Printf("ConnActor[%d]: msg %T is not proto.Message", c.connID, inner)
-			return
-		}
-		body, _ := c.codec.Marshal(protoMsg)
-
-		c.forward(ctx, &gateway.Frame{
-			ConnId:   c.connID,
-			Uid:      c.uid,
-			ServerId: c.serverID,
-			Payload:  body,
-			MsgType:  reflect.TypeOf(inner).Elem().Name(),
-		})
+		c.forward(ctx, inner)
 	})
+
+	c.router.Route(ctx, inner)
 }
 
-func (c *ConnActor) forward(ctx actor.ActorContext, frame *gateway.Frame) {
-	pid, ok := ctx.Lookup(StreamActorName(c.serverID))
+func (c *ConnActor) forward(ctx actor.ActorContext, inner interface{}) {
+	protoMsg, ok := inner.(proto.Message)
 	if !ok {
-		log.Printf("ConnActor[%d]: stream actor not found for server %s", c.connID, c.serverID)
+		log.Printf("ConnActor[%d]: msg %T is not proto.Message", c.connID, inner)
 		return
 	}
-	ctx.Send(pid, &StreamMsg{Frame: frame})
+	body, _ := c.codec.Marshal(protoMsg)
+
+	frame := &protoGateway.Frame{
+		ConnId:   c.connID,
+		Uid:      c.uid,
+		ServerId: c.serverID,
+		Payload:  body,
+		MsgType:  reflect.TypeOf(inner).Elem().Name(),
+	}
+
+	if c.serverID == "" {
+		log.Printf("ConnActor[%d]: no game node assigned, drop message", c.connID)
+		return
+	}
+	ctx.Send(actor.MustLookup(ActorNats), &StreamMsg{Frame: frame})
 }
 
 func (c *ConnActor) Reply(msg proto.Message) {

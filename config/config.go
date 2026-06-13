@@ -10,14 +10,17 @@ var (
 	// etcd 地址，支持环境变量 ETCD_ENDPOINTS 覆盖（逗号分隔）
 	EtcdEndpoints = envSlice("ETCD_ENDPOINTS", "43.160.212.55:2379")
 
-	// gate WebSocket 监听地址
-	GateListenAddr = env("GATE_LISTEN_ADDR", ":8080")
+	// gate WebSocket 基础端口，实际端口 = GateBasePort + GateID
+	GateBasePort = 8080
 
-	// game gRPC 基础端口，实际端口 = GrpcBasePort + ServerID
-	GrpcBasePort = 9000
+	// game gRPC 基础端口，实际端口 = GameBasePort + ServerID
+	GameBasePort = 9000
 
 	// 日志级别
 	LogLevel = env("LOG_LEVEL", "debug")
+
+	// Gate ID，由启动参数指定，每个 gate 进程唯一
+	GateID = 0
 
 	// 区服 ID，由启动参数指定，每个 game 进程唯一
 	ServerID = 0
@@ -29,15 +32,19 @@ var (
 	MongoURL = env("MONGO_URL", "mongodb://localhost:27017")
 
 	// NATS 连接地址
-	NatsURL = env("NATS_URL", "nats://localhost:4222")
+	NatsURL = env("NATS_URL", "nats://43.160.212.55:4222")
 )
 
-func GrpcAddr() string {
-	return fmt.Sprintf(":%d", GrpcBasePort+ServerID)
+func GateAddr() string {
+	return fmt.Sprintf(":%d", GateBasePort+GateID)
+}
+
+func GameAddr() string {
+	return fmt.Sprintf(":%d", GameBasePort+ServerID)
 }
 
 func GrpcAddrFor(serverID int) string {
-	return fmt.Sprintf("%s:%d", GrpcHost, GrpcBasePort+serverID)
+	return fmt.Sprintf("%s:%d", GrpcHost, GameBasePort+serverID)
 }
 
 func env(key, defaultVal string) string {

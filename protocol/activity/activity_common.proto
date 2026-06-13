@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/protoActivity";
+
+// 活动状态
+enum ActivityStatus {
+  NOT_STARTED = 0; // 未开始
+  ONGOING     = 1; // 进行中
+  ENDED       = 2; // 已结束
+}
+
+// 活动信息
+message ActivityInfo {
+  uint64         id         = 1;
+  string         name       = 2;
+  ActivityStatus status     = 3;
+  int64          start_time = 4;
+  int64          end_time   = 5;
+}
+
+// 玩家活动进度
+message ActivityProgress {
+  uint64 activity_id = 1;
+  uint64 uid         = 2;
+  int32  progress    = 3;
+  int32  target      = 4;
+  bool   rewarded    = 5;
+}

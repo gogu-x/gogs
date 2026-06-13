@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/protoActivity";
+
+message GetActivityListReq {}
+
+message JoinActivityReq {
+  uint64 uid         = 1;
+  uint64 activity_id = 2;
+}
+
+message GetProgressReq {
+  uint64 uid         = 1;
+  uint64 activity_id = 2;
+}
+
+message ClaimRewardReq {
+  uint64 uid         = 1;
+  uint64 activity_id = 2;
+}

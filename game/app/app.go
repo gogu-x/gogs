@@ -1,19 +1,22 @@
 package app
 
 import (
-	"github.com/gogu-x/gogs/game/activity"
-	"github.com/gogu-x/gogs/game/guild"
 	"github.com/gogu-x/gogs/game/player"
+	"github.com/gogu-x/gogs/game/player/bag"
+	"github.com/gogu-x/gogs/game/player/cardGroup"
+	"github.com/gogu-x/gogs/game/player/shop"
 )
 
 type App struct {
-	Players  *player.Mgr
-	Guild    *guild.Manager
-	Activity *activity.Manager
+	Player       *player.Player
+	ConnID       uint64
+	BagMgr       *bag.Mgr
+	ShopMgr      *shop.Mgr
+	CardGroupMgr *cardGroup.Mgr
 }
 
-func New() *App {
+func New(uid uint64) *App {
 	return &App{
-		Players: player.NewManager(),
+		Player: &player.Player{UID: uid},
 	}
 }

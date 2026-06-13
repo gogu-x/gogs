@@ -3,10 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
+	"log"
+
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
-	"github.com/gogu-x/gogs/pb/gateway"
-	"log"
+	"github.com/gogu-x/gogs/pb/protoGateway"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -14,11 +15,16 @@ import (
 
 type StreamActor struct {
 	serverID string
-	stream   gateway.Gateway_StreamClient
+	stream   protoGateway.Gateway_StreamClient
+}
+
+func (s *StreamActor) Name() {
+	//TODO implement me
+	panic("implement me")
 }
 
 type StreamMsg struct {
-	Frame *gateway.Frame
+	Frame *protoGateway.Frame
 }
 
 func NewStreamActor(serverID string) *StreamActor {
@@ -44,7 +50,7 @@ func (s *StreamActor) OnInit(ctx actor.ActorContext) {
 		return
 	}
 
-	stream, err := gateway.NewGatewayClient(conn).Stream(context.Background())
+	stream, err := protoGateway.NewGatewayClient(conn).Stream(context.Background())
 	if err != nil {
 		log.Printf("StreamActor[%s]: stream error: %v", s.serverID, err)
 		ctx.Stop()
@@ -53,20 +59,19 @@ func (s *StreamActor) OnInit(ctx actor.ActorContext) {
 	s.stream = stream
 
 	self := ctx.Self()
-	sys := ctx.System()
 	go func() {
 		for {
 			frame, err := stream.Recv()
 			if err != nil {
 				log.Printf("StreamActor[%s]: recv error: %v", s.serverID, err)
-				sys.Send(self, &stopMsg{})
+				actor.Send(self, &stopMsg{})
 				return
 			}
-			connPID, ok := sys.Lookup(connActorName(frame.ConnId))
+			connPID, ok := actor.Lookup(connActorName(frame.ConnId))
 			if !ok {
 				continue
 			}
-			sys.Send(connPID, frame)
+			actor.Send(connPID, frame)
 		}
 	}()
 }

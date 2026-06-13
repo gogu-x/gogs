@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-option go_package = "github.com/gogu-x/gogs/pb/protoChat";
-
-message chatAck {
-   int32 state =1;
-}

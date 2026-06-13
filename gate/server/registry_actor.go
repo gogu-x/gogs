@@ -3,38 +3,60 @@ package server
 import (
 	"context"
 	"log"
+	"sync/atomic"
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
 )
 
+// Registry 全局单例，ConnActor 登录时调用 Pick 分配 serverID
+var Registry *RegistryActor
+
+// RegistryActor 监听 etcd，维护在线 Game 节点列表，提供轮询 Pick
 type RegistryActor struct {
-	cancel context.CancelFunc
+	servers []string // 在线 serverID 列表
+	cursor  atomic.Uint64
+	cancel  context.CancelFunc
 }
 
-func NewRegistryActor() *RegistryActor {
-	return &RegistryActor{}
+// Pick 轮询返回一个在线 serverID，无节点时返回 ""
+func (r *RegistryActor) Pick() string {
+	if len(r.servers) == 0 {
+		return ""
+	}
+	idx := r.cursor.Add(1) - 1
+	return r.servers[idx%uint64(len(r.servers))]
+}
+
+// HasServer 检查指定 serverID 是否在线
+func (r *RegistryActor) HasServer(serverID string) bool {
+	for _, id := range r.servers {
+		if id == serverID {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *RegistryActor) OnInit(ctx actor.ActorContext) {
+	Registry = r // 设置全局单例
 	nodes, err := cluster.GetAll()
 	if err != nil {
 		log.Printf("RegistryActor: get all error: %v", err)
 	} else {
 		for serverID := range nodes {
-			ctx.System().Spawn(StreamActorName(serverID), NewStreamActor(serverID))
-			log.Printf("RegistryActor: loaded server %s", serverID)
+			r.servers = append(r.servers, serverID)
 		}
+		log.Printf("RegistryActor: loaded %d game nodes", len(r.servers))
 	}
 
 	watchCtx, cancel := context.WithCancel(context.Background())
 	r.cancel = cancel
 	self := ctx.Self()
-	sys := ctx.System()
 
 	go func() {
 		for ev := range cluster.Watch(watchCtx) {
-			sys.Send(self, &ev)
+			actor.Send(self, &ev)
 		}
 	}()
 }
@@ -44,20 +66,23 @@ func (r *RegistryActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 	if !ok {
 		return
 	}
-
-	name := StreamActorName(ev.ServerID)
-
 	switch ev.Type {
 	case "put":
-		if _, ok := ctx.Lookup(name); !ok {
-			ctx.System().Spawn(name, NewStreamActor(ev.ServerID))
-			log.Printf("RegistryActor: server %s online -> %s", ev.ServerID, ev.Addr)
+		for _, id := range r.servers {
+			if id == ev.ServerID {
+				return // 已存在
+			}
 		}
+		r.servers = append(r.servers, ev.ServerID)
+		log.Printf("RegistryActor: game [%s] online, total=%d", ev.ServerID, len(r.servers))
 	case "delete":
-		if pid, ok := ctx.Lookup(name); ok {
-			ctx.System().Send(pid, &stopMsg{})
+		for i, id := range r.servers {
+			if id == ev.ServerID {
+				r.servers = append(r.servers[:i], r.servers[i+1:]...)
+				break
+			}
 		}
-		log.Printf("RegistryActor: server %s offline", ev.ServerID)
+		log.Printf("RegistryActor: game [%s] offline, total=%d", ev.ServerID, len(r.servers))
 	}
 }
 

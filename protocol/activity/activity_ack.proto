@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/protoActivity";
+
+import "activity/activity_common.proto";
+
+message GetActivityListResp {
+  repeated ActivityInfo activities = 1;
+}
+
+message JoinActivityResp {
+  int32  code = 1;
+  string msg  = 2;
+}
+
+message GetProgressResp {
+  int32            code     = 1;
+  ActivityProgress progress = 2;
+}
+
+message ClaimRewardResp {
+  int32  code = 1;
+  string msg  = 2;
+}

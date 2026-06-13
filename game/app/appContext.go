@@ -6,43 +6,17 @@ import (
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/codec"
-	"github.com/gogu-x/gogs/pb/gateway"
+	"github.com/gogu-x/gogs/pb/protoGateway"
 	"google.golang.org/protobuf/proto"
 )
 
-// Context wraps ActorContext and App for each message handler call.
-type Context struct {
-	actor.ActorContext
-	*App
-	UID    uint64
-	ConnID uint64
-}
+// NatsReplier 由 model 包注入，避免 import cycle
+var NatsReplier func(connID uint64, payload []byte) error
 
-func NewContext(ctx actor.ActorContext, a *App, uid, connID uint64) *Context {
-	return &Context{ActorContext: ctx, App: a, UID: uid, ConnID: connID}
-}
-
-func (a *App) Handle(fn func(*Context, interface{})) actor.Handler {
-	return func(ctx actor.ActorContext, msg interface{}) {
-		c := ctx.(*gameContext)
-		fn(NewContext(c.ActorContext, a, c.uid, c.connID), msg)
-	}
-}
-
-type gameContext struct {
-	actor.ActorContext
-	uid    uint64
-	connID uint64
-}
-
-func WrapContext(ctx actor.ActorContext, uid, connID uint64) actor.ActorContext {
-	return &gameContext{ActorContext: ctx, uid: uid, connID: connID}
-}
-
-// Reply wraps msg into a gateway.Frame and sends it back to GateActor.
-func (c *Context) Reply(msg proto.Message) {
-	gate, ok := c.Lookup("gate")
-	if !ok {
+// Reply 将回包通过 NATS 发回 Gate
+func (a *App) Reply(msg proto.Message) {
+	if NatsReplier == nil {
+		log.Printf("Reply: NatsReplier not set")
 		return
 	}
 	body, err := codec.ProtoCodec.Marshal(msg)
@@ -50,10 +24,25 @@ func (c *Context) Reply(msg proto.Message) {
 		log.Printf("Reply marshal error: %v", err)
 		return
 	}
-	c.Send(gate, &gateway.Frame{
-		Uid:     c.UID,
-		ConnId:  c.ConnID,
+	frame := &protoGateway.Frame{
+		Uid:     a.Player.UID,
+		ConnId:  a.ConnID,
 		Payload: body,
 		MsgType: reflect.TypeOf(msg).Elem().Name(),
-	})
+	}
+	data, err := proto.Marshal(frame)
+	if err != nil {
+		log.Printf("Reply frame marshal error: %v", err)
+		return
+	}
+	if err := NatsReplier(a.ConnID, data); err != nil {
+		log.Printf("Reply error: %v", err)
+	}
+}
+
+// Handle 将业务函数包装为 actor.Handler，ctx 直接传 actor.ActorContext
+func (a *App) Handle(fn func(*App, actor.ActorContext, interface{})) actor.Handler {
+	return func(ctx actor.ActorContext, msg interface{}) {
+		fn(a, ctx, msg)
+	}
 }

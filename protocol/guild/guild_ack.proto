@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/protoGuild";
+
+import "guild/guild_common.proto";
+
+message CreateGuildResp {
+  int32     code  = 1;
+  string    msg   = 2;
+  GuildInfo guild = 3;
+}
+
+message JoinGuildResp {
+  int32  code = 1;
+  string msg  = 2;
+}
+
+message LeaveGuildResp {
+  int32  code = 1;
+  string msg  = 2;
+}
+
+message GetGuildResp {
+  int32     code  = 1;
+  GuildInfo guild = 2;
+}

@@ -4,6 +4,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -55,8 +56,20 @@ func RegisterWithTTL(serverID, addr string, ttl int64) error {
 	if err != nil {
 		return err
 	}
+
 	go func() {
 		for range ch {
+		}
+		// channel 关闭说明续租中断，重新注册
+		log.Printf("cluster: keepalive lost for [%s], re-registering...", serverID)
+		for {
+			time.Sleep(2 * time.Second)
+			if err := RegisterWithTTL(serverID, addr, ttl); err != nil {
+				log.Printf("cluster: re-register failed: %v", err)
+				continue
+			}
+			log.Printf("cluster: re-registered [%s]", serverID)
+			return
 		}
 	}()
 	return nil

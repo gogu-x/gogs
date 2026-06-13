@@ -2,13 +2,15 @@ package model
 
 import (
 	"fmt"
+	"log"
+	"net"
+
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/pb/gateway"
-	"log"
-	"net"
+	"github.com/gogu-x/gogs/game/constant"
+	"github.com/gogu-x/gogs/pb/protoGateway"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -23,33 +25,31 @@ type inboundMsg struct {
 type GateActor struct {
 	grpcServer *grpc.Server
 	gamePID    actor.PID
-	sys        *actor.ActorSystem
-	stream     gateway.Gateway_StreamServer
+	stream     protoGateway.Gateway_StreamServer
 }
 
 func (g *GateActor) OnInit(ctx actor.ActorContext) {
-	g.gamePID, _ = ctx.Lookup("game")
-	g.sys = ctx.System()
+	g.gamePID = actor.MustLookup(constant.ActorGame)
 
-	lis, err := net.Listen("tcp", config.GrpcAddr())
+	lis, err := net.Listen("tcp", config.GameAddr())
 	if err != nil {
 		log.Fatalf("GateActor: listen error: %v", err)
 	}
 
 	g.grpcServer = grpc.NewServer()
-	gateway.RegisterGatewayServer(g.grpcServer, &gatewayService{actor: g, codec: codec.JsonCodec})
+	protoGateway.RegisterGatewayServer(g.grpcServer, &gatewayService{actor: g, codec: codec.JsonCodec})
 
 	go func() {
-		log.Printf("GateActor: gRPC server listening on %s", config.GrpcAddr())
+		log.Printf("GateActor: gRPC server listening on %s", config.GameAddr())
 		if err := g.grpcServer.Serve(lis); err != nil {
 			log.Printf("GateActor: grpc serve error: %v", err)
 		}
 	}()
 
-	if err := cluster.Register(fmt.Sprintf("%d", config.ServerID), config.GrpcAddr()); err != nil {
+	if err := cluster.Register(fmt.Sprintf("%d", config.ServerID), config.GameAddr()); err != nil {
 		log.Printf("GateActor: cluster register error: %v", err)
 	} else {
-		log.Printf("GateActor: registered [%d] -> %s", config.ServerID, config.GrpcAddr())
+		log.Printf("GateActor: registered [%d] -> %s", config.ServerID, config.GameAddr())
 	}
 }
 
@@ -57,7 +57,7 @@ func (g *GateActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 	switch m := msg.(type) {
 	case *inboundMsg:
 		ctx.Send(g.gamePID, m)
-	case *gateway.Frame:
+	case *protoGateway.Frame:
 		if g.stream != nil {
 			if err := g.stream.Send(m); err != nil {
 				log.Printf("GateActor: stream send error: %v", err)
@@ -73,15 +73,14 @@ func (g *GateActor) OnStop(ctx actor.ActorContext) {
 }
 
 type gatewayService struct {
-	gateway.UnimplementedGatewayServer
+	protoGateway.UnimplementedGatewayServer
 	actor *GateActor
 	codec codec.Codec
 }
 
-func (s *gatewayService) Stream(stream gateway.Gateway_StreamServer) error {
+func (s *gatewayService) Stream(stream protoGateway.Gateway_StreamServer) error {
 	s.actor.stream = stream
-	self := s.actor.sys.MustLookup("gate")
-	sys := s.actor.sys
+	self := actor.MustLookup(constant.ActorGate)
 
 	for {
 		frame, err := stream.Recv()
@@ -102,7 +101,7 @@ func (s *gatewayService) Stream(stream gateway.Gateway_StreamServer) error {
 			log.Printf("inner: proto.Message error: %v", err)
 			continue
 		}
-		sys.Send(self, &inboundMsg{
+		actor.Send(self, &inboundMsg{
 			msg:    protoMsg,
 			uid:    frame.Uid,
 			connID: frame.ConnId,

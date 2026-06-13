@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/protoGuild";
+
+message CreateGuildReq {
+  uint64 uid          = 1;
+  string name         = 2;
+  string leader_name  = 3;
+  uint32 leader_level = 4;
+}
+
+message JoinGuildReq {
+  uint64 uid          = 1;
+  uint64 guild_id     = 2;
+  string member_name  = 3;
+  uint32 member_level = 4;
+}
+
+message LeaveGuildReq {
+  uint64 uid = 1;
+}
+
+message GetGuildReq {
+  uint64 guild_id = 1;
+}

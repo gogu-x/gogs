@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -8,19 +8,15 @@ import (
 	"github.com/gogu-x/bigTree/log"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
+	"github.com/gogu-x/gogs/game/constant"
 	"github.com/gogu-x/gogs/game/model"
+	natsclient "github.com/gogu-x/gogs/nats"
 
 	actor "github.com/gogu-x/bigTree"
-
 	"github.com/urfave/cli/v3"
 )
 
 func main() {
-	if err := cluster.Init(config.EtcdEndpoints); err != nil {
-		log.Fatal("cluster init error: " + err.Error())
-	}
-	defer cluster.Close()
-
 	cmd := &cli.Command{
 		Name:  "game",
 		Usage: "game server",
@@ -33,16 +29,29 @@ func main() {
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			config.ServerID = int(c.Int("server-id"))
-			grpcAddr := config.GrpcAddr()
+			config.ServerID = c.Int("server-id")
 
-			fmt.Printf("game server [%d] starting, gRPC: %s\n", config.ServerID, grpcAddr)
+			if err := cluster.Init(config.EtcdEndpoints); err != nil {
+				log.Fatal("cluster init error: " + err.Error())
+			}
+			defer cluster.Close()
 
-			sys := actor.NewActorSystem()
-			sys.Spawn("game", &model.GameActor{})
-			sys.Spawn("gate", &model.GateActor{})
+			if err := natsclient.Init(config.NatsURL); err != nil {
+				log.Fatal("NATS init error: " + err.Error())
+			}
+			defer natsclient.Close()
 
-			sys.Start()
+			serverID := fmt.Sprintf("%d", config.ServerID)
+			addr := config.GrpcAddrFor(config.ServerID)
+			if err := cluster.Register(serverID, addr); err != nil {
+				log.Fatal("cluster register error: " + err.Error())
+			}
+			fmt.Printf("game server [%s] registered at %s\n", serverID, addr)
+
+			actor.Spawn(constant.ActorSupervisor, &model.PlayerSupervisor{})
+			actor.Spawn(constant.ActorGuild, model.NewGuildActor())
+			actor.Spawn(constant.ActorActivity, model.NewActivityActor())
+			actor.Default().Start()
 			return nil
 		},
 	}

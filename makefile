@@ -1,7 +1,12 @@
 include config.mk
 
+SHELL := cmd.exe
+
 proto:
-	protoc --proto_path=$(PROTO_DIR) \
-		--go_out=$(ROOT_DIR) --go_opt=module=$(MODULE) \
-		--go-grpc_out=$(ROOT_DIR) --go-grpc_opt=module=$(MODULE) \
-		$(shell find $(PROTO_DIR) -name "*.proto")
+	$(PYTHON) $(GEN_PROTO) $(PROTO_PATH) $(GO_OUT) $(MODULE)
+
+register:
+	$(PYTHON) $(GEN_REG) $(GO_OUT) $(PROTO_PATH)
+
+build: proto register
+	go build ./...
