@@ -48,7 +48,7 @@ func main() {
 			}
 			fmt.Printf("game server [%s] registered at %s\n", serverID, addr)
 
-			actor.Spawn(constant.ActorSupervisor, &model.PlayerSupervisor{})
+			actor.Spawn(constant.ActorSupervisor, &model.NatsActor{})
 			actor.Spawn(constant.ActorGuild, model.NewGuildActor())
 			actor.Spawn(constant.ActorActivity, model.NewActivityActor())
 			actor.Default().Start()
