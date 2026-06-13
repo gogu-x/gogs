@@ -7,8 +7,8 @@ import (
 )
 
 func InitRoutes(r *actor.Router, s *ActivityMgr) {
-	app.Handle(r, &protoActivity.GetActivityListReq{}, s.GetList)
-	app.Handle(r, &protoActivity.JoinActivityReq{}, s.Join)
-	app.Handle(r, &protoActivity.GetProgressReq{}, s.GetProgress)
-	app.Handle(r, &protoActivity.ClaimRewardReq{}, s.ClaimReward)
+	app.Register(r, &protoActivity.GetActivityListReq{}, s.GetList)
+	app.Register(r, &protoActivity.JoinActivityReq{}, s.Join)
+	app.Register(r, &protoActivity.GetProgressReq{}, s.GetProgress)
+	app.Register(r, &protoActivity.ClaimRewardReq{}, s.ClaimReward)
 }

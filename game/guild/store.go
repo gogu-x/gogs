@@ -3,6 +3,7 @@ package guild
 import (
 	"sync/atomic"
 
+	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/pb/protoGuild"
 )
 
@@ -58,7 +59,7 @@ func NewStore() *Store {
 	}
 }
 
-func (s *Store) Create(req *protoGuild.CreateGuildReq) *protoGuild.CreateGuildResp {
+func (s *Store) Create(ctx actor.ActorContext, req *protoGuild.CreateGuildReq) {
 	uid := req.GetUid()
 
 	id := idGen.Add(1)
@@ -69,32 +70,34 @@ func (s *Store) Create(req *protoGuild.CreateGuildReq) *protoGuild.CreateGuildRe
 		},
 	}
 	s.guilds[id] = g
-	return &protoGuild.CreateGuildResp{Guild: g.ToProto()}
+	ctx.Response(&protoGuild.CreateGuildResp{Guild: g.ToProto()}, nil)
 }
 
-func (s *Store) Join(req *protoGuild.JoinGuildReq) *protoGuild.JoinGuildResp {
+func (s *Store) Join(ctx actor.ActorContext, req *protoGuild.JoinGuildReq) {
+	ack := &protoGuild.JoinGuildResp{Code: 1}
+	defer ctx.Response(ack, nil)
 	uid := req.GetUid()
 
 	g, ok := s.guilds[req.GuildId]
 	if !ok {
-		return &protoGuild.JoinGuildResp{Code: 2, Msg: "guild not found"}
+		ack.Code = 3
+		return
 	}
 	g.Members[uid] = &Member{UID: uid, Name: req.GetMemberName(), Level: req.GetMemberLevel(), Role: protoGuild.GuildRole_MEMBER}
-
-	return &protoGuild.JoinGuildResp{}
 }
 
-func (s *Store) Leave(req *protoGuild.LeaveGuildReq) *protoGuild.LeaveGuildResp {
+func (s *Store) Leave(_ actor.ActorContext, req *protoGuild.LeaveGuildReq) {
 
-	return &protoGuild.LeaveGuildResp{}
 }
 
-func (s *Store) Get(req *protoGuild.GetGuildReq) *protoGuild.GetGuildResp {
+func (s *Store) Get(ctx actor.ActorContext, req *protoGuild.GetGuildReq) {
+	ack := &protoGuild.GetGuildResp{Code: 1}
+	defer ctx.Response(ack, nil)
 	g, ok := s.guilds[req.GuildId]
 	if !ok {
-		return &protoGuild.GetGuildResp{Code: 1}
+		return
 	}
-	return &protoGuild.GetGuildResp{Guild: g.ToProto()}
+	ack.Guild = g.ToProto()
 }
 
 func (s *Store) UpdateMember(uid uint64, name string, level uint32) {

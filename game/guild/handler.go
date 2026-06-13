@@ -7,13 +7,8 @@ import (
 )
 
 func InitRoutes(r *actor.Router, s *Store) {
-	app.Handle(r, &protoGuild.CreateGuildReq{}, s.Create)
-	app.Handle(r, &protoGuild.JoinGuildReq{}, s.Join)
-	app.Handle(r, &protoGuild.LeaveGuildReq{}, s.Leave)
-	app.Handle(r, &protoGuild.GetGuildReq{}, s.Get)
-
-	r.Register(&UpdateMemberMsg{}, func(_ actor.ActorContext, msg interface{}) {
-		m := msg.(*UpdateMemberMsg)
-		s.UpdateMember(m.UID, m.Name, m.Level)
-	})
+	app.Register(r, &protoGuild.CreateGuildReq{}, s.Create)
+	app.Register(r, &protoGuild.JoinGuildReq{}, s.Join)
+	app.Register(r, &protoGuild.LeaveGuildReq{}, s.Leave)
+	app.Register(r, &protoGuild.GetGuildReq{}, s.Get)
 }

@@ -1,6 +1,7 @@
 package activity
 
 import (
+	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/pb/protoActivity"
 )
 
@@ -54,51 +55,66 @@ func (s *ActivityMgr) AddActivity(a *Activity) {
 	s.activities[a.ID] = a
 }
 
-func (s *ActivityMgr) GetList(_ *protoActivity.GetActivityListReq) *protoActivity.GetActivityListResp {
+func (s *ActivityMgr) GetList(ctx actor.ActorContext, _ *protoActivity.GetActivityListReq) {
 	list := make([]*protoActivity.ActivityInfo, 0, len(s.activities))
 	for _, a := range s.activities {
 		if a.Status == protoActivity.ActivityStatus_ONGOING {
 			list = append(list, a.ToProto())
 		}
 	}
-	return &protoActivity.GetActivityListResp{Activities: list}
+	ctx.Response(&protoActivity.GetActivityListResp{Activities: list}, nil)
 }
 
-func (s *ActivityMgr) Join(req *protoActivity.JoinActivityReq) *protoActivity.JoinActivityResp {
+func (s *ActivityMgr) Join(ctx actor.ActorContext, req *protoActivity.JoinActivityReq) {
+	ack := &protoActivity.JoinActivityResp{}
+	defer ctx.Response(ack, nil)
 	act, ok := s.activities[req.ActivityId]
 	if !ok || act.Status != protoActivity.ActivityStatus_ONGOING {
-		return &protoActivity.JoinActivityResp{Code: 1, Msg: "activity not available"}
+		ack.Code = 1
+		ack.Msg = "activity not available"
+		return
 	}
 	if _, exists := s.getProgress(req.Uid, req.ActivityId); exists {
-		return &protoActivity.JoinActivityResp{Code: 2, Msg: "already joined"}
+		ack.Code = 2
+		ack.Msg = "already joined"
+		return
 	}
 	s.setProgress(req.Uid, &Progress{
 		ActivityID: req.ActivityId, UID: req.Uid, Target: 100,
 	})
-	return &protoActivity.JoinActivityResp{}
 }
 
-func (s *ActivityMgr) GetProgress(req *protoActivity.GetProgressReq) *protoActivity.GetProgressResp {
+func (s *ActivityMgr) GetProgress(ctx actor.ActorContext, req *protoActivity.GetProgressReq) {
+	ack := &protoActivity.GetProgressResp{Code: 1}
+	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.Uid, req.ActivityId)
 	if !ok {
-		return &protoActivity.GetProgressResp{Code: 1}
+		return
 	}
-	return &protoActivity.GetProgressResp{Progress: p.ToProto()}
+	ack.Code = 0
+	ack.Progress = p.ToProto()
 }
 
-func (s *ActivityMgr) ClaimReward(req *protoActivity.ClaimRewardReq) *protoActivity.ClaimRewardResp {
+func (s *ActivityMgr) ClaimReward(ctx actor.ActorContext, req *protoActivity.ClaimRewardReq) {
+	ack := &protoActivity.ClaimRewardResp{}
+	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.Uid, req.ActivityId)
 	if !ok {
-		return &protoActivity.ClaimRewardResp{Code: 1, Msg: "not joined"}
+		ack.Code = 1
+		ack.Msg = "not joined"
+		return
 	}
 	if p.Rewarded {
-		return &protoActivity.ClaimRewardResp{Code: 2, Msg: "already claimed"}
+		ack.Code = 2
+		ack.Msg = "already claimed"
+		return
 	}
 	if p.Progress < p.Target {
-		return &protoActivity.ClaimRewardResp{Code: 3, Msg: "not completed"}
+		ack.Code = 3
+		ack.Msg = "not completed"
+		return
 	}
 	p.Rewarded = true
-	return &protoActivity.ClaimRewardResp{}
 }
 
 func (s *ActivityMgr) getProgress(uid, activityID uint64) (*Progress, bool) {

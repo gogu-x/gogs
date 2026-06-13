@@ -2,13 +2,18 @@ package app
 
 import (
 	actor "github.com/gogu-x/bigTree"
-	"google.golang.org/protobuf/proto"
 )
 
-// Handle 将 func(*Req) *Resp 注册到 router，省去样板闭包。
-// 用法：app.Handle(r, &pb.CreateGuildReq{}, store.Create)
-func Handle[Req, Resp proto.Message](r *actor.Router, req Req, fn func(Req) Resp) {
+// Handle 注册 ctl 层处理函数
+func (a *App) Handle(fn func(*App, actor.ActorContext, interface{})) actor.Handler {
+	return func(ctx actor.ActorContext, msg interface{}) {
+		fn(a, ctx, msg)
+	}
+}
+
+// Register 注册有响应的处理函数，自动调用 ctx.Response
+func Register[Req any](r *actor.Router, req Req, fn func(actor.ActorContext, Req)) {
 	r.Register(req, func(ctx actor.ActorContext, msg interface{}) {
-		ctx.Response(fn(msg.(Req)), nil)
+		fn(ctx, msg.(Req))
 	})
 }

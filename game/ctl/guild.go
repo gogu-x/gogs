@@ -53,7 +53,6 @@ func LeaveGuild(a *app.App, ctx actor.ActorContext, msg interface{}) {
 
 func GetGuild(a *app.App, ctx actor.ActorContext, msg interface{}) {
 	req := msg.(*protoGuild.GetGuildReq)
-
 	requestGuild(a, ctx, req, func(ret interface{}, err error) {
 		if err != nil {
 			a.Reply(&protoGuild.GetGuildResp{Code: -1})
