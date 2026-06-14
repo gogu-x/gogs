@@ -21,6 +21,7 @@ func (a *App) Reply(msg proto.Message) {
 	frame := &protoGateway.Frame{
 		Uid:     a.Player.UID,
 		ConnId:  a.ConnID,
+		GateId:  a.GateId,
 		Payload: body,
 		MsgType: reflect.TypeOf(msg).Elem().Name(),
 	}

@@ -1,13 +1,13 @@
 // cmd/testclient/main.go
-// 测试客户端：使用 protobuf 协议连接 Gate WebSocket
+// 压测客户端：模拟 N 个并发用户登录并持续发消息，统计成功率与吞吐量。
 package main
 
 import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gogu-x/gogs/codec"
@@ -18,7 +18,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var addr = flag.String("addr", "ws://127.0.0.1:8081/ws", "gate websocket address")
+var (
+	addr     = flag.String("addr", "ws://127.0.0.1:8081/ws", "gate websocket address")
+	users    = flag.Int("users", 10000, "concurrent users")
+	duration = flag.Duration("duration", 100*time.Second, "test duration")
+	interval = flag.Duration("interval", 1*time.Second, "message send interval per user")
+	dialRate = flag.Int("dial-rate", 1000, "max concurrent dials per second")
+)
 
 func init() {
 	codec.RegisterMsg(
@@ -29,56 +35,152 @@ func init() {
 	)
 }
 
-func main() {
-	flag.Parse()
+var (
+	connOK    int64
+	connFail  int64
+	sendOK    int64
+	sendFail  int64
+	recvTotal int64
 
-	dialer := websocket.Dialer{Subprotocols: []string{"protobuf"}}
+	failMu  sync.Mutex
+	failMap = map[string]int{}
+)
+
+func runUser(uid uint64, wg *sync.WaitGroup, stop <-chan struct{}) {
+	defer wg.Done()
+
+	dialer := websocket.Dialer{
+		Subprotocols:     []string{"protobuf"},
+		HandshakeTimeout: 5 * time.Second,
+	}
 	conn, _, err := dialer.Dial(*addr, nil)
 	if err != nil {
-		log.Fatalf("dial error: %v", err)
+		atomic.AddInt64(&connFail, 1)
+		failMu.Lock()
+		// 只取错误关键词，避免 map key 爆炸
+		key := err.Error()
+		if len(key) > 60 {
+			key = key[:60]
+		}
+		failMap[key]++
+		failMu.Unlock()
+		return
 	}
+	atomic.AddInt64(&connOK, 1)
 	defer conn.Close()
-	log.Printf("connected to %s (subprotocol: %s)", *addr, conn.Subprotocol())
 
 	// 接收协程
 	go func() {
 		for {
-			_, data, err := conn.ReadMessage()
+			_, _, err := conn.ReadMessage()
 			if err != nil {
-				log.Printf("recv closed: %v", err)
 				return
 			}
-			msg, err := codec.ProtoCodec.Unmarshal(data)
-			if err != nil {
-				log.Printf("<<< unmarshal error: %v (raw %d bytes)", err, len(data))
-				continue
-			}
-			log.Printf("<<< %T: %+v", msg, msg)
+			atomic.AddInt64(&recvTotal, 1)
 		}
 	}()
 
-	send := func(msg proto.Message) {
+	send := func(msg proto.Message) bool {
 		data, err := codec.ProtoCodec.Marshal(msg)
 		if err != nil {
-			log.Fatalf("marshal error: %v", err)
+			return false
 		}
-		log.Printf(">>> %T", msg)
+		conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 		if err := conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
-			log.Fatalf("send error: %v", err)
+			return false
 		}
+		return true
 	}
 
-	// 1. 登录
-	send(&protoGateway.LoginReq{Uid: 2001, Token: "test-token", ServerId: 1})
-	time.Sleep(500 * time.Millisecond)
+	// 登录
+	if !send(&protoGateway.LoginReq{Uid: uid, Token: "test-token", ServerId: 1}) {
+		atomic.AddInt64(&sendFail, 1)
+		return
+	}
+	atomic.AddInt64(&sendOK, 1)
+	time.Sleep(200 * time.Millisecond)
 
-	// 2. 聊天
-	send(&protoChat.ChatReq{Type: 1, Content: "hello gogs"})
+	ticker := time.NewTicker(*interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			if send(&protoChat.ChatReq{Type: 1, Content: fmt.Sprintf("hi from %d", uid)}) {
+				atomic.AddInt64(&sendOK, 1)
+			} else {
+				atomic.AddInt64(&sendFail, 1)
+				return
+			}
+		}
+	}
+}
 
-	//工会
-	send(&protoGuild.GetGuildReq{GuildId: 1})
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
-	<-quit
-	fmt.Println("bye")
+func main() {
+	flag.Parse()
+	log.Printf("压测开始: users=%d duration=%v interval=%v addr=%s", *users, *duration, *interval, *addr)
+
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+
+	// 令牌桶限速建连：每秒最多 dialRate 个并发握手
+	dialTicker := time.NewTicker(time.Second / time.Duration(*dialRate))
+	defer dialTicker.Stop()
+	for i := 0; i < *users; i++ {
+		<-dialTicker.C
+		wg.Add(1)
+		go runUser(uint64(100000+i), &wg, stop)
+	}
+
+	// 定时打印统计
+	ticker := time.NewTicker(5 * time.Second)
+	start := time.Now()
+	go func() {
+		for range ticker.C {
+			elapsed := time.Since(start).Seconds()
+			ok := atomic.LoadInt64(&sendOK)
+			fail := atomic.LoadInt64(&sendFail)
+			total := ok + fail
+			rate := 0.0
+			if total > 0 {
+				rate = float64(ok) / float64(total) * 100
+			}
+			log.Printf("[%ds] 连接: 成功=%d 失败=%d | 发送: 成功=%d 失败=%d 成功率=%.1f%% | 收到=%d | 吞吐=%.0f msg/s",
+				int(elapsed),
+				atomic.LoadInt64(&connOK), atomic.LoadInt64(&connFail),
+				ok, fail, rate,
+				atomic.LoadInt64(&recvTotal),
+				float64(ok)/elapsed,
+			)
+		}
+	}()
+
+	time.Sleep(*duration)
+	close(stop)
+	ticker.Stop()
+
+	wg.Wait()
+
+	// 最终统计
+	elapsed := time.Since(start).Seconds()
+	ok := atomic.LoadInt64(&sendOK)
+	fail := atomic.LoadInt64(&sendFail)
+	total := ok + fail
+	rate := 0.0
+	if total > 0 {
+		rate = float64(ok) / float64(total) * 100
+	}
+	log.Printf("===== 压测结束 =====")
+	log.Printf("耗时:     %.1fs", elapsed)
+	log.Printf("建连成功: %d  失败: %d", atomic.LoadInt64(&connOK), atomic.LoadInt64(&connFail))
+	log.Printf("发送成功: %d  失败: %d  成功率: %.2f%%", ok, fail, rate)
+	log.Printf("收到消息: %d", atomic.LoadInt64(&recvTotal))
+	log.Printf("平均吞吐: %.0f msg/s", float64(ok)/elapsed)
+	if len(failMap) > 0 {
+		log.Printf("建连失败原因:")
+		for k, v := range failMap {
+			log.Printf("  [%d次] %s", v, k)
+		}
+	}
 }

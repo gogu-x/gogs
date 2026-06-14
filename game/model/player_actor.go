@@ -2,11 +2,12 @@ package model
 
 import (
 	"fmt"
+	"log"
 
 	actor "github.com/gogu-x/bigTree"
-	"github.com/gogu-x/bigTree/timer"
 	"github.com/gogu-x/gogs/game/app"
 	"github.com/gogu-x/gogs/game/router"
+	"github.com/gogu-x/gogs/game/timer"
 )
 
 // playerActorName 返回玩家 Actor 的注册名，格式 player-{uid}
@@ -20,7 +21,6 @@ type PlayerActor struct {
 	uid    uint64
 	router actor.Router
 	app    *app.App
-	timer  *timer.TimeWheel
 }
 
 func newPlayerActor(uid, connID uint64) *PlayerActor {
@@ -33,20 +33,20 @@ func newPlayerActor(uid, connID uint64) *PlayerActor {
 func (p *PlayerActor) OnInit(ctx actor.ActorContext) {
 	ctx.Register(playerActorName(p.uid))
 	p.app = app.New(p.uid)
-	p.timer = timer.NewTimeWheel(10240)
 	router.Init(&p.router, p.app)
+	timer.Init(ctx)
 }
 
 func (p *PlayerActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 	switch m := msg.(type) {
 	case *inboundMsg:
 		p.app.ConnID = m.connID
+		p.app.GateId = m.gateId
 		p.router.Route(ctx, m.msg)
 	}
 }
 
 func (p *PlayerActor) OnStop(ctx actor.ActorContext) {
-	if p.timer != nil {
-		p.timer.Stop()
-	}
+	// TODO: 将玩家内存数据持久化到 DB
+	log.Printf("PlayerActor[%d]: saving to DB...", p.uid)
 }

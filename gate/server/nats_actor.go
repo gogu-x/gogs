@@ -1,9 +1,11 @@
 package server
 
 import (
+	"fmt"
 	"log"
 
 	actor "github.com/gogu-x/bigTree"
+	"github.com/gogu-x/gogs/config"
 	natsclient "github.com/gogu-x/gogs/nats"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"google.golang.org/protobuf/proto"
@@ -14,7 +16,8 @@ type NatsActor struct{}
 func NewNatsActor() *NatsActor { return &NatsActor{} }
 
 func (n *NatsActor) OnInit(_ actor.ActorContext) {
-	natsclient.SubscribeGateOut(func(connID uint64, data []byte) {
+	gateID := fmt.Sprintf("%d", config.GateID)
+	_, err := natsclient.SubscribeGateOut(gateID, 64, func(connID uint64, data []byte) {
 		var frame protoGateway.Frame
 		if err := proto.Unmarshal(data, &frame); err != nil {
 			log.Printf("NatsActor: unmarshal frame error: %v", err)
@@ -26,6 +29,9 @@ func (n *NatsActor) OnInit(_ actor.ActorContext) {
 		}
 		actor.Send(pid, &frame)
 	})
+	if err != nil {
+		log.Fatalf("NatsActor: SubscribeGateOut error: %v", err)
+	}
 	log.Println("NatsActor: ready")
 }
 

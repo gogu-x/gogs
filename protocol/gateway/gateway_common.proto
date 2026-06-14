@@ -6,6 +6,7 @@ option go_package = "github.com/gogu-x/gogs/pb/protoGateway";
 message Frame {
   uint64 uid       = 1;
   string server_id = 2;
+  string gate_id   = 3;
   uint64 conn_id   = 4;
   bytes  payload   = 5;
   string msg_type  = 6;

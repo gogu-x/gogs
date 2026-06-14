@@ -7,6 +7,7 @@ import (
 
 	actor "github.com/gogu-x/bigTree"
 	msgcodec "github.com/gogu-x/gogs/codec"
+	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 
 	"google.golang.org/protobuf/proto"
@@ -86,6 +87,7 @@ func (c *ConnActor) forward(ctx actor.ActorContext, inner interface{}) {
 		ConnId:   c.connID,
 		Uid:      c.uid,
 		ServerId: c.serverID,
+		GateId:   fmt.Sprintf("%d", config.GateID),
 		Payload:  body,
 		MsgType:  reflect.TypeOf(inner).Elem().Name(),
 	}

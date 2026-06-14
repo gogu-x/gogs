@@ -28,6 +28,9 @@ var (
 	// game 进程对外暴露的 host（容器内需设为容器名或IP）
 	GrpcHost = env("GRPC_HOST", "127.0.0.1")
 
+	// GrpcPortOverride 由启动参数 --port 覆盖，同一 serverID 多实例时用于区分端口
+	GrpcPortOverride = ""
+
 	// MongoDB 连接地址
 	MongoURL = env("MONGO_URL", "mongodb://localhost:27017")
 
@@ -40,7 +43,10 @@ func GateAddr() string {
 }
 
 func GameAddr() string {
-	return fmt.Sprintf(":%d", GameBasePort+ServerID)
+	if GrpcPortOverride != "" {
+		return fmt.Sprintf("%s:%s", GrpcHost, GrpcPortOverride)
+	}
+	return fmt.Sprintf("%s:%d", GrpcHost, GameBasePort+ServerID)
 }
 
 func GrpcAddrFor(serverID int) string {

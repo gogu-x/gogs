@@ -26,6 +26,7 @@ type Frame struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Uid           uint64                 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
 	ServerId      string                 `protobuf:"bytes,2,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	GateId        string                 `protobuf:"bytes,3,opt,name=gate_id,json=gateId,proto3" json:"gate_id,omitempty"`
 	ConnId        uint64                 `protobuf:"varint,4,opt,name=conn_id,json=connId,proto3" json:"conn_id,omitempty"`
 	Payload       []byte                 `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
 	MsgType       string                 `protobuf:"bytes,6,opt,name=msg_type,json=msgType,proto3" json:"msg_type,omitempty"`
@@ -77,6 +78,13 @@ func (x *Frame) GetServerId() string {
 	return ""
 }
 
+func (x *Frame) GetGateId() string {
+	if x != nil {
+		return x.GateId
+	}
+	return ""
+}
+
 func (x *Frame) GetConnId() uint64 {
 	if x != nil {
 		return x.ConnId
@@ -102,10 +110,11 @@ var File_gateway_gateway_common_proto protoreflect.FileDescriptor
 
 const file_gateway_gateway_common_proto_rawDesc = "" +
 	"\n" +
-	"\x1cgateway/gateway_common.proto\"\x84\x01\n" +
+	"\x1cgateway/gateway_common.proto\"\x9d\x01\n" +
 	"\x05Frame\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x1b\n" +
 	"\tserver_id\x18\x02 \x01(\tR\bserverId\x12\x17\n" +
+	"\agate_id\x18\x03 \x01(\tR\x06gateId\x12\x17\n" +
 	"\aconn_id\x18\x04 \x01(\x04R\x06connId\x12\x18\n" +
 	"\apayload\x18\x05 \x01(\fR\apayload\x12\x19\n" +
 	"\bmsg_type\x18\x06 \x01(\tR\amsgType2'\n" +

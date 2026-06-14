@@ -10,6 +10,7 @@ import (
 type App struct {
 	Player       *player.Player
 	ConnID       uint64
+	GateId       string
 	BagMgr       *bag.Mgr
 	ShopMgr      *shop.Mgr
 	CardGroupMgr *cardGroup.Mgr

@@ -18,15 +18,6 @@ type StreamActor struct {
 	stream   protoGateway.Gateway_StreamClient
 }
 
-func (s *StreamActor) Name() {
-	//TODO implement me
-	panic("implement me")
-}
-
-type StreamMsg struct {
-	Frame *protoGateway.Frame
-}
-
 func NewStreamActor(serverID string) *StreamActor {
 	return &StreamActor{serverID: serverID}
 }

@@ -1,12 +1,12 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="go build github.com/gogu-x/gogs/game" type="GoApplicationRunConfiguration" factoryName="Go Application" nameIsGenerated="true">
+  <configuration default="false" name="go build github.com/gogu-x/gogs/game1-1" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="gogs" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="--server-id 1" />
+    <parameters value="--server-id 1 --port 8001" />
     <kind value="DIRECTORY" />
     <package value="github.com/gogu-x/gogs" />
     <directory value="$PROJECT_DIR$/game" />
     <filePath value="$PROJECT_DIR$" />
-    <method v="2" />
+    <method v="1" />
   </configuration>
 </component>

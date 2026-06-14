@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/codec"
@@ -11,8 +12,10 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin:  func(r *http.Request) bool { return true },
-	Subprotocols: []string{"protobuf", "json"},
+	CheckOrigin:     func(r *http.Request) bool { return true },
+	Subprotocols:    []string{"protobuf", "json"},
+	ReadBufferSize:  4096,
+	WriteBufferSize: 4096,
 }
 
 type GateServer struct {
@@ -24,8 +27,16 @@ func NewGateServer(addr string) *GateServer {
 }
 
 func (s *GateServer) Start() error {
-	http.HandleFunc("/ws", s.wsHandler)
-	return http.ListenAndServe(s.addr, nil)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", s.wsHandler)
+	srv := &http.Server{
+		Addr:    s.addr,
+		Handler: mux,
+		// 限制慢握手占用，快速释放 backlog
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	return srv.ListenAndServe()
 }
 
 func (s *GateServer) wsHandler(w http.ResponseWriter, r *http.Request) {

@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"log"
+	"os"
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/codec"
@@ -12,6 +13,9 @@ import (
 	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
 )
+
+// DrainMsg 通知 NatsActor 取消订阅，停止接收新消息
+type DrainMsg struct{}
 
 // NatsActor 订阅 NATS gate.in.{serverID}，将消息路由到对应 PlayerActor
 type NatsActor struct {
@@ -39,13 +43,22 @@ func (a *NatsActor) OnInit(ctx actor.ActorContext) {
 			log.Printf("NatsActor: payload is not proto.Message")
 			return
 		}
-		actor.Send(ctx.Self(), &inboundMsg{msg: protoMsg, uid: frame.Uid, connID: frame.ConnId})
+		actor.Send(ctx.Self(), &inboundMsg{msg: protoMsg, uid: frame.Uid, connID: frame.ConnId, gateId: frame.GateId})
 	})
 	if err != nil {
 		log.Fatalf("NatsActor: subscribe error: %v", err)
 	}
 	a.sub = sub
-	log.Printf("NatsActor: subscribed gate.in.%s", serverID)
+
+	instID := fmt.Sprintf("%d", os.Getpid())
+	_, err = natsclient.SubscribeShutdown(serverID, instID, func() {
+		log.Printf("NatsActor: received shutdown, exiting...")
+		a.OnStop(ctx)
+	})
+	if err != nil {
+		return
+	}
+	log.Printf("NatsActor: subscribed gate.in.%s inst=%s", serverID, instID)
 }
 
 func (a *NatsActor) OnStop(_ actor.ActorContext) {
@@ -69,7 +82,8 @@ func (a *NatsActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 			log.Printf("NatsActor: reply unmarshal error: %v", err)
 			return
 		}
-		if err := natsclient.PublishRawToGate(frame.ConnId, m); err != nil {
+		log.Printf("NatsActor: reply pid=%d gateId=%q connID=%d", os.Getpid(), frame.GateId, frame.ConnId)
+		if err := natsclient.PublishRawToGate(frame.GateId, frame.ConnId, m); err != nil {
 			log.Printf("NatsActor: publish error: %v", err)
 		}
 	}

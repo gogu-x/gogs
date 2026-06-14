@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
@@ -20,6 +21,7 @@ type inboundMsg struct {
 	msg    proto.Message
 	uid    uint64
 	connID uint64
+	gateId string
 }
 
 type GateActor struct {
@@ -46,7 +48,7 @@ func (g *GateActor) OnInit(ctx actor.ActorContext) {
 		}
 	}()
 
-	if err := cluster.Register(fmt.Sprintf("%d", config.ServerID), config.GameAddr()); err != nil {
+	if err := cluster.Register(fmt.Sprintf("%d", config.ServerID), fmt.Sprintf("%d", os.Getpid()), config.GameAddr()); err != nil {
 		log.Printf("GateActor: cluster register error: %v", err)
 	} else {
 		log.Printf("GateActor: registered [%d] -> %s", config.ServerID, config.GameAddr())
@@ -105,6 +107,7 @@ func (s *gatewayService) Stream(stream protoGateway.Gateway_StreamServer) error 
 			msg:    protoMsg,
 			uid:    frame.Uid,
 			connID: frame.ConnId,
+			gateId: frame.GateId,
 		})
 	}
 }
