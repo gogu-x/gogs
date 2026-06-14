@@ -19,7 +19,14 @@ type DrainMsg struct{}
 
 // NatsActor 订阅 NATS gate.in.{serverID}，将消息路由到对应 PlayerActor
 type NatsActor struct {
-	sub *nats.Subscription
+	sub    *nats.Subscription
+	instID string
+}
+
+func NewNatsActor(instID string) *NatsActor {
+	return &NatsActor{
+		instID: instID,
+	}
 }
 
 func (a *NatsActor) OnInit(ctx actor.ActorContext) {
@@ -50,21 +57,21 @@ func (a *NatsActor) OnInit(ctx actor.ActorContext) {
 	}
 	a.sub = sub
 
-	instID := fmt.Sprintf("%d", os.Getpid())
-	_, err = natsclient.SubscribeShutdown(serverID, instID, func() {
+	_, err = natsclient.SubscribeShutdown(serverID, a.instID, func() {
 		log.Printf("NatsActor: received shutdown, exiting...")
 		a.OnStop(ctx)
 	})
 	if err != nil {
 		return
 	}
-	log.Printf("NatsActor: subscribed gate.in.%s inst=%s", serverID, instID)
+	log.Printf("NatsActor: subscribed gate.in.%s inst=%s", serverID, a.instID)
 }
 
 func (a *NatsActor) OnStop(_ actor.ActorContext) {
 	if a.sub != nil {
 		a.sub.Unsubscribe()
 	}
+	actor.Default().Shutdown()
 }
 
 func (a *NatsActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {

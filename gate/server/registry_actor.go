@@ -52,8 +52,8 @@ func (r *RegistryActor) OnInit(ctx actor.ActorContext) {
 	r.cancel = cancel
 	self := ctx.Self()
 	go func() {
-		for range cluster.WatchInstances(watchCtx) {
-			actor.Send(self, new(cluster.WatchInstances(watchCtx)))
+		for ev := range cluster.WatchInstances(watchCtx) {
+			actor.Send(self, &ev)
 		}
 	}()
 }

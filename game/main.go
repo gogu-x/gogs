@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/gogu-x/bigTree/log"
@@ -53,64 +50,20 @@ func main() {
 			defer natsclient.Close()
 
 			serverID := fmt.Sprintf("%d", config.ServerID)
-			instID := strconv.Itoa(os.Getpid())
+			instID := fmt.Sprintf("%v", time.Now().Unix())
 			addr := config.GameAddr()
 
+			fmt.Println(instID)
 			if err := cluster.Register(serverID, instID, addr); err != nil {
 				log.Fatal("cluster register error: " + err.Error())
 			}
 			fmt.Printf("game server [%s] inst=%s registered at %s\n", serverID, instID, addr)
 
-			actor.Spawn(constant.ActorSupervisor, &model.NatsActor{})
+			actor.Spawn(constant.ActorSupervisor, model.NewNatsActor(instID))
 			actor.Spawn(constant.ActorGuild, model.NewGuildActor())
 			actor.Spawn(constant.ActorActivity, model.NewActivityActor())
+			actor.Default().Start()
 
-			// 系统 actor 数量（非 PlayerActor）：supervisor + guild + activity = 3
-			const systemActorCount = 3
-
-			quit := make(chan os.Signal, 1)
-			signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
-			go actor.Default().Start()
-			<-quit
-
-			fmt.Printf("game [%s] inst=%s: received signal, shutting down...\n", serverID, instID)
-
-			// 1. 取消订阅，停止接收新消息
-			if pid, ok := actor.Lookup(constant.ActorSupervisor); ok {
-				actor.Send(pid, &model.DrainMsg{})
-			}
-
-			// 2. 等待所有 PlayerActor 退出（超时 30s）
-			deadline := time.After(30 * time.Second)
-		waitLoop:
-			for {
-				select {
-				case <-deadline:
-					fmt.Println("game: drain timeout, forcing shutdown")
-					break waitLoop
-				case <-time.After(200 * time.Millisecond):
-					if actor.Default().SpawnCount() <= systemActorCount {
-						fmt.Println("game: all players saved")
-						break waitLoop
-					}
-				}
-			}
-
-			// 3. 有活跃玩家时写 drain 标记，通知 gate 开始缓冲并切换
-			if actor.Default().SpawnCount() > systemActorCount {
-				if err := cluster.SetDrain(serverID, instID); err != nil {
-					fmt.Printf("game: SetDrain error: %v\n", err)
-				}
-			}
-
-			// 4. 从 etcd 注销，gate 感知 delete 后切换到新实例
-			if err := cluster.Deregister(serverID, instID); err != nil {
-				fmt.Printf("game: Deregister error: %v\n", err)
-			}
-			fmt.Printf("game [%s] inst=%s: deregistered\n", serverID, instID)
-
-			// 5. 关闭 actor 系统
-			actor.Default().Shutdown()
 			return nil
 		},
 	}
