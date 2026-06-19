@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/protoGateway";
+
+import "gateway/gateway_common.proto";
+
+// SwitchMsg 通知 NatsActor 切换目标 serverID
+message SwitchMsg {
+  string server_id = 1;
+  string new_addr  = 2;
+}
+
+// StreamMsg 包装发往 game 的消息帧
+message StreamMsg {
+  Frame frame = 1;
+}
+
+// CheckDeleteMsg 延迟确认 active 实例是否真的下线
+message CheckDeleteMsg {
+  string server_id = 1;
+  string inst_id   = 2;
+}
+
+// ConnRegMsg ConnActor 上线时注册到 GateServer
+message ConnRegMsg {
+  uint64 conn_id = 1;
+}
+
+// ConnUnregMsg ConnActor 下线时从 GateServer 注销
+message ConnUnregMsg {
+  uint64 conn_id = 1;
+}
+
+// BroadcastMsg 向所有在线 ConnActor 广播消息
+message BroadcastMsg {
+  bytes data = 1;
+}

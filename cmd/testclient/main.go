@@ -20,7 +20,7 @@ import (
 
 var (
 	addr     = flag.String("addr", "ws://127.0.0.1:8081/ws", "gate websocket address")
-	users    = flag.Int("users", 10000, "concurrent users")
+	users    = flag.Int("users", 20000, "concurrent users")
 	duration = flag.Duration("duration", 100*time.Second, "test duration")
 	interval = flag.Duration("interval", 3*time.Second, "message send interval per user")
 	dialRate = flag.Int("dial-rate", 1000, "max concurrent dials per second")

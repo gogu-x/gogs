@@ -1,5 +1,7 @@
 package constant
 
+import "fmt"
+
 // Actor 名称常量，用于 ActorSystem Spawn/Lookup，避免魔法字符串
 const (
 	// ActorSupervisor 玩家监督者 Actor，负责管理所有 PlayerActor 生命周期
@@ -17,3 +19,5 @@ const (
 	// ActorGate 旧 gRPC 网关 Actor，新架构已由 NATS 替代，保留供旧代码引用
 	ActorGate = "gate"
 )
+
+func PlayerName(uid uint64) string { return fmt.Sprintf("player-%d", uid) }

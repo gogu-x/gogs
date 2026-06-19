@@ -9,8 +9,12 @@ import (
 	"github.com/gogu-x/bigTree/log"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/gate/server"
-	natsclient "github.com/gogu-x/gogs/nats"
+	"github.com/gogu-x/gogs/gate/conn"
+	"github.com/gogu-x/gogs/gate/constant"
+	gatenats "github.com/gogu-x/gogs/gate/nats"
+	"github.com/gogu-x/gogs/gate/registry"
+	"github.com/gogu-x/gogs/gate/wsserver"
+	natsclient "github.com/gogu-x/gogs/natsrpc"
 	"github.com/urfave/cli/v3"
 )
 
@@ -22,13 +26,11 @@ func main() {
 			&cli.IntFlag{
 				Name:     "gate-id",
 				Aliases:  []string{"id"},
-				Usage:    "gate ID (unique per gate process, e.g. 1, 2, 3)",
 				Required: true,
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			config.GateID = c.Int("gate-id")
-			addr := config.GateAddr()
 
 			if err := cluster.Init(config.EtcdEndpoints); err != nil {
 				log.Fatal("cluster init error: " + err.Error())
@@ -40,17 +42,16 @@ func main() {
 			}
 			defer natsclient.Close()
 
-			fmt.Printf("gate server [%d] starting, listen: %s\n", config.GateID, addr)
+			reg := &registry.Actor{}
+			actor.Spawn(constant.ActorRegistry, reg)
+			actor.Spawn(constant.ActorNats, gatenats.NewActor())
+			actor.Spawn(constant.ActorGateServer, wsserver.New(config.GateAddr()))
 
-			actor.Spawn(server.ActorRegistry, &server.RegistryActor{})
-			actor.Spawn(server.ActorNats, server.NewNatsActor())
+			// 注入 registry 检查到 conn 路由，避免循环依赖
+			conn.RegistryHasServer = reg.HasServer
 
-			srv := server.NewGateServer(addr)
-			go actor.Default().Start()
-
-			if err := srv.Start(); err != nil {
-				log.Fatal("gate server error: " + err.Error())
-			}
+			fmt.Printf("gate server [%d] starting, listen: %s\n", config.GateID, config.GateAddr())
+			actor.Default().Start()
 			return nil
 		},
 	}

@@ -28,10 +28,22 @@ type GateActor struct {
 	grpcServer *grpc.Server
 	gamePID    actor.PID
 	stream     protoGateway.Gateway_StreamServer
+	router     actor.Router
 }
 
 func (g *GateActor) OnInit(ctx actor.ActorContext) {
 	g.gamePID = actor.MustLookup(constant.ActorGame)
+
+	g.router.Register(&inboundMsg{}, func(ctx actor.ActorContext, msg interface{}) {
+		ctx.Send(g.gamePID, msg)
+	})
+	g.router.Register(&protoGateway.Frame{}, func(_ actor.ActorContext, msg interface{}) {
+		if g.stream != nil {
+			if err := g.stream.Send(msg.(*protoGateway.Frame)); err != nil {
+				log.Printf("GateActor: stream send error: %v", err)
+			}
+		}
+	})
 
 	lis, err := net.Listen("tcp", config.GameAddr())
 	if err != nil {
@@ -56,16 +68,7 @@ func (g *GateActor) OnInit(ctx actor.ActorContext) {
 }
 
 func (g *GateActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
-	switch m := msg.(type) {
-	case *inboundMsg:
-		ctx.Send(g.gamePID, m)
-	case *protoGateway.Frame:
-		if g.stream != nil {
-			if err := g.stream.Send(m); err != nil {
-				log.Printf("GateActor: stream send error: %v", err)
-			}
-		}
-	}
+	g.router.Route(ctx, msg)
 }
 
 func (g *GateActor) OnStop(ctx actor.ActorContext) {

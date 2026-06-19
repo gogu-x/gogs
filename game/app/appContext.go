@@ -7,6 +7,7 @@ import (
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/game/constant"
+	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"google.golang.org/protobuf/proto"
 )
@@ -30,5 +31,5 @@ func (a *App) Reply(msg proto.Message) {
 		log.Printf("Reply frame marshal error: %v", err)
 		return
 	}
-	actor.Send(actor.MustLookup(constant.ActorSupervisor), data)
+	actor.Send(actor.MustLookup(constant.ActorSupervisor), &natsrpc.ReplyMsg{Data: data})
 }

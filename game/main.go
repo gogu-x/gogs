@@ -11,7 +11,7 @@ import (
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/game/constant"
 	"github.com/gogu-x/gogs/game/model"
-	natsclient "github.com/gogu-x/gogs/nats"
+	natsclient "github.com/gogu-x/gogs/natsrpc"
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/urfave/cli/v3"
