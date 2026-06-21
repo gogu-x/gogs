@@ -10,10 +10,12 @@ import (
 )
 
 func NewActor() *natsrpc.Actor {
+	gateID := fmt.Sprintf("%d", config.GateID)
 	return natsrpc.NewActor(natsrpc.ActorConfig{
-		GateOut: fmt.Sprintf("%d", config.GateID),
-		LookupConn: func(connID uint64) (actor.PID, bool) {
-			return actor.Lookup(constant.ConnName(connID))
+		Subs: []natsrpc.SubConfig{
+			natsrpc.Sub(natsrpc.GateOutSubject(gateID), func(frame *natsrpc.Frame) (actor.PID, bool) {
+				return actor.Default().Lookup(constant.ConnName(frame.ConnId))
+			}, 20),
 		},
 	})
 }

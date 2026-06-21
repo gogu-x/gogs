@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package platform;
+
+option go_package = "github.com/gogu-x/gogs/pb/protoPlatform";
+
+import "common/error.proto";
+
+enum OrderStatus {
+  PENDING   = 0;
+  PAID      = 1;
+  DELIVERED = 2;
+  FAILED    = 3;
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+message RegisterReq {
+  string account   = 1;
+  string password  = 2;
+  int32  server_id = 3;
+}
+
+message AuthLoginReq {
+  string account   = 1;
+  string password  = 2;
+  int32  server_id = 3;
+}
+
+message AuthAck {
+  ErrCode code  = 1;
+  string  msg   = 2;
+  uint64  uid   = 3;
+  string  token = 4;
+}
+
+message VerifyTokenReq {
+  string token = 1;
+}
+
+message VerifyAck {
+  bool   valid = 1;
+  uint64 uid   = 2;
+}
+
+service AuthService {
+  rpc Register    (RegisterReq)    returns (AuthAck);
+  rpc Login       (AuthLoginReq)   returns (AuthAck);
+  rpc VerifyToken (VerifyTokenReq) returns (VerifyAck);
+}
+
+// ─── Order ───────────────────────────────────────────────────────────────────
+
+message CreateOrderReq {
+  uint64 uid        = 1;
+  string product_id = 2;
+  string server_id  = 3;
+}
+
+message OrderAck {
+  ErrCode code     = 1;
+  string  msg      = 2;
+  string  order_id = 3;
+}
+
+message QueryOrderReq {
+  string order_id = 1;
+}
+
+message OrderDetail {
+  string      order_id   = 1;
+  uint64      uid        = 2;
+  string      product_id = 3;
+  string      server_id  = 4;
+  OrderStatus status     = 5;
+}
+
+service OrderService {
+  rpc CreateOrder (CreateOrderReq) returns (OrderAck);
+  rpc QueryOrder  (QueryOrderReq)  returns (OrderDetail);
+}
+
+// ─── Deliver（平台服 → game NATS 通知）────────────────────────────────────────
+
+message DeliverNotify {
+  uint64 uid        = 1;
+  string order_id   = 2;
+  string product_id = 3;
+  string server_id  = 4;
+}

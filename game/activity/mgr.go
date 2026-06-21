@@ -1,8 +1,9 @@
-package activity
+﻿package activity
 
 import (
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/pb/protoActivity"
+	"github.com/gogu-x/gogs/pb/protoCommon"
 )
 
 // Activity 活动数据
@@ -21,7 +22,6 @@ func (a *Activity) ToProto() *protoActivity.ActivityInfo {
 	}
 }
 
-// Progress 玩家在某活动的进度
 type Progress struct {
 	ActivityID uint64
 	UID        uint64
@@ -37,10 +37,9 @@ func (p *Progress) ToProto() *protoActivity.ActivityProgress {
 	}
 }
 
-// ActivityMgr 活动数据存储，纯数据操作，在 ActivityActor 单 goroutine 内使用
 type ActivityMgr struct {
-	activities map[uint64]*Activity            // activityID → Activity
-	progresses map[uint64]map[uint64]*Progress // uid → activityID → Progress
+	activities map[uint64]*Activity            // activityID �?Activity
+	progresses map[uint64]map[uint64]*Progress // uid �?activityID �?Progress
 }
 
 func NewActivityMgr() *ActivityMgr {
@@ -62,20 +61,20 @@ func (s *ActivityMgr) GetList(ctx actor.ActorContext, _ *protoActivity.GetActivi
 			list = append(list, a.ToProto())
 		}
 	}
-	ctx.Response(&protoActivity.GetActivityListResp{Activities: list}, nil)
+	ctx.Response(&protoActivity.GetActivityListAck{Activities: list}, nil)
 }
 
 func (s *ActivityMgr) Join(ctx actor.ActorContext, req *protoActivity.JoinActivityReq) {
-	ack := &protoActivity.JoinActivityResp{}
+	ack := &protoActivity.JoinActivityAck{}
 	defer ctx.Response(ack, nil)
 	act, ok := s.activities[req.ActivityId]
 	if !ok || act.Status != protoActivity.ActivityStatus_ONGOING {
-		ack.Code = 1
+		ack.Code = protoCommon.ErrCode_ERR_UNKNOWN
 		ack.Msg = "activity not available"
 		return
 	}
 	if _, exists := s.getProgress(req.Uid, req.ActivityId); exists {
-		ack.Code = 2
+		ack.Code = protoCommon.ErrCode_ERR_ALREADY_IN_GUILD
 		ack.Msg = "already joined"
 		return
 	}
@@ -85,32 +84,32 @@ func (s *ActivityMgr) Join(ctx actor.ActorContext, req *protoActivity.JoinActivi
 }
 
 func (s *ActivityMgr) GetProgress(ctx actor.ActorContext, req *protoActivity.GetProgressReq) {
-	ack := &protoActivity.GetProgressResp{Code: 1}
+	ack := &protoActivity.GetProgressAck{Code: protoCommon.ErrCode_ERR_UNKNOWN}
 	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.Uid, req.ActivityId)
 	if !ok {
 		return
 	}
-	ack.Code = 0
+	ack.Code = protoCommon.ErrCode_OK
 	ack.Progress = p.ToProto()
 }
 
 func (s *ActivityMgr) ClaimReward(ctx actor.ActorContext, req *protoActivity.ClaimRewardReq) {
-	ack := &protoActivity.ClaimRewardResp{}
+	ack := &protoActivity.ClaimRewardAck{}
 	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.Uid, req.ActivityId)
 	if !ok {
-		ack.Code = 1
+		ack.Code = protoCommon.ErrCode_ERR_UNKNOWN
 		ack.Msg = "not joined"
 		return
 	}
 	if p.Rewarded {
-		ack.Code = 2
+		ack.Code = protoCommon.ErrCode_ERR_UNKNOWN
 		ack.Msg = "already claimed"
 		return
 	}
 	if p.Progress < p.Target {
-		ack.Code = 3
+		ack.Code = protoCommon.ErrCode_ERR_UNKNOWN
 		ack.Msg = "not completed"
 		return
 	}

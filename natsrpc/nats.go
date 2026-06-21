@@ -1,81 +1,51 @@
 package natsrpc
 
 import (
-	"fmt"
 	"log"
 
 	natsgo "github.com/nats-io/nats.go"
+	"google.golang.org/protobuf/proto"
 
 	actor "github.com/gogu-x/bigTree"
 )
 
-// ActorConfig 配置 Actor 的订阅行为。
+// RouteFunc 根据 Frame 返回目标 Actor PID。
+type RouteFunc func(frame *Frame) (actor.PID, bool)
+
+// ActorConfig 配置订阅列表。
 type ActorConfig struct {
-	GameIn     string                         // 订阅 gate.in.{GameIn}
-	GateOut    string                         // 订阅 gate.out.{GateOut}.*
-	LookupConn func(uint64) (actor.PID, bool) // gate 模式：connID → ConnActor PID
-	Shutdown   struct{ ServerID, InstID string }
+	Subs []SubConfig
 }
 
-// Actor 通用 NATS Actor，HandleMessage 完全由内部 Router 驱动。
+// Actor NATS 订阅 Actor，负责收消息、反序列化、投递。
 type Actor struct {
-	cfg    ActorConfig
-	router actor.Router
-	subs   []*natsgo.Subscription
+	cfg  ActorConfig
+	subs []*natsgo.Subscription
 }
 
-func NewActor(cfg ActorConfig) *Actor {
-	return &Actor{cfg: cfg}
-}
-
-// ─── 生命周期 ─────────────────────────────────────────────────────────────────
+func NewActor(cfg ActorConfig) *Actor { return &Actor{cfg: cfg} }
 
 func (a *Actor) OnInit(ctx actor.ActorContext) {
-	a.router.Register(&InboundMsg{}, a.handleInbound)
-	a.router.Register(&OutboundMsg{}, a.handleOutbound)
-	a.router.Register(&rawMsg{}, a.handleRaw)
-	a.router.Register(&ReplyMsg{}, a.handleReply)
-	a.router.Register(&shutdownMsg{}, a.handleShutdown)
-
 	self := ctx.Self()
-
-	if a.cfg.GameIn != "" {
-		sub, err := nc.Subscribe(fmt.Sprintf(subGameIn, a.cfg.GameIn), func(m *natsgo.Msg) {
-			a.onGameInMsg(self, m)
-		})
-		if err != nil {
-			log.Fatalf("natsrpc: subscribe GameIn error: %v", err)
-		}
-		a.subs = append(a.subs, sub)
-		log.Printf("natsrpc: subscribed gate.in.%s", a.cfg.GameIn)
-	}
-
-	if a.cfg.GateOut != "" {
-		ch := make(chan *natsgo.Msg, 65536)
-		sub, err := nc.ChanSubscribe(fmt.Sprintf("gate.out.%s.*", a.cfg.GateOut), ch)
-		if err != nil {
-			log.Fatalf("natsrpc: subscribe GateOut error: %v", err)
-		}
-		a.subs = append(a.subs, sub)
-		go a.runGateOutWorker(self, ch)
-		log.Printf("natsrpc: subscribed gate.out.%s.*", a.cfg.GateOut)
-	}
-
-	if a.cfg.Shutdown.ServerID != "" {
-		sub, err := nc.Subscribe(
-			fmt.Sprintf(subGameShutdown, a.cfg.Shutdown.ServerID, a.cfg.Shutdown.InstID),
-			func(_ *natsgo.Msg) { actor.Send(self, &shutdownMsg{}) },
-		)
-		if err != nil {
-			log.Printf("natsrpc: subscribe shutdown error: %v", err)
-		} else {
-			a.subs = append(a.subs, sub)
+	for _, sub := range a.cfg.Subs {
+		switch sub.kind {
+		case kindSub:
+			a.subscribe(sub)
+		case kindShutdown:
+			a.subscribeShutdown(self, sub)
 		}
 	}
 }
 
 func (a *Actor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
-	a.router.Route(ctx, msg)
+	switch m := msg.(type) {
+	case *SendMsg:
+		if err := send(m); err != nil {
+			log.Printf("natsrpc: send [%s/%s]: %v", m.Module, m.NodeID, err)
+		}
+	case *shutdownMsg:
+		a.OnStop(ctx)
+	}
 }
 
 func (a *Actor) OnStop(_ actor.ActorContext) {
@@ -83,4 +53,47 @@ func (a *Actor) OnStop(_ actor.ActorContext) {
 		_ = sub.Unsubscribe()
 	}
 	actor.Default().Shutdown()
+}
+
+func (a *Actor) subscribe(sub SubConfig) {
+	ch := make(chan *natsgo.Msg, 65536)
+	s, err := nc.ChanSubscribe(sub.subject, ch)
+	if err != nil {
+		log.Fatalf("natsrpc: subscribe %s: %v", sub.subject, err)
+	}
+	a.subs = append(a.subs, s)
+	workers := sub.workers
+	if workers <= 0 {
+		workers = 1
+	}
+	route := sub.route
+	for i := 0; i < workers; i++ {
+		go func() {
+			for m := range ch {
+				var frame Frame
+				if err := proto.Unmarshal(m.Data, &frame); err != nil {
+					log.Printf("natsrpc: unmarshal frame: %v", err)
+					continue
+				}
+				pid, ok := route(&frame)
+				if !ok {
+					continue
+				}
+				actor.Default().Send(pid, &frame)
+			}
+		}()
+	}
+	log.Printf("natsrpc: subscribed %s (%d workers)", sub.subject, workers)
+}
+
+func (a *Actor) subscribeShutdown(self actor.PID, sub SubConfig) {
+	s, err := nc.Subscribe(sub.subject, func(_ *natsgo.Msg) {
+		actor.Send(self, &shutdownMsg{})
+	})
+	if err != nil {
+		log.Printf("natsrpc: subscribe %s: %v", sub.subject, err)
+		return
+	}
+	a.subs = append(a.subs, s)
+	log.Printf("natsrpc: subscribed %s", sub.subject)
 }

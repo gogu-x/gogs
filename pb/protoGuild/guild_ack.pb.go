@@ -7,6 +7,7 @@
 package protoGuild
 
 import (
+	protoCommon "github.com/gogu-x/gogs/pb/protoCommon"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -21,29 +22,29 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type CreateGuildResp struct {
+type CreateGuildAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Code          protoCommon.ErrCode    `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
 	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
 	Guild         *GuildInfo             `protobuf:"bytes,3,opt,name=guild,proto3" json:"guild,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateGuildResp) Reset() {
-	*x = CreateGuildResp{}
+func (x *CreateGuildAck) Reset() {
+	*x = CreateGuildAck{}
 	mi := &file_guild_guild_ack_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateGuildResp) String() string {
+func (x *CreateGuildAck) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateGuildResp) ProtoMessage() {}
+func (*CreateGuildAck) ProtoMessage() {}
 
-func (x *CreateGuildResp) ProtoReflect() protoreflect.Message {
+func (x *CreateGuildAck) ProtoReflect() protoreflect.Message {
 	mi := &file_guild_guild_ack_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -55,54 +56,54 @@ func (x *CreateGuildResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateGuildResp.ProtoReflect.Descriptor instead.
-func (*CreateGuildResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateGuildAck.ProtoReflect.Descriptor instead.
+func (*CreateGuildAck) Descriptor() ([]byte, []int) {
 	return file_guild_guild_ack_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CreateGuildResp) GetCode() int32 {
+func (x *CreateGuildAck) GetCode() protoCommon.ErrCode {
 	if x != nil {
 		return x.Code
 	}
-	return 0
+	return protoCommon.ErrCode(0)
 }
 
-func (x *CreateGuildResp) GetMsg() string {
+func (x *CreateGuildAck) GetMsg() string {
 	if x != nil {
 		return x.Msg
 	}
 	return ""
 }
 
-func (x *CreateGuildResp) GetGuild() *GuildInfo {
+func (x *CreateGuildAck) GetGuild() *GuildInfo {
 	if x != nil {
 		return x.Guild
 	}
 	return nil
 }
 
-type JoinGuildResp struct {
+type JoinGuildAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Code          protoCommon.ErrCode    `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
 	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *JoinGuildResp) Reset() {
-	*x = JoinGuildResp{}
+func (x *JoinGuildAck) Reset() {
+	*x = JoinGuildAck{}
 	mi := &file_guild_guild_ack_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *JoinGuildResp) String() string {
+func (x *JoinGuildAck) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*JoinGuildResp) ProtoMessage() {}
+func (*JoinGuildAck) ProtoMessage() {}
 
-func (x *JoinGuildResp) ProtoReflect() protoreflect.Message {
+func (x *JoinGuildAck) ProtoReflect() protoreflect.Message {
 	mi := &file_guild_guild_ack_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -114,47 +115,47 @@ func (x *JoinGuildResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use JoinGuildResp.ProtoReflect.Descriptor instead.
-func (*JoinGuildResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use JoinGuildAck.ProtoReflect.Descriptor instead.
+func (*JoinGuildAck) Descriptor() ([]byte, []int) {
 	return file_guild_guild_ack_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *JoinGuildResp) GetCode() int32 {
+func (x *JoinGuildAck) GetCode() protoCommon.ErrCode {
 	if x != nil {
 		return x.Code
 	}
-	return 0
+	return protoCommon.ErrCode(0)
 }
 
-func (x *JoinGuildResp) GetMsg() string {
+func (x *JoinGuildAck) GetMsg() string {
 	if x != nil {
 		return x.Msg
 	}
 	return ""
 }
 
-type LeaveGuildResp struct {
+type LeaveGuildAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Code          protoCommon.ErrCode    `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
 	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LeaveGuildResp) Reset() {
-	*x = LeaveGuildResp{}
+func (x *LeaveGuildAck) Reset() {
+	*x = LeaveGuildAck{}
 	mi := &file_guild_guild_ack_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LeaveGuildResp) String() string {
+func (x *LeaveGuildAck) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LeaveGuildResp) ProtoMessage() {}
+func (*LeaveGuildAck) ProtoMessage() {}
 
-func (x *LeaveGuildResp) ProtoReflect() protoreflect.Message {
+func (x *LeaveGuildAck) ProtoReflect() protoreflect.Message {
 	mi := &file_guild_guild_ack_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -166,47 +167,47 @@ func (x *LeaveGuildResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LeaveGuildResp.ProtoReflect.Descriptor instead.
-func (*LeaveGuildResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use LeaveGuildAck.ProtoReflect.Descriptor instead.
+func (*LeaveGuildAck) Descriptor() ([]byte, []int) {
 	return file_guild_guild_ack_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *LeaveGuildResp) GetCode() int32 {
+func (x *LeaveGuildAck) GetCode() protoCommon.ErrCode {
 	if x != nil {
 		return x.Code
 	}
-	return 0
+	return protoCommon.ErrCode(0)
 }
 
-func (x *LeaveGuildResp) GetMsg() string {
+func (x *LeaveGuildAck) GetMsg() string {
 	if x != nil {
 		return x.Msg
 	}
 	return ""
 }
 
-type GetGuildResp struct {
+type GetGuildAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Code          protoCommon.ErrCode    `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
 	Guild         *GuildInfo             `protobuf:"bytes,2,opt,name=guild,proto3" json:"guild,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetGuildResp) Reset() {
-	*x = GetGuildResp{}
+func (x *GetGuildAck) Reset() {
+	*x = GetGuildAck{}
 	mi := &file_guild_guild_ack_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetGuildResp) String() string {
+func (x *GetGuildAck) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetGuildResp) ProtoMessage() {}
+func (*GetGuildAck) ProtoMessage() {}
 
-func (x *GetGuildResp) ProtoReflect() protoreflect.Message {
+func (x *GetGuildAck) ProtoReflect() protoreflect.Message {
 	mi := &file_guild_guild_ack_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -218,19 +219,19 @@ func (x *GetGuildResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetGuildResp.ProtoReflect.Descriptor instead.
-func (*GetGuildResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetGuildAck.ProtoReflect.Descriptor instead.
+func (*GetGuildAck) Descriptor() ([]byte, []int) {
 	return file_guild_guild_ack_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *GetGuildResp) GetCode() int32 {
+func (x *GetGuildAck) GetCode() protoCommon.ErrCode {
 	if x != nil {
 		return x.Code
 	}
-	return 0
+	return protoCommon.ErrCode(0)
 }
 
-func (x *GetGuildResp) GetGuild() *GuildInfo {
+func (x *GetGuildAck) GetGuild() *GuildInfo {
 	if x != nil {
 		return x.Guild
 	}
@@ -241,20 +242,20 @@ var File_guild_guild_ack_proto protoreflect.FileDescriptor
 
 const file_guild_guild_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x15guild/guild_ack.proto\x1a\x18guild/guild_common.proto\"Y\n" +
-	"\x0fCreateGuildResp\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
+	"\x15guild/guild_ack.proto\x1a\x18guild/guild_common.proto\x1a\x12common/error.proto\"b\n" +
+	"\x0eCreateGuildAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x10\n" +
 	"\x03msg\x18\x02 \x01(\tR\x03msg\x12 \n" +
 	"\x05guild\x18\x03 \x01(\v2\n" +
-	".GuildInfoR\x05guild\"5\n" +
-	"\rJoinGuildResp\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
-	"\x03msg\x18\x02 \x01(\tR\x03msg\"6\n" +
-	"\x0eLeaveGuildResp\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
-	"\x03msg\x18\x02 \x01(\tR\x03msg\"D\n" +
-	"\fGetGuildResp\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12 \n" +
+	".GuildInfoR\x05guild\">\n" +
+	"\fJoinGuildAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x10\n" +
+	"\x03msg\x18\x02 \x01(\tR\x03msg\"?\n" +
+	"\rLeaveGuildAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x10\n" +
+	"\x03msg\x18\x02 \x01(\tR\x03msg\"M\n" +
+	"\vGetGuildAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12 \n" +
 	"\x05guild\x18\x02 \x01(\v2\n" +
 	".GuildInfoR\x05guildB&Z$github.com/gogu-x/gogs/pb/protoGuildb\x06proto3"
 
@@ -272,20 +273,25 @@ func file_guild_guild_ack_proto_rawDescGZIP() []byte {
 
 var file_guild_guild_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_guild_guild_ack_proto_goTypes = []any{
-	(*CreateGuildResp)(nil), // 0: CreateGuildResp
-	(*JoinGuildResp)(nil),   // 1: JoinGuildResp
-	(*LeaveGuildResp)(nil),  // 2: LeaveGuildResp
-	(*GetGuildResp)(nil),    // 3: GetGuildResp
-	(*GuildInfo)(nil),       // 4: GuildInfo
+	(*CreateGuildAck)(nil),   // 0: CreateGuildAck
+	(*JoinGuildAck)(nil),     // 1: JoinGuildAck
+	(*LeaveGuildAck)(nil),    // 2: LeaveGuildAck
+	(*GetGuildAck)(nil),      // 3: GetGuildAck
+	(protoCommon.ErrCode)(0), // 4: ErrCode
+	(*GuildInfo)(nil),        // 5: GuildInfo
 }
 var file_guild_guild_ack_proto_depIdxs = []int32{
-	4, // 0: CreateGuildResp.guild:type_name -> GuildInfo
-	4, // 1: GetGuildResp.guild:type_name -> GuildInfo
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 0: CreateGuildAck.code:type_name -> ErrCode
+	5, // 1: CreateGuildAck.guild:type_name -> GuildInfo
+	4, // 2: JoinGuildAck.code:type_name -> ErrCode
+	4, // 3: LeaveGuildAck.code:type_name -> ErrCode
+	4, // 4: GetGuildAck.code:type_name -> ErrCode
+	5, // 5: GetGuildAck.guild:type_name -> GuildInfo
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_guild_guild_ack_proto_init() }

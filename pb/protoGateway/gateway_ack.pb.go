@@ -7,6 +7,7 @@
 package protoGateway
 
 import (
+	protoCommon "github.com/gogu-x/gogs/pb/protoCommon"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -21,28 +22,28 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type LoginResp struct {
+type LoginAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Code          protoCommon.ErrCode    `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
 	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LoginResp) Reset() {
-	*x = LoginResp{}
+func (x *LoginAck) Reset() {
+	*x = LoginAck{}
 	mi := &file_gateway_gateway_ack_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LoginResp) String() string {
+func (x *LoginAck) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LoginResp) ProtoMessage() {}
+func (*LoginAck) ProtoMessage() {}
 
-func (x *LoginResp) ProtoReflect() protoreflect.Message {
+func (x *LoginAck) ProtoReflect() protoreflect.Message {
 	mi := &file_gateway_gateway_ack_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -54,19 +55,71 @@ func (x *LoginResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LoginResp.ProtoReflect.Descriptor instead.
-func (*LoginResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use LoginAck.ProtoReflect.Descriptor instead.
+func (*LoginAck) Descriptor() ([]byte, []int) {
 	return file_gateway_gateway_ack_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *LoginResp) GetCode() int32 {
+func (x *LoginAck) GetCode() protoCommon.ErrCode {
 	if x != nil {
 		return x.Code
 	}
-	return 0
+	return protoCommon.ErrCode(0)
 }
 
-func (x *LoginResp) GetMsg() string {
+func (x *LoginAck) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
+type RegisterAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          protoCommon.ErrCode    `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterAck) Reset() {
+	*x = RegisterAck{}
+	mi := &file_gateway_gateway_ack_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterAck) ProtoMessage() {}
+
+func (x *RegisterAck) ProtoReflect() protoreflect.Message {
+	mi := &file_gateway_gateway_ack_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterAck.ProtoReflect.Descriptor instead.
+func (*RegisterAck) Descriptor() ([]byte, []int) {
+	return file_gateway_gateway_ack_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *RegisterAck) GetCode() protoCommon.ErrCode {
+	if x != nil {
+		return x.Code
+	}
+	return protoCommon.ErrCode(0)
+}
+
+func (x *RegisterAck) GetMsg() string {
 	if x != nil {
 		return x.Msg
 	}
@@ -77,9 +130,12 @@ var File_gateway_gateway_ack_proto protoreflect.FileDescriptor
 
 const file_gateway_gateway_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x19gateway/gateway_ack.proto\"1\n" +
-	"\tLoginResp\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
+	"\x19gateway/gateway_ack.proto\x1a\x12common/error.proto\":\n" +
+	"\bLoginAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x10\n" +
+	"\x03msg\x18\x02 \x01(\tR\x03msg\"=\n" +
+	"\vRegisterAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x10\n" +
 	"\x03msg\x18\x02 \x01(\tR\x03msgB(Z&github.com/gogu-x/gogs/pb/protoGatewayb\x06proto3"
 
 var (
@@ -94,16 +150,20 @@ func file_gateway_gateway_ack_proto_rawDescGZIP() []byte {
 	return file_gateway_gateway_ack_proto_rawDescData
 }
 
-var file_gateway_gateway_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_gateway_gateway_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_gateway_gateway_ack_proto_goTypes = []any{
-	(*LoginResp)(nil), // 0: LoginResp
+	(*LoginAck)(nil),         // 0: LoginAck
+	(*RegisterAck)(nil),      // 1: RegisterAck
+	(protoCommon.ErrCode)(0), // 2: ErrCode
 }
 var file_gateway_gateway_ack_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	2, // 0: LoginAck.code:type_name -> ErrCode
+	2, // 1: RegisterAck.code:type_name -> ErrCode
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_gateway_gateway_ack_proto_init() }
@@ -117,7 +177,7 @@ func file_gateway_gateway_ack_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gateway_gateway_ack_proto_rawDesc), len(file_gateway_gateway_ack_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

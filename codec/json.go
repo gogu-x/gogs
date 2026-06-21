@@ -20,7 +20,8 @@ type jsonCodec struct {
 
 func (c *jsonCodec) register(msg proto.Message) {
 	t := reflect.TypeOf(msg)
-	c.nameToType[t.Elem().Name()] = t
+	key := t.Elem().PkgPath() + "." + t.Elem().Name()
+	c.nameToType[key] = t
 }
 
 func (c *jsonCodec) Unmarshal(data []byte) (interface{}, error) {
@@ -44,9 +45,9 @@ func (c *jsonCodec) Unmarshal(data []byte) (interface{}, error) {
 
 func (c *jsonCodec) Marshal(msg interface{}) ([]byte, error) {
 	t := reflect.TypeOf(msg)
-	name := t.Elem().Name()
-	if _, ok := c.nameToType[name]; !ok {
-		return nil, fmt.Errorf("json: message %s not registered", name)
+	key := t.Elem().PkgPath() + "." + t.Elem().Name()
+	if _, ok := c.nameToType[key]; !ok {
+		return nil, fmt.Errorf("json: message %s not registered", key)
 	}
-	return json.Marshal(map[string]interface{}{name: msg})
+	return json.Marshal(map[string]interface{}{key: msg})
 }

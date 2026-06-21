@@ -10,7 +10,7 @@ import (
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/game/constant"
+	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 
 	"google.golang.org/grpc"
@@ -32,7 +32,7 @@ type GateActor struct {
 }
 
 func (g *GateActor) OnInit(ctx actor.ActorContext) {
-	g.gamePID = actor.MustLookup(constant.ActorGame)
+	g.gamePID = actor.MustLookup(constant.ActorNats)
 
 	g.router.Register(&inboundMsg{}, func(ctx actor.ActorContext, msg interface{}) {
 		ctx.Send(g.gamePID, msg)

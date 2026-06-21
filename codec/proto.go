@@ -22,8 +22,9 @@ type protoCodec struct {
 }
 
 func msgID(msg proto.Message) uint16 {
+	t := reflect.TypeOf(msg).Elem()
 	h := fnv.New32a()
-	h.Write([]byte(reflect.TypeOf(msg).Elem().Name()))
+	h.Write([]byte(t.PkgPath() + "." + t.Name()))
 	return uint16(h.Sum32())
 }
 

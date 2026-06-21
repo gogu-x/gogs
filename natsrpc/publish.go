@@ -8,31 +8,42 @@ import (
 
 const (
 	subGameIn       = "gate.in.%s"
-	subGateOut      = "gate.out.%s.%d"
+	subGateOut      = "gate.out.%s"
 	subCross        = "cross.%s"
 	subGameShutdown = "game.shutdown.%s.%s"
+	subDeliver      = "platform.deliver.%s"
 )
 
-func PublishToGame(serverID string, msg proto.Message) error {
+func GameInSubject(serverID string) string { return fmt.Sprintf(subGameIn, serverID) }
+func GateOutSubject(gateID string) string  { return fmt.Sprintf(subGateOut, gateID) }
+
+func publish(subject string, msg proto.Message) error {
 	data, err := proto.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("natsrpc.PublishToGame: %w", err)
+		return fmt.Errorf("natsrpc.publish: %w", err)
 	}
-	return nc.Publish(fmt.Sprintf(subGameIn, serverID), data)
+	return nc.Publish(subject, data)
 }
 
-func PublishRawToGate(gateID string, connID uint64, data []byte) error {
-	return nc.Publish(fmt.Sprintf(subGateOut, gateID, connID), data)
-}
-
-func PublishCross(topic string, msg proto.Message) error {
-	data, err := proto.Marshal(msg)
-	if err != nil {
-		return fmt.Errorf("natsrpc.PublishCross: %w", err)
+func send(m *SendMsg) error {
+	switch m.Module {
+	case ModuleGame:
+		return publish(fmt.Sprintf(subGameIn, m.NodeID), m.Frame)
+	case ModuleGate:
+		return publish(fmt.Sprintf(subGateOut, m.NodeID), m.Frame)
+	case ModuleCross:
+		return publish(fmt.Sprintf(subCross, m.NodeID), m.Frame)
+	case ModuleDeliver:
+		return publish(fmt.Sprintf(subDeliver, m.NodeID), m.Frame)
+	default:
+		return fmt.Errorf("unknown module: %s", m.Module)
 	}
-	return nc.Publish(fmt.Sprintf(subCross, topic), data)
 }
 
 func PublishShutdown(serverID, instID string) error {
 	return nc.Publish(fmt.Sprintf(subGameShutdown, serverID, instID), []byte("shutdown"))
+}
+
+func PublishDeliver(serverID string, msg proto.Message) error {
+	return publish(fmt.Sprintf(subDeliver, serverID), msg)
 }

@@ -12,6 +12,7 @@ import (
 
 func Init(r *actor.Router, a *app.App) {
 	r.Register(&protoGateway.LoginReq{}, a.Handle(ctl.AutoLogin))
+	r.Register(&protoGateway.RegisterReq{}, a.Handle(ctl.AutoRegister))
 
 	r.Register(&protoChat.ChatReq{}, a.Handle(ctl.ChatService))
 

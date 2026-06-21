@@ -11,29 +11,21 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/codec"
+	_ "github.com/gogu-x/gogs/pb/pbregister"
 	"github.com/gogu-x/gogs/pb/protoChat"
 	"github.com/gogu-x/gogs/pb/protoGateway"
-	"github.com/gogu-x/gogs/pb/protoGuild"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 )
 
 var (
 	addr     = flag.String("addr", "ws://127.0.0.1:8081/ws", "gate websocket address")
-	users    = flag.Int("users", 20000, "concurrent users")
+	users    = flag.Int("users", 100, "concurrent users")
 	duration = flag.Duration("duration", 100*time.Second, "test duration")
-	interval = flag.Duration("interval", 3*time.Second, "message send interval per user")
-	dialRate = flag.Int("dial-rate", 1000, "max concurrent dials per second")
+	interval = flag.Duration("interval", 1*time.Second, "message send interval per user")
+	dialRate = flag.Int("dial-rate", 1, "max concurrent dials per second")
 )
 
-func init() {
-	codec.RegisterMsg(
-		&protoGateway.LoginReq{},
-		&protoGateway.LoginResp{},
-		&protoChat.ChatReq{},
-		&protoGuild.GetGuildReq{},
-	)
-}
 
 var (
 	connOK    int64
@@ -93,7 +85,7 @@ func runUser(uid uint64, wg *sync.WaitGroup, stop <-chan struct{}) {
 	}
 
 	// 登录
-	if !send(&protoGateway.LoginReq{Uid: uid, Token: "test-token", ServerId: 1}) {
+	if !send(&protoGateway.RegisterReq{Account: "test", Password: "123456", ServerId: 1}) {
 		atomic.AddInt64(&sendFail, 1)
 		return
 	}

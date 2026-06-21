@@ -1,11 +1,12 @@
-package ctl
+﻿package ctl
 
 import (
 	"log"
 
 	actor "github.com/gogu-x/bigTree"
+	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/app"
-	"github.com/gogu-x/gogs/game/constant"
+	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoGuild"
 )
 
@@ -17,10 +18,10 @@ func CreateGuild(a *app.App, ctx actor.ActorContext, msg interface{}) {
 
 	requestGuild(a, ctx, req, func(ret interface{}, err error) {
 		if err != nil {
-			a.Reply(&protoGuild.CreateGuildResp{Code: -1, Msg: err.Error()})
+			a.Reply(&protoGuild.CreateGuildAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 			return
 		}
-		a.Reply(ret.(*protoGuild.CreateGuildResp))
+		a.Reply(ret.(*protoGuild.CreateGuildAck))
 	})
 }
 
@@ -32,10 +33,10 @@ func JoinGuild(a *app.App, ctx actor.ActorContext, msg interface{}) {
 
 	requestGuild(a, ctx, req, func(ret interface{}, err error) {
 		if err != nil {
-			a.Reply(&protoGuild.JoinGuildResp{Code: -1, Msg: err.Error()})
+			a.Reply(&protoGuild.JoinGuildAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 			return
 		}
-		a.Reply(ret.(*protoGuild.JoinGuildResp))
+		a.Reply(ret.(*protoGuild.JoinGuildAck))
 	})
 }
 
@@ -44,10 +45,10 @@ func LeaveGuild(a *app.App, ctx actor.ActorContext, msg interface{}) {
 
 	requestGuild(a, ctx, req, func(ret interface{}, err error) {
 		if err != nil {
-			a.Reply(&protoGuild.LeaveGuildResp{Code: -1, Msg: err.Error()})
+			a.Reply(&protoGuild.LeaveGuildAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 			return
 		}
-		a.Reply(ret.(*protoGuild.LeaveGuildResp))
+		a.Reply(ret.(*protoGuild.LeaveGuildAck))
 	})
 }
 
@@ -55,10 +56,10 @@ func GetGuild(a *app.App, ctx actor.ActorContext, msg interface{}) {
 	req := msg.(*protoGuild.GetGuildReq)
 	requestGuild(a, ctx, req, func(ret interface{}, err error) {
 		if err != nil {
-			a.Reply(&protoGuild.GetGuildResp{Code: -1})
+			a.Reply(&protoGuild.GetGuildAck{Code: protoCommon.ErrCode_ERR_UNKNOWN})
 			return
 		}
-		a.Reply(ret.(*protoGuild.GetGuildResp))
+		a.Reply(ret.(*protoGuild.GetGuildAck))
 	})
 }
 

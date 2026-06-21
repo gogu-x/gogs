@@ -1,0 +1,23 @@
+﻿syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/protoCommon";
+
+enum ErrCode {
+  OK = 0;
+
+  ERR_UNKNOWN = -1;
+  ERR_PARAM   = -2;
+
+  ERR_UNAUTHORIZED      = -1001;
+  ERR_LOGIN_IN_PROGRESS = -1002;
+  ERR_SERVER_NOT_FOUND  = -1003;
+
+  ERR_USERNAME_EXISTS  = -2001;
+  ERR_WRONG_PASSWORD   = -2002;
+  ERR_INTERNAL         = -2003;
+
+  ERR_GUILD_EXISTS     = -3001;
+  ERR_GUILD_NOT_FOUND  = -3002;
+  ERR_ALREADY_IN_GUILD = -3003;
+  ERR_NOT_IN_GUILD     = -3004;
+}

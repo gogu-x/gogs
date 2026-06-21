@@ -1,17 +1,17 @@
-package ctl
+﻿package ctl
 
 import (
 	"log"
 
 	actor "github.com/gogu-x/bigTree"
+	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/app"
-	"github.com/gogu-x/gogs/game/constant"
 	"github.com/gogu-x/gogs/pb/protoActivity"
 )
 
 func GetActivityList(a *app.App, ctx actor.ActorContext, msg interface{}) {
 	requestActivity(a, ctx, msg.(*protoActivity.GetActivityListReq), func(ret interface{}, err error) {
-		a.Reply(ret.(*protoActivity.GetActivityListResp))
+		a.Reply(ret.(*protoActivity.GetActivityListAck))
 	})
 }
 
@@ -20,7 +20,7 @@ func JoinActivity(a *app.App, ctx actor.ActorContext, msg interface{}) {
 	req.Uid = a.Player.UID
 
 	requestActivity(a, ctx, req, func(ret interface{}, err error) {
-		a.Reply(ret.(*protoActivity.JoinActivityResp))
+		a.Reply(ret.(*protoActivity.JoinActivityAck))
 	})
 }
 
@@ -29,7 +29,7 @@ func GetProgress(a *app.App, ctx actor.ActorContext, msg interface{}) {
 	req.Uid = a.Player.UID
 
 	requestActivity(a, ctx, req, func(ret interface{}, err error) {
-		a.Reply(ret.(*protoActivity.GetProgressResp))
+		a.Reply(ret.(*protoActivity.GetProgressAck))
 	})
 }
 
@@ -38,7 +38,7 @@ func ClaimReward(a *app.App, ctx actor.ActorContext, msg interface{}) {
 	req.Uid = a.Player.UID
 
 	requestActivity(a, ctx, req, func(ret interface{}, err error) {
-		a.Reply(ret.(*protoActivity.ClaimRewardResp))
+		a.Reply(ret.(*protoActivity.ClaimRewardAck))
 	})
 }
 

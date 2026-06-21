@@ -36,6 +36,18 @@ var (
 
 	// NATS 连接地址
 	NatsURL = env("NATS_URL", "nats://43.160.212.55:4222")
+
+	// 平台服 gRPC 监听地址
+	PlatformAddr = env("PLATFORM_ADDR", ":7000")
+
+	// 平台服 gRPC 连接地址（gate/game 侧使用）
+	PlatformGrpcAddr = env("PLATFORM_GRPC_ADDR", "127.0.0.1:7000")
+
+	// 平台服 HTTP webhook 监听地址
+	PlatformWebhookAddr = env("PLATFORM_WEBHOOK_ADDR", ":7001")
+
+	// JWT 签名密钥
+	JWTSecret = env("JWT_SECRET", "changeme-secret")
 )
 
 func GateAddr() string {

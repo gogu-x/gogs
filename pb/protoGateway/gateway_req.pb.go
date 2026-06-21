@@ -23,8 +23,8 @@ const (
 
 type LoginReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Uid           uint64                 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
-	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	Account       string                 `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 	ServerId      int32                  `protobuf:"varint,3,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -60,21 +60,81 @@ func (*LoginReq) Descriptor() ([]byte, []int) {
 	return file_gateway_gateway_req_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *LoginReq) GetUid() uint64 {
+func (x *LoginReq) GetAccount() string {
 	if x != nil {
-		return x.Uid
+		return x.Account
 	}
-	return 0
+	return ""
 }
 
-func (x *LoginReq) GetToken() string {
+func (x *LoginReq) GetPassword() string {
 	if x != nil {
-		return x.Token
+		return x.Password
 	}
 	return ""
 }
 
 func (x *LoginReq) GetServerId() int32 {
+	if x != nil {
+		return x.ServerId
+	}
+	return 0
+}
+
+type RegisterReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       string                 `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	ServerId      int32                  `protobuf:"varint,3,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterReq) Reset() {
+	*x = RegisterReq{}
+	mi := &file_gateway_gateway_req_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterReq) ProtoMessage() {}
+
+func (x *RegisterReq) ProtoReflect() protoreflect.Message {
+	mi := &file_gateway_gateway_req_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterReq.ProtoReflect.Descriptor instead.
+func (*RegisterReq) Descriptor() ([]byte, []int) {
+	return file_gateway_gateway_req_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *RegisterReq) GetAccount() string {
+	if x != nil {
+		return x.Account
+	}
+	return ""
+}
+
+func (x *RegisterReq) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *RegisterReq) GetServerId() int32 {
 	if x != nil {
 		return x.ServerId
 	}
@@ -90,7 +150,7 @@ type LogoutReq struct {
 
 func (x *LogoutReq) Reset() {
 	*x = LogoutReq{}
-	mi := &file_gateway_gateway_req_proto_msgTypes[1]
+	mi := &file_gateway_gateway_req_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -102,7 +162,7 @@ func (x *LogoutReq) String() string {
 func (*LogoutReq) ProtoMessage() {}
 
 func (x *LogoutReq) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_gateway_req_proto_msgTypes[1]
+	mi := &file_gateway_gateway_req_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -115,7 +175,7 @@ func (x *LogoutReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutReq.ProtoReflect.Descriptor instead.
 func (*LogoutReq) Descriptor() ([]byte, []int) {
-	return file_gateway_gateway_req_proto_rawDescGZIP(), []int{1}
+	return file_gateway_gateway_req_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *LogoutReq) GetUid() uint64 {
@@ -129,10 +189,14 @@ var File_gateway_gateway_req_proto protoreflect.FileDescriptor
 
 const file_gateway_gateway_req_proto_rawDesc = "" +
 	"\n" +
-	"\x19gateway/gateway_req.proto\"O\n" +
-	"\bLoginReq\x12\x10\n" +
-	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x14\n" +
-	"\x05token\x18\x02 \x01(\tR\x05token\x12\x1b\n" +
+	"\x19gateway/gateway_req.proto\"]\n" +
+	"\bLoginReq\x12\x18\n" +
+	"\aaccount\x18\x01 \x01(\tR\aaccount\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1b\n" +
+	"\tserver_id\x18\x03 \x01(\x05R\bserverId\"`\n" +
+	"\vRegisterReq\x12\x18\n" +
+	"\aaccount\x18\x01 \x01(\tR\aaccount\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1b\n" +
 	"\tserver_id\x18\x03 \x01(\x05R\bserverId\"\x1d\n" +
 	"\tLogoutReq\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\x04R\x03uidB(Z&github.com/gogu-x/gogs/pb/protoGatewayb\x06proto3"
@@ -149,10 +213,11 @@ func file_gateway_gateway_req_proto_rawDescGZIP() []byte {
 	return file_gateway_gateway_req_proto_rawDescData
 }
 
-var file_gateway_gateway_req_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_gateway_gateway_req_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_gateway_gateway_req_proto_goTypes = []any{
-	(*LoginReq)(nil),  // 0: LoginReq
-	(*LogoutReq)(nil), // 1: LogoutReq
+	(*LoginReq)(nil),    // 0: LoginReq
+	(*RegisterReq)(nil), // 1: RegisterReq
+	(*LogoutReq)(nil),   // 2: LogoutReq
 }
 var file_gateway_gateway_req_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -173,7 +238,7 @@ func file_gateway_gateway_req_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gateway_gateway_req_proto_rawDesc), len(file_gateway_gateway_req_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

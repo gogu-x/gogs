@@ -3,8 +3,14 @@ syntax = "proto3";
 option go_package = "github.com/gogu-x/gogs/pb/protoGateway";
 
 message LoginReq {
-  uint64 uid       = 1;
-  string token     = 2;
+  string account   = 1;
+  string password  = 2;
+  int32  server_id = 3;
+}
+
+message RegisterReq {
+  string account   = 1;
+  string password  = 2;
   int32  server_id = 3;
 }
 

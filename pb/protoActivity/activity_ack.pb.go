@@ -7,6 +7,7 @@
 package protoActivity
 
 import (
+	protoCommon "github.com/gogu-x/gogs/pb/protoCommon"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -21,27 +22,27 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type GetActivityListResp struct {
+type GetActivityListAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Activities    []*ActivityInfo        `protobuf:"bytes,1,rep,name=activities,proto3" json:"activities,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetActivityListResp) Reset() {
-	*x = GetActivityListResp{}
+func (x *GetActivityListAck) Reset() {
+	*x = GetActivityListAck{}
 	mi := &file_activity_activity_ack_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetActivityListResp) String() string {
+func (x *GetActivityListAck) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetActivityListResp) ProtoMessage() {}
+func (*GetActivityListAck) ProtoMessage() {}
 
-func (x *GetActivityListResp) ProtoReflect() protoreflect.Message {
+func (x *GetActivityListAck) ProtoReflect() protoreflect.Message {
 	mi := &file_activity_activity_ack_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -53,40 +54,40 @@ func (x *GetActivityListResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetActivityListResp.ProtoReflect.Descriptor instead.
-func (*GetActivityListResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetActivityListAck.ProtoReflect.Descriptor instead.
+func (*GetActivityListAck) Descriptor() ([]byte, []int) {
 	return file_activity_activity_ack_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *GetActivityListResp) GetActivities() []*ActivityInfo {
+func (x *GetActivityListAck) GetActivities() []*ActivityInfo {
 	if x != nil {
 		return x.Activities
 	}
 	return nil
 }
 
-type JoinActivityResp struct {
+type JoinActivityAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Code          protoCommon.ErrCode    `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
 	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *JoinActivityResp) Reset() {
-	*x = JoinActivityResp{}
+func (x *JoinActivityAck) Reset() {
+	*x = JoinActivityAck{}
 	mi := &file_activity_activity_ack_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *JoinActivityResp) String() string {
+func (x *JoinActivityAck) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*JoinActivityResp) ProtoMessage() {}
+func (*JoinActivityAck) ProtoMessage() {}
 
-func (x *JoinActivityResp) ProtoReflect() protoreflect.Message {
+func (x *JoinActivityAck) ProtoReflect() protoreflect.Message {
 	mi := &file_activity_activity_ack_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -98,47 +99,47 @@ func (x *JoinActivityResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use JoinActivityResp.ProtoReflect.Descriptor instead.
-func (*JoinActivityResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use JoinActivityAck.ProtoReflect.Descriptor instead.
+func (*JoinActivityAck) Descriptor() ([]byte, []int) {
 	return file_activity_activity_ack_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *JoinActivityResp) GetCode() int32 {
+func (x *JoinActivityAck) GetCode() protoCommon.ErrCode {
 	if x != nil {
 		return x.Code
 	}
-	return 0
+	return protoCommon.ErrCode(0)
 }
 
-func (x *JoinActivityResp) GetMsg() string {
+func (x *JoinActivityAck) GetMsg() string {
 	if x != nil {
 		return x.Msg
 	}
 	return ""
 }
 
-type GetProgressResp struct {
+type GetProgressAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Code          protoCommon.ErrCode    `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
 	Progress      *ActivityProgress      `protobuf:"bytes,2,opt,name=progress,proto3" json:"progress,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetProgressResp) Reset() {
-	*x = GetProgressResp{}
+func (x *GetProgressAck) Reset() {
+	*x = GetProgressAck{}
 	mi := &file_activity_activity_ack_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetProgressResp) String() string {
+func (x *GetProgressAck) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetProgressResp) ProtoMessage() {}
+func (*GetProgressAck) ProtoMessage() {}
 
-func (x *GetProgressResp) ProtoReflect() protoreflect.Message {
+func (x *GetProgressAck) ProtoReflect() protoreflect.Message {
 	mi := &file_activity_activity_ack_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -150,47 +151,47 @@ func (x *GetProgressResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetProgressResp.ProtoReflect.Descriptor instead.
-func (*GetProgressResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetProgressAck.ProtoReflect.Descriptor instead.
+func (*GetProgressAck) Descriptor() ([]byte, []int) {
 	return file_activity_activity_ack_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *GetProgressResp) GetCode() int32 {
+func (x *GetProgressAck) GetCode() protoCommon.ErrCode {
 	if x != nil {
 		return x.Code
 	}
-	return 0
+	return protoCommon.ErrCode(0)
 }
 
-func (x *GetProgressResp) GetProgress() *ActivityProgress {
+func (x *GetProgressAck) GetProgress() *ActivityProgress {
 	if x != nil {
 		return x.Progress
 	}
 	return nil
 }
 
-type ClaimRewardResp struct {
+type ClaimRewardAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Code          protoCommon.ErrCode    `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
 	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ClaimRewardResp) Reset() {
-	*x = ClaimRewardResp{}
+func (x *ClaimRewardAck) Reset() {
+	*x = ClaimRewardAck{}
 	mi := &file_activity_activity_ack_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ClaimRewardResp) String() string {
+func (x *ClaimRewardAck) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ClaimRewardResp) ProtoMessage() {}
+func (*ClaimRewardAck) ProtoMessage() {}
 
-func (x *ClaimRewardResp) ProtoReflect() protoreflect.Message {
+func (x *ClaimRewardAck) ProtoReflect() protoreflect.Message {
 	mi := &file_activity_activity_ack_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -202,19 +203,19 @@ func (x *ClaimRewardResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ClaimRewardResp.ProtoReflect.Descriptor instead.
-func (*ClaimRewardResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use ClaimRewardAck.ProtoReflect.Descriptor instead.
+func (*ClaimRewardAck) Descriptor() ([]byte, []int) {
 	return file_activity_activity_ack_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *ClaimRewardResp) GetCode() int32 {
+func (x *ClaimRewardAck) GetCode() protoCommon.ErrCode {
 	if x != nil {
 		return x.Code
 	}
-	return 0
+	return protoCommon.ErrCode(0)
 }
 
-func (x *ClaimRewardResp) GetMsg() string {
+func (x *ClaimRewardAck) GetMsg() string {
 	if x != nil {
 		return x.Msg
 	}
@@ -225,19 +226,19 @@ var File_activity_activity_ack_proto protoreflect.FileDescriptor
 
 const file_activity_activity_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x1bactivity/activity_ack.proto\x1a\x1eactivity/activity_common.proto\"D\n" +
-	"\x13GetActivityListResp\x12-\n" +
+	"\x1bactivity/activity_ack.proto\x1a\x1eactivity/activity_common.proto\x1a\x12common/error.proto\"C\n" +
+	"\x12GetActivityListAck\x12-\n" +
 	"\n" +
 	"activities\x18\x01 \x03(\v2\r.ActivityInfoR\n" +
-	"activities\"8\n" +
-	"\x10JoinActivityResp\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
-	"\x03msg\x18\x02 \x01(\tR\x03msg\"T\n" +
-	"\x0fGetProgressResp\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12-\n" +
-	"\bprogress\x18\x02 \x01(\v2\x11.ActivityProgressR\bprogress\"7\n" +
-	"\x0fClaimRewardResp\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
+	"activities\"A\n" +
+	"\x0fJoinActivityAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x10\n" +
+	"\x03msg\x18\x02 \x01(\tR\x03msg\"]\n" +
+	"\x0eGetProgressAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12-\n" +
+	"\bprogress\x18\x02 \x01(\v2\x11.ActivityProgressR\bprogress\"@\n" +
+	"\x0eClaimRewardAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x10\n" +
 	"\x03msg\x18\x02 \x01(\tR\x03msgB)Z'github.com/gogu-x/gogs/pb/protoActivityb\x06proto3"
 
 var (
@@ -254,21 +255,25 @@ func file_activity_activity_ack_proto_rawDescGZIP() []byte {
 
 var file_activity_activity_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_activity_activity_ack_proto_goTypes = []any{
-	(*GetActivityListResp)(nil), // 0: GetActivityListResp
-	(*JoinActivityResp)(nil),    // 1: JoinActivityResp
-	(*GetProgressResp)(nil),     // 2: GetProgressResp
-	(*ClaimRewardResp)(nil),     // 3: ClaimRewardResp
-	(*ActivityInfo)(nil),        // 4: ActivityInfo
-	(*ActivityProgress)(nil),    // 5: ActivityProgress
+	(*GetActivityListAck)(nil), // 0: GetActivityListAck
+	(*JoinActivityAck)(nil),    // 1: JoinActivityAck
+	(*GetProgressAck)(nil),     // 2: GetProgressAck
+	(*ClaimRewardAck)(nil),     // 3: ClaimRewardAck
+	(*ActivityInfo)(nil),       // 4: ActivityInfo
+	(protoCommon.ErrCode)(0),   // 5: ErrCode
+	(*ActivityProgress)(nil),   // 6: ActivityProgress
 }
 var file_activity_activity_ack_proto_depIdxs = []int32{
-	4, // 0: GetActivityListResp.activities:type_name -> ActivityInfo
-	5, // 1: GetProgressResp.progress:type_name -> ActivityProgress
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 0: GetActivityListAck.activities:type_name -> ActivityInfo
+	5, // 1: JoinActivityAck.code:type_name -> ErrCode
+	5, // 2: GetProgressAck.code:type_name -> ErrCode
+	6, // 3: GetProgressAck.progress:type_name -> ActivityProgress
+	5, // 4: ClaimRewardAck.code:type_name -> ErrCode
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_activity_activity_ack_proto_init() }

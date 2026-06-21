@@ -1,9 +1,10 @@
-package guild
+﻿package guild
 
 import (
 	"sync/atomic"
 
 	actor "github.com/gogu-x/bigTree"
+	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoGuild"
 )
 
@@ -48,9 +49,8 @@ type UpdateMemberMsg struct {
 
 var idGen atomic.Uint64
 
-// Store 工会数据存储，纯数据操作，无业务逻辑，在 GuildActor 单 goroutine 内使用
 type Store struct {
-	guilds map[uint64]*Guild // guildID → Guild
+	guilds map[uint64]*Guild // guildID �?Guild
 }
 
 func NewStore() *Store {
@@ -70,17 +70,17 @@ func (s *Store) Create(ctx actor.ActorContext, req *protoGuild.CreateGuildReq) {
 		},
 	}
 	s.guilds[id] = g
-	ctx.Response(&protoGuild.CreateGuildResp{Guild: g.ToProto()}, nil)
+	ctx.Response(&protoGuild.CreateGuildAck{Guild: g.ToProto()}, nil)
 }
 
 func (s *Store) Join(ctx actor.ActorContext, req *protoGuild.JoinGuildReq) {
-	ack := &protoGuild.JoinGuildResp{Code: 1}
+	ack := &protoGuild.JoinGuildAck{Code: protoCommon.ErrCode_OK}
 	defer ctx.Response(ack, nil)
 	uid := req.GetUid()
 
 	g, ok := s.guilds[req.GuildId]
 	if !ok {
-		ack.Code = 3
+		ack.Code = protoCommon.ErrCode_ERR_GUILD_NOT_FOUND
 		return
 	}
 	g.Members[uid] = &Member{UID: uid, Name: req.GetMemberName(), Level: req.GetMemberLevel(), Role: protoGuild.GuildRole_MEMBER}
@@ -91,10 +91,11 @@ func (s *Store) Leave(_ actor.ActorContext, req *protoGuild.LeaveGuildReq) {
 }
 
 func (s *Store) Get(ctx actor.ActorContext, req *protoGuild.GetGuildReq) {
-	ack := &protoGuild.GetGuildResp{Code: 1}
+	ack := &protoGuild.GetGuildAck{Code: protoCommon.ErrCode_OK}
 	defer ctx.Response(ack, nil)
 	g, ok := s.guilds[req.GuildId]
 	if !ok {
+		ack.Code = protoCommon.ErrCode_ERR_GUILD_NOT_FOUND
 		return
 	}
 	ack.Guild = g.ToProto()

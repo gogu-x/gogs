@@ -4,8 +4,9 @@ import (
 	"log"
 
 	actor "github.com/gogu-x/bigTree"
+	"github.com/gogu-x/gogs/codec"
+	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/app"
-	"github.com/gogu-x/gogs/game/constant"
 	"github.com/gogu-x/gogs/game/router"
 	"github.com/gogu-x/gogs/game/timer"
 	"github.com/gogu-x/gogs/natsrpc"
@@ -32,12 +33,22 @@ func (p *PlayerActor) OnInit(ctx actor.ActorContext) {
 	router.Init(&p.router, p.app)
 	timer.Init(ctx)
 
-	// 注册 InboundMsg：更新连接上下文，再按业务消息类型路由
-	p.router.Register(&natsrpc.InboundMsg{}, func(ctx actor.ActorContext, msg interface{}) {
-		m := msg.(*natsrpc.InboundMsg)
-		p.app.ConnID = m.ConnID
-		p.app.GateId = m.GateID
-		p.router.Route(ctx, m.Msg)
+	// 收到 *Frame：更新连接上下文，解 Payload 后按业务消息类型路由
+	p.router.Register(&natsrpc.Frame{}, func(ctx actor.ActorContext, msg interface{}) {
+		frame := msg.(*natsrpc.Frame)
+		if frame.MsgType == natsrpc.MsgTypeDisconnect {
+			log.Printf("PlayerActor[%d]: client disconnected, stopping", p.uid)
+			ctx.Stop()
+			return
+		}
+		p.app.ConnID = frame.ConnId
+		p.app.GateId = frame.GateId
+		inner, err := codec.ProtoCodec.Unmarshal(frame.Payload)
+		if err != nil {
+			log.Printf("PlayerActor[%d]: unmarshal payload: %v", p.uid, err)
+			return
+		}
+		p.router.Route(ctx, inner)
 	})
 }
 
