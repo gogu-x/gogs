@@ -12,18 +12,27 @@ import (
 type deliverReq struct{ orderID string }
 
 func (a *Actor) onCreateOrder(ctx actor.ActorContext, msg interface{}) {
-	resp, err := service.CreateOrder(a.mongoPID, msg.(*protoPlatform.CreateOrderReq))
-	ctx.Response(resp, err)
+	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*protoPlatform.CreateOrderReq)
+	go func() {
+		resp, err := service.CreateOrder(mongoPID, req)
+		f.Respond(resp, err)
+	}()
 }
 
 func (a *Actor) onQueryOrder(ctx actor.ActorContext, msg interface{}) {
-	resp, err := service.QueryOrder(a.mongoPID, msg.(*protoPlatform.QueryOrderReq))
-	ctx.Response(resp, err)
+	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*protoPlatform.QueryOrderReq)
+	go func() {
+		resp, err := service.QueryOrder(mongoPID, req)
+		f.Respond(resp, err)
+	}()
 }
 
 func (a *Actor) onDeliver(ctx actor.ActorContext, msg interface{}) {
-	err := service.DeliverOrder(a.mongoPID, msg.(*deliverReq).orderID)
-	ctx.Response(nil, err)
+	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*deliverReq)
+	go func() {
+		err := service.DeliverOrder(mongoPID, req.orderID)
+		f.Respond(nil, err)
+	}()
 }
 
 // DeliverByOrderID 由 webhook 调用，向 GrpcActor mailbox 发送 deliverReq

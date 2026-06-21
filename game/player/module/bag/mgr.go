@@ -6,5 +6,5 @@ type Item struct {
 }
 
 type Mgr struct {
-	slots map[uint64]*Item
+	Slots map[uint64]*Item `bson:"slots"`
 }

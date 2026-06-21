@@ -17,7 +17,7 @@ type connState int
 
 const (
 	stateAnon    connState = iota // 未登录
-	stateLogging                  // 登录/注册中
+	stateLogging                  // 登录/注册 中
 	stateAuthed                   // 已登录
 )
 

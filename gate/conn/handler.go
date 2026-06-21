@@ -1,9 +1,10 @@
-﻿package conn
+package conn
 
 import (
 	"fmt"
 	"log"
 	"reflect"
+	"time"
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/config"
@@ -100,9 +101,12 @@ func (c *Actor) onRegister(ctx actor.ActorContext, msg interface{}) {
 		return
 	}
 	c.state = stateLogging
+	start := time.Now()
+	log.Printf("ConnActor[%d]: register start", c.connID)
 	platformPID := actor.MustLookup(constant.ActorRpcPlatform)
 	ctx.Request(platformPID, &protoPlatform.RegisterReq{Account: req.Account, Password: req.Password, ServerId: req.ServerId}).
 		Callback(ctx, func(ret interface{}, err error) {
+			log.Printf("ConnActor[%d]: register platform cb elapsed=%v err=%v", c.connID, time.Since(start), err)
 			if err != nil {
 				c.state = stateAnon
 				c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})

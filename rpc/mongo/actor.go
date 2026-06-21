@@ -31,6 +31,7 @@ type UpdateOne struct {
 	Collection string
 	Filter     interface{}
 	Update     interface{}
+	Upsert     bool
 }
 
 // DeleteOne deletes a single document. Response: error
@@ -62,35 +63,66 @@ func (a *Actor) OnStop(_ actor.ActorContext) {}
 
 func (a *Actor) onInsert(ctx actor.ActorContext, msg interface{}) {
 	m := msg.(*InsertOne)
-	res, err := a.db.Collection(m.Collection).InsertOne(bg(), m.Doc)
-	if err != nil {
-		ctx.Response(nil, err)
-		return
-	}
-	ctx.Response(res.InsertedID, nil)
+	f := ctx.Future()
+	go func() {
+		res, err := a.db.Collection(m.Collection).InsertOne(bg(), m.Doc)
+		if f == nil {
+			return
+		}
+		if err != nil {
+			f.Respond(nil, err)
+			return
+		}
+		f.Respond(res.InsertedID, nil)
+	}()
 }
 
 func (a *Actor) onFind(ctx actor.ActorContext, msg interface{}) {
 	m := msg.(*FindOne)
-	err := a.db.Collection(m.Collection).FindOne(bg(), m.Filter).Decode(m.Result)
-	ctx.Response(m.Result, err)
+	f := ctx.Future()
+	go func() {
+		err := a.db.Collection(m.Collection).FindOne(bg(), m.Filter).Decode(m.Result)
+		if f == nil {
+			return
+		}
+		f.Respond(m.Result, err)
+	}()
 }
 
 func (a *Actor) onUpdate(ctx actor.ActorContext, msg interface{}) {
 	m := msg.(*UpdateOne)
-	_, err := a.db.Collection(m.Collection).UpdateOne(bg(), m.Filter, m.Update)
-	ctx.Response(nil, err)
+	f := ctx.Future()
+	go func() {
+		opts := options.UpdateOne()
+		if m.Upsert {
+			opts.SetUpsert(true)
+		}
+		_, err := a.db.Collection(m.Collection).UpdateOne(bg(), m.Filter, m.Update, opts)
+		if f == nil {
+			return
+		}
+		f.Respond(nil, err)
+	}()
 }
 
 func (a *Actor) onDelete(ctx actor.ActorContext, msg interface{}) {
 	m := msg.(*DeleteOne)
-	_, err := a.db.Collection(m.Collection).DeleteOne(bg(), m.Filter)
-	ctx.Response(nil, err)
+	f := ctx.Future()
+	go func() {
+		_, err := a.db.Collection(m.Collection).DeleteOne(bg(), m.Filter)
+		if f == nil {
+			return
+		}
+		f.Respond(nil, err)
+	}()
 }
 
 func bg() context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	_ = cancel
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	go func() {
+		<-ctx.Done()
+		cancel()
+	}()
 	return ctx
 }
 

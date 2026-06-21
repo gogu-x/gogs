@@ -9,12 +9,12 @@ import (
 	"github.com/gogu-x/gogs/pb/protoGuild"
 )
 
-func CreateGuild(s *Session, ctx actor.ActorContext, msg interface{}) {
+func CreateGuild(s *Session, msg interface{}) {
 	req := msg.(*protoGuild.CreateGuildReq)
 	req.Uid = s.Data.UID
 	req.LeaderName = s.Data.Name
 	req.LeaderLevel = s.Data.Level
-	requestGuild(s, ctx, req, func(ret interface{}, err error) {
+	requestGuild(s, req, func(ret interface{}, err error) {
 		if err != nil {
 			s.Reply(&protoGuild.CreateGuildAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 			return
@@ -23,12 +23,12 @@ func CreateGuild(s *Session, ctx actor.ActorContext, msg interface{}) {
 	})
 }
 
-func JoinGuild(s *Session, ctx actor.ActorContext, msg interface{}) {
+func JoinGuild(s *Session, msg interface{}) {
 	req := msg.(*protoGuild.JoinGuildReq)
 	req.Uid = s.Data.UID
 	req.MemberName = s.Data.Name
 	req.MemberLevel = s.Data.Level
-	requestGuild(s, ctx, req, func(ret interface{}, err error) {
+	requestGuild(s, req, func(ret interface{}, err error) {
 		if err != nil {
 			s.Reply(&protoGuild.JoinGuildAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 			return
@@ -37,8 +37,8 @@ func JoinGuild(s *Session, ctx actor.ActorContext, msg interface{}) {
 	})
 }
 
-func LeaveGuild(s *Session, ctx actor.ActorContext, msg interface{}) {
-	requestGuild(s, ctx, &protoGuild.LeaveGuildReq{Uid: s.Data.UID}, func(ret interface{}, err error) {
+func LeaveGuild(s *Session, msg interface{}) {
+	requestGuild(s, &protoGuild.LeaveGuildReq{Uid: s.Data.UID}, func(ret interface{}, err error) {
 		if err != nil {
 			s.Reply(&protoGuild.LeaveGuildAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 			return
@@ -47,8 +47,8 @@ func LeaveGuild(s *Session, ctx actor.ActorContext, msg interface{}) {
 	})
 }
 
-func GetGuild(s *Session, ctx actor.ActorContext, msg interface{}) {
-	requestGuild(s, ctx, msg.(*protoGuild.GetGuildReq), func(ret interface{}, err error) {
+func GetGuild(s *Session, msg interface{}) {
+	requestGuild(s, msg.(*protoGuild.GetGuildReq), func(ret interface{}, err error) {
 		if err != nil {
 			s.Reply(&protoGuild.GetGuildAck{Code: protoCommon.ErrCode_ERR_UNKNOWN})
 			return
@@ -57,8 +57,8 @@ func GetGuild(s *Session, ctx actor.ActorContext, msg interface{}) {
 	})
 }
 
-func requestGuild(s *Session, ctx actor.ActorContext, msg interface{ ProtoMessage() }, cb func(interface{}, error)) {
-	ctx.Request(actor.MustLookup(constant.ActorGuild), msg).Callback(ctx, func(ret interface{}, err error) {
+func requestGuild(s *Session, msg interface{ ProtoMessage() }, cb func(interface{}, error)) {
+	s.Request(actor.MustLookup(constant.ActorGuild), msg, func(ret interface{}, err error) {
 		if err != nil {
 			log.Printf("requestGuild error: %v", err)
 		}

@@ -49,14 +49,18 @@ func (a *Actor) HandleMessage(ctx actor.ActorContext, msg any) {
 		ctx.Response(nil, fmt.Errorf("rpc/platform: no route for %T", msg))
 		return
 	}
-	rctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	resp := r.newResp()
-	if err := a.conn.Invoke(rctx, r.method, msg, resp); err != nil {
-		ctx.Response(nil, err)
-		return
-	}
-	ctx.Response(resp, nil)
+	f := ctx.Future()
+	conn := a.conn
+	go func() {
+		rctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		resp := r.newResp()
+		if err := conn.Invoke(rctx, r.method, msg, resp); err != nil {
+			f.Respond(nil, err)
+			return
+		}
+		f.Respond(resp, nil)
+	}()
 }
 
 func (a *Actor) OnStop(_ actor.ActorContext) {

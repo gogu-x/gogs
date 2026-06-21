@@ -7,6 +7,8 @@ const ActorRpcPlatform = "rpc_platform"
 
 const ActorNats = "nats"
 
+const ActorGameMongo = "game_mongo" // game 进程的 MongoDB actor
+
 // ─── Platform Actors ──────────────────────────────────────────────────────────
 const (
 	ActorPlatformMongo   = "platform_mongo"

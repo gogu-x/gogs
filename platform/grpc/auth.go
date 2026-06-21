@@ -7,16 +7,25 @@ import (
 )
 
 func (a *Actor) onRegister(ctx actor.ActorContext, msg interface{}) {
-	resp, err := service.Register(a.mongoPID, msg.(*protoPlatform.RegisterReq))
-	ctx.Response(resp, err)
+	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*protoPlatform.RegisterReq)
+	go func() {
+		resp, err := service.Register(mongoPID, req)
+		f.Respond(resp, err)
+	}()
 }
 
 func (a *Actor) onLogin(ctx actor.ActorContext, msg interface{}) {
-	resp, err := service.Login(a.mongoPID, msg.(*protoPlatform.AuthLoginReq))
-	ctx.Response(resp, err)
+	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*protoPlatform.AuthLoginReq)
+	go func() {
+		resp, err := service.Login(mongoPID, req)
+		f.Respond(resp, err)
+	}()
 }
 
 func (a *Actor) onVerify(ctx actor.ActorContext, msg interface{}) {
-	resp, err := service.VerifyToken(msg.(*protoPlatform.VerifyTokenReq))
-	ctx.Response(resp, err)
+	f, req := ctx.Future(), msg.(*protoPlatform.VerifyTokenReq)
+	go func() {
+		resp, err := service.VerifyToken(req)
+		f.Respond(resp, err)
+	}()
 }

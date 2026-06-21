@@ -1,6 +1,7 @@
 package player
 
 import (
+	"errors"
 	"log"
 
 	actor "github.com/gogu-x/bigTree"
@@ -8,6 +9,7 @@ import (
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/player/internal"
 	"github.com/gogu-x/gogs/natsrpc"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // PlayerActor 每个在线玩家独立一个 Actor
@@ -24,17 +26,33 @@ func NewPlayerActor(uid, connID uint64) *PlayerActor {
 
 func (p *PlayerActor) OnInit(ctx actor.ActorContext) {
 	ctx.Register(constant.PlayerName(p.uid))
-	data := internal.Load(p.uid)
-	p.s = internal.NewSession(data)
-	internal.InitRoutes(&p.router, p.s)
 
+	internal.Load(ctx, p.uid, func(data *internal.PlayerData, err error) {
+		if err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				// 新玩家
+				data = internal.NewPlayerData(p.uid)
+				data.Save()
+			} else {
+				log.Printf("PlayerActor[%d]: load failed: %v", p.uid, err)
+				ctx.Stop()
+				return
+			}
+		}
+		p.s = internal.NewSession(data, ctx)
+		internal.InitRoutes(&p.router, p.s)
+		internal.InitTimers(p.s)
+		log.Printf("PlayerActor[%d]: ready", p.uid)
+	})
+
+	// 注册 Frame handler（Load 未完成时消息在 mailbox 缓冲，回调执行后路由生效）
 	p.router.Register(&natsrpc.Frame{}, func(ctx actor.ActorContext, msg interface{}) {
 		frame := msg.(*natsrpc.Frame)
-		if frame.MsgType == natsrpc.MsgTypeDisconnect {
-			log.Printf("PlayerActor[%d]: client disconnected, stopping", p.uid)
-			ctx.Stop()
-			return
-		}
+		//if frame.MsgType == natsrpc.MsgTypeDisconnect {
+		//	log.Printf("PlayerActor[%d]: client disconnected, stopping", p.uid)
+		//	ctx.Stop()
+		//	return
+		//}
 		p.s.ConnID = frame.ConnId
 		p.s.GateId = frame.GateId
 		inner, err := codec.ProtoCodec.Unmarshal(frame.Payload)
@@ -51,8 +69,5 @@ func (p *PlayerActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 }
 
 func (p *PlayerActor) OnStop(_ actor.ActorContext) {
-	log.Printf("PlayerActor[%d]: saving to DB...", p.uid)
-	if err := p.s.Data.Save(); err != nil {
-		log.Printf("PlayerActor[%d]: save error: %v", p.uid, err)
-	}
+	p.s.Data.Save()
 }

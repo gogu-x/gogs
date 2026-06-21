@@ -68,7 +68,7 @@ func main() {
 			actor.Spawn(constant.ActorNats, gate.NewNatsActor(instID))
 			actor.Spawn(constant.ActorGuild, guild.NewGuildActor())
 			actor.Spawn(constant.ActorActivity, activity.NewActivityActor())
-			actor.Spawn(constant.ActorPlatformMongo, rpcmongo.NewActor(db))
+			actor.Spawn(constant.ActorGameMongo, rpcmongo.NewActor(db))
 			actor.Default().Start()
 
 			return nil
