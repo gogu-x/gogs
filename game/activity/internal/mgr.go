@@ -1,4 +1,4 @@
-﻿package activity
+package internal
 
 import (
 	actor "github.com/gogu-x/bigTree"
@@ -6,7 +6,6 @@ import (
 	"github.com/gogu-x/gogs/pb/protoCommon"
 )
 
-// Activity 活动数据
 type Activity struct {
 	ID        uint64
 	Name      string
@@ -37,24 +36,19 @@ func (p *Progress) ToProto() *protoActivity.ActivityProgress {
 	}
 }
 
-type ActivityMgr struct {
-	activities map[uint64]*Activity            // activityID �?Activity
-	progresses map[uint64]map[uint64]*Progress // uid �?activityID �?Progress
+type Mgr struct {
+	activities map[uint64]*Activity
+	progresses map[uint64]map[uint64]*Progress
 }
 
-func NewActivityMgr() *ActivityMgr {
-	return &ActivityMgr{
+func NewMgr() *Mgr {
+	return &Mgr{
 		activities: make(map[uint64]*Activity),
 		progresses: make(map[uint64]map[uint64]*Progress),
 	}
 }
 
-// AddActivity 添加活动（由 GM 或定时任务调用）
-func (s *ActivityMgr) AddActivity(a *Activity) {
-	s.activities[a.ID] = a
-}
-
-func (s *ActivityMgr) GetList(ctx actor.ActorContext, _ *protoActivity.GetActivityListReq) {
+func (s *Mgr) GetList(ctx actor.ActorContext, _ *protoActivity.GetActivityListReq) {
 	list := make([]*protoActivity.ActivityInfo, 0, len(s.activities))
 	for _, a := range s.activities {
 		if a.Status == protoActivity.ActivityStatus_ONGOING {
@@ -64,7 +58,7 @@ func (s *ActivityMgr) GetList(ctx actor.ActorContext, _ *protoActivity.GetActivi
 	ctx.Response(&protoActivity.GetActivityListAck{Activities: list}, nil)
 }
 
-func (s *ActivityMgr) Join(ctx actor.ActorContext, req *protoActivity.JoinActivityReq) {
+func (s *Mgr) Join(ctx actor.ActorContext, req *protoActivity.JoinActivityReq) {
 	ack := &protoActivity.JoinActivityAck{}
 	defer ctx.Response(ack, nil)
 	act, ok := s.activities[req.ActivityId]
@@ -78,12 +72,10 @@ func (s *ActivityMgr) Join(ctx actor.ActorContext, req *protoActivity.JoinActivi
 		ack.Msg = "already joined"
 		return
 	}
-	s.setProgress(req.Uid, &Progress{
-		ActivityID: req.ActivityId, UID: req.Uid, Target: 100,
-	})
+	s.setProgress(req.Uid, &Progress{ActivityID: req.ActivityId, UID: req.Uid, Target: 100})
 }
 
-func (s *ActivityMgr) GetProgress(ctx actor.ActorContext, req *protoActivity.GetProgressReq) {
+func (s *Mgr) GetProgress(ctx actor.ActorContext, req *protoActivity.GetProgressReq) {
 	ack := &protoActivity.GetProgressAck{Code: protoCommon.ErrCode_ERR_UNKNOWN}
 	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.Uid, req.ActivityId)
@@ -94,7 +86,7 @@ func (s *ActivityMgr) GetProgress(ctx actor.ActorContext, req *protoActivity.Get
 	ack.Progress = p.ToProto()
 }
 
-func (s *ActivityMgr) ClaimReward(ctx actor.ActorContext, req *protoActivity.ClaimRewardReq) {
+func (s *Mgr) ClaimReward(ctx actor.ActorContext, req *protoActivity.ClaimRewardReq) {
 	ack := &protoActivity.ClaimRewardAck{}
 	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.Uid, req.ActivityId)
@@ -116,7 +108,7 @@ func (s *ActivityMgr) ClaimReward(ctx actor.ActorContext, req *protoActivity.Cla
 	p.Rewarded = true
 }
 
-func (s *ActivityMgr) getProgress(uid, activityID uint64) (*Progress, bool) {
+func (s *Mgr) getProgress(uid, activityID uint64) (*Progress, bool) {
 	if m, ok := s.progresses[uid]; ok {
 		p, ok := m[activityID]
 		return p, ok
@@ -124,7 +116,7 @@ func (s *ActivityMgr) getProgress(uid, activityID uint64) (*Progress, bool) {
 	return nil, false
 }
 
-func (s *ActivityMgr) setProgress(uid uint64, p *Progress) {
+func (s *Mgr) setProgress(uid uint64, p *Progress) {
 	if s.progresses[uid] == nil {
 		s.progresses[uid] = make(map[uint64]*Progress)
 	}

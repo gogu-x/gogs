@@ -1,4 +1,4 @@
-﻿package guild
+package internal
 
 import (
 	"sync/atomic"
@@ -8,7 +8,6 @@ import (
 	"github.com/gogu-x/gogs/pb/protoGuild"
 )
 
-// Member 工会成员快照
 type Member struct {
 	UID   uint64
 	Name  string
@@ -20,7 +19,6 @@ func (m *Member) ToProto() *protoGuild.GuildMember {
 	return &protoGuild.GuildMember{Uid: m.UID, Name: m.Name, Level: m.Level, Role: m.Role}
 }
 
-// Guild 工会数据
 type Guild struct {
 	ID      uint64
 	Name    string
@@ -40,29 +38,19 @@ func (g *Guild) ToProto() *protoGuild.GuildInfo {
 	}
 }
 
-// UpdateMemberMsg 玩家数据变化时通知 GuildActor 同步快照
-type UpdateMemberMsg struct {
-	UID   uint64
-	Name  string
-	Level uint32
-}
-
 var idGen atomic.Uint64
 
 type Store struct {
-	guilds map[uint64]*Guild // guildID �?Guild
+	guilds map[uint64]*Guild
 }
 
 func NewStore() *Store {
-	return &Store{
-		guilds: make(map[uint64]*Guild),
-	}
+	return &Store{guilds: make(map[uint64]*Guild)}
 }
 
 func (s *Store) Create(ctx actor.ActorContext, req *protoGuild.CreateGuildReq) {
-	uid := req.GetUid()
-
 	id := idGen.Add(1)
+	uid := req.GetUid()
 	g := &Guild{
 		ID: id, Name: req.Name, Leader: uid,
 		Members: map[uint64]*Member{
@@ -77,7 +65,6 @@ func (s *Store) Join(ctx actor.ActorContext, req *protoGuild.JoinGuildReq) {
 	ack := &protoGuild.JoinGuildAck{Code: protoCommon.ErrCode_OK}
 	defer ctx.Response(ack, nil)
 	uid := req.GetUid()
-
 	g, ok := s.guilds[req.GuildId]
 	if !ok {
 		ack.Code = protoCommon.ErrCode_ERR_GUILD_NOT_FOUND
@@ -86,9 +73,7 @@ func (s *Store) Join(ctx actor.ActorContext, req *protoGuild.JoinGuildReq) {
 	g.Members[uid] = &Member{UID: uid, Name: req.GetMemberName(), Level: req.GetMemberLevel(), Role: protoGuild.GuildRole_MEMBER}
 }
 
-func (s *Store) Leave(_ actor.ActorContext, req *protoGuild.LeaveGuildReq) {
-
-}
+func (s *Store) Leave(_ actor.ActorContext, req *protoGuild.LeaveGuildReq) {}
 
 func (s *Store) Get(ctx actor.ActorContext, req *protoGuild.GetGuildReq) {
 	ack := &protoGuild.GetGuildAck{Code: protoCommon.ErrCode_OK}
@@ -99,8 +84,4 @@ func (s *Store) Get(ctx actor.ActorContext, req *protoGuild.GetGuildReq) {
 		return
 	}
 	ack.Guild = g.ToProto()
-}
-
-func (s *Store) UpdateMember(uid uint64, name string, level uint32) {
-
 }

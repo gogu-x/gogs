@@ -1,25 +1,26 @@
-package model
+package activity
 
 import (
 	actor "github.com/gogu-x/bigTree"
-	"github.com/gogu-x/gogs/game/activity"
+	"github.com/gogu-x/gogs/game/activity/internal"
 )
 
 type ActivityActor struct {
-	store  *activity.ActivityMgr
+	mgr    *internal.Mgr
 	router actor.Router
 }
 
+// NewActivityActor 创建 ActivityActor
 func NewActivityActor() *ActivityActor {
-	return &ActivityActor{store: activity.NewActivityMgr()}
+	return &ActivityActor{mgr: internal.NewMgr()}
 }
 
 func (a *ActivityActor) OnInit(_ actor.ActorContext) {
-	activity.InitRoutes(&a.router, a.store)
+	internal.InitRoutes(&a.router, a.mgr)
 }
-
-func (a *ActivityActor) OnStop(_ actor.ActorContext) {}
 
 func (a *ActivityActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 	a.router.Route(ctx, msg)
 }
+
+func (a *ActivityActor) OnStop(_ actor.ActorContext) {}

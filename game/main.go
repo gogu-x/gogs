@@ -10,7 +10,10 @@ import (
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
-	"github.com/gogu-x/gogs/game/model"
+	"github.com/gogu-x/gogs/game/activity"
+	"github.com/gogu-x/gogs/game/gate"
+	"github.com/gogu-x/gogs/game/guild"
+	"github.com/gogu-x/gogs/game/player"
 	natsclient "github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
 	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
@@ -63,9 +66,10 @@ func main() {
 
 			db := rpcmongo.Connect(config.MongoURL, "game")
 
-			actor.Spawn(constant.ActorNats, model.NewNatsActor(instID))
-			actor.Spawn(constant.ActorGuild, model.NewGuildActor())
-			actor.Spawn(constant.ActorActivity, model.NewActivityActor())
+			actor.Spawn(constant.ActorNats, player.NewNatsActor(instID))
+			actor.Spawn(constant.ActorGate, gate.NewGateActor())
+			actor.Spawn(constant.ActorGuild, guild.NewGuildActor())
+			actor.Spawn(constant.ActorActivity, activity.NewActivityActor())
 			actor.Spawn(constant.ActorPlatformMongo, rpcmongo.NewActor(db))
 			actor.Default().Start()
 

@@ -1,4 +1,4 @@
-package model
+package internal
 
 import (
 	"fmt"
@@ -17,11 +17,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type inboundMsg struct {
-	msg    proto.Message
-	uid    uint64
-	connID uint64
-	gateId string
+type InboundMsg struct {
+	Msg    proto.Message
+	UID    uint64
+	ConnID uint64
+	GateId string
 }
 
 type GateActor struct {
@@ -31,10 +31,12 @@ type GateActor struct {
 	router     actor.Router
 }
 
+func NewGateActor() *GateActor { return &GateActor{} }
+
 func (g *GateActor) OnInit(ctx actor.ActorContext) {
 	g.gamePID = actor.MustLookup(constant.ActorNats)
 
-	g.router.Register(&inboundMsg{}, func(ctx actor.ActorContext, msg interface{}) {
+	g.router.Register(&InboundMsg{}, func(ctx actor.ActorContext, msg interface{}) {
 		ctx.Send(g.gamePID, msg)
 	})
 	g.router.Register(&protoGateway.Frame{}, func(_ actor.ActorContext, msg interface{}) {
@@ -71,7 +73,7 @@ func (g *GateActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 	g.router.Route(ctx, msg)
 }
 
-func (g *GateActor) OnStop(ctx actor.ActorContext) {
+func (g *GateActor) OnStop(_ actor.ActorContext) {
 	if g.grpcServer != nil {
 		g.grpcServer.GracefulStop()
 	}
@@ -106,11 +108,11 @@ func (s *gatewayService) Stream(stream protoGateway.Gateway_StreamServer) error 
 			log.Printf("inner: proto.Message error: %v", err)
 			continue
 		}
-		actor.Send(self, &inboundMsg{
-			msg:    protoMsg,
-			uid:    frame.Uid,
-			connID: frame.ConnId,
-			gateId: frame.GateId,
+		actor.Send(self, &InboundMsg{
+			Msg:    protoMsg,
+			UID:    frame.Uid,
+			ConnID: frame.ConnId,
+			GateId: frame.GateId,
 		})
 	}
 }

@@ -1,4 +1,4 @@
-package app
+package internal
 
 import (
 	"log"
@@ -12,8 +12,19 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// Session 每次请求携带的网络上下文
+type Session struct {
+	ConnID uint64
+	GateId string
+	Data   *PlayerData
+}
+
+func NewSession(data *PlayerData) *Session {
+	return &Session{Data: data}
+}
+
 // Reply 将回包通过 NATS 发回 Gate
-func (a *App) Reply(msg proto.Message) {
+func (s *Session) Reply(msg proto.Message) {
 	body, err := codec.ProtoCodec.Marshal(msg)
 	if err != nil {
 		log.Printf("Reply marshal error: %v", err)
@@ -21,13 +32,20 @@ func (a *App) Reply(msg proto.Message) {
 	}
 	actor.Send(actor.MustLookup(constant.ActorNats), &natsrpc.SendMsg{
 		Module: natsrpc.ModuleGate,
-		NodeID: a.GateId,
+		NodeID: s.GateId,
 		Frame: &protoGateway.Frame{
-			Uid:     a.Player.UID,
-			ConnId:  a.ConnID,
-			GateId:  a.GateId,
+			Uid:     s.Data.UID,
+			ConnId:  s.ConnID,
+			GateId:  s.GateId,
 			Payload: body,
 			MsgType: reflect.TypeOf(msg).Elem().Name(),
 		},
 	})
+}
+
+// Handle 将 ctl 层函数包装为 actor.Handler
+func (s *Session) Handle(fn func(*Session, actor.ActorContext, interface{})) actor.Handler {
+	return func(ctx actor.ActorContext, msg interface{}) {
+		fn(s, ctx, msg)
+	}
 }
