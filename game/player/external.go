@@ -1,12 +1,10 @@
 package player
 
 import (
-	"fmt"
 	"log"
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/codec"
-	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/player/internal"
 	"github.com/gogu-x/gogs/natsrpc"
@@ -20,7 +18,7 @@ type PlayerActor struct {
 	s      *internal.Session
 }
 
-func newPlayerActor(uid, connID uint64) *PlayerActor {
+func NewPlayerActor(uid, connID uint64) *PlayerActor {
 	return &PlayerActor{uid: uid, connID: connID}
 }
 
@@ -58,23 +56,3 @@ func (p *PlayerActor) OnStop(_ actor.ActorContext) {
 		log.Printf("PlayerActor[%d]: save error: %v", p.uid, err)
 	}
 }
-
-// NewNatsActor 创建 NatsActor，负责接收消息并 spawn PlayerActor
-func NewNatsActor(instID string) *natsrpc.Actor {
-	serverID := fmt.Sprintf("%d", config.ServerID)
-	return natsrpc.NewActor(natsrpc.ActorConfig{
-		Subs: []natsrpc.SubConfig{
-			natsrpc.Sub(natsrpc.GameInSubject(serverID), func(frame *natsrpc.Frame) (actor.PID, bool) {
-				name := constant.PlayerName(frame.Uid)
-				pid, exists := actor.Default().Lookup(name)
-				if !exists {
-					pid = actor.Default().Spawn(name, newPlayerActor(frame.Uid, frame.ConnId))
-				}
-				return pid, true
-			}, 1),
-			natsrpc.ShutdownSub(serverID, instID),
-		},
-	})
-}
-
-
