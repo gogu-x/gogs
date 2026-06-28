@@ -123,7 +123,7 @@ func (x *StreamMsg) GetFrame() *Frame {
 type CheckDeleteMsg struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ServerId      string                 `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
-	InstId        string                 `protobuf:"bytes,2,opt,name=inst_id,json=instId,proto3" json:"inst_id,omitempty"`
+	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -165,9 +165,9 @@ func (x *CheckDeleteMsg) GetServerId() string {
 	return ""
 }
 
-func (x *CheckDeleteMsg) GetInstId() string {
+func (x *CheckDeleteMsg) GetNodeId() string {
 	if x != nil {
-		return x.InstId
+		return x.NodeId
 	}
 	return ""
 }
@@ -319,7 +319,7 @@ const file_gateway_gateway_internal_proto_rawDesc = "" +
 	"\x05frame\x18\x01 \x01(\v2\x06.FrameR\x05frame\"F\n" +
 	"\x0eCheckDeleteMsg\x12\x1b\n" +
 	"\tserver_id\x18\x01 \x01(\tR\bserverId\x12\x17\n" +
-	"\ainst_id\x18\x02 \x01(\tR\x06instId\"%\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\"%\n" +
 	"\n" +
 	"ConnRegMsg\x12\x17\n" +
 	"\aconn_id\x18\x01 \x01(\x04R\x06connId\"'\n" +

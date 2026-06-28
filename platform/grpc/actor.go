@@ -1,4 +1,4 @@
-﻿package grpc
+package grpc
 
 import (
 	"context"
@@ -8,25 +8,24 @@ import (
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
+	"github.com/gogu-x/gogs/platform/service"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"google.golang.org/grpc"
 )
 
 type Actor struct {
 	router     actor.Router
 	grpcServer *grpc.Server
-	mongoPID   actor.PID
+	db         *mongo.Database
 }
 
-func NewActor() *Actor { return &Actor{} }
+func NewActor(db *mongo.Database) *Actor { return &Actor{db: db} }
 
 func (a *Actor) OnInit(ctx actor.ActorContext) {
-	mongoPID, ok := ctx.Lookup(constant.ActorPlatformMongo)
-	if !ok {
-		log.Fatalf("GrpcActor: MongoActor not found")
+	if err := service.EnsureIndexes(a.db); err != nil {
+		log.Printf("GrpcActor: EnsureIndexes: %v", err)
 	}
-	a.mongoPID = mongoPID
 
 	a.router.Register(&protoPlatform.RegisterReq{}, a.onRegister)
 	a.router.Register(&protoPlatform.AuthLoginReq{}, a.onLogin)
@@ -61,8 +60,6 @@ func (a *Actor) OnStop(_ actor.ActorContext) {
 		a.grpcServer.GracefulStop()
 	}
 }
-
-// ─── gRPC service（gRPC goroutine → GrpcActor）───────────────────────────────
 
 type svcHandler struct {
 	protoPlatform.UnimplementedAuthServiceServer

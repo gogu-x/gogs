@@ -4,16 +4,13 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"time"
 
 	actor "github.com/gogu-x/bigTree"
+	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
-	"github.com/gogu-x/gogs/gate/registry"
 	"github.com/gogu-x/gogs/natsrpc"
-	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoGateway"
-	"github.com/gogu-x/gogs/pb/protoPlatform"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 )
@@ -41,12 +38,13 @@ func (c *Actor) forward(ctx actor.ActorContext, inner interface{}) {
 		return
 	}
 	body, _ := c.codec.Marshal(protoMsg)
-	if c.serverID == "" {
+	if c.serverID == "" || c.nodeID == "" {
 		return
 	}
 	ctx.Send(actor.MustLookup(constant.ActorNats), &natsrpc.SendMsg{
-		Module: natsrpc.ModuleGame,
-		NodeID: c.serverID,
+		Module: natsrpc.GameNats,
+		ID:     c.serverID,
+		NodeId: c.nodeID,
 		Frame: &protoGateway.Frame{
 			ConnId:   c.connID,
 			Uid:      c.uid,
@@ -66,59 +64,16 @@ func (c *Actor) Reply(msg proto.Message) {
 	_ = c.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
-func (c *Actor) onLogin(ctx actor.ActorContext, msg interface{}) {
-	req := msg.(*protoGateway.LoginReq)
-	serverID := fmt.Sprintf("%d", req.ServerId)
-	if !registry.Global.HasServer(serverID) {
-		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_SERVER_NOT_FOUND, Msg: "server not available"})
+func (c *Actor) onNodeFailover(_ actor.ActorContext, msg interface{}) {
+	m := msg.(*NodeFailoverMsg)
+	if c.state != stateAuthed || c.serverID != m.ServerID || c.nodeID != m.DeadNodeID {
 		return
 	}
-	c.state = stateLogging
-	platformPID := actor.MustLookup(constant.ActorRpcPlatform)
-	ctx.Request(platformPID, &protoPlatform.AuthLoginReq{Account: req.Account, Password: req.Password, ServerId: req.ServerId}).
-		Callback(ctx, func(ret interface{}, err error) {
-			if err != nil {
-				c.state = stateAnon
-				c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
-				return
-			}
-			AuthAck := ret.(*protoPlatform.AuthAck)
-			c.uid = AuthAck.Uid
-			c.token = AuthAck.Token
-			c.serverID = serverID
-			c.state = stateAuthed
-			c.forward(ctx, req)
-			log.Printf("ConnActor[%d]: uid=%d logged in -> server %s", c.connID, c.uid, c.serverID)
-			c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
-		})
-}
-
-func (c *Actor) onRegister(ctx actor.ActorContext, msg interface{}) {
-	req := msg.(*protoGateway.RegisterReq)
-	serverID := fmt.Sprintf("%d", req.ServerId)
-	if !registry.Global.HasServer(serverID) {
-		c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_ERR_SERVER_NOT_FOUND, Msg: "server not available"})
+	inst, ok := cluster.HashPick(m.ServerID, c.uid)
+	if !ok {
+		log.Printf("ConnActor[%d]: uid=%d failover: no available node for server=%s", c.connID, c.uid, m.ServerID)
 		return
 	}
-	c.state = stateLogging
-	start := time.Now()
-	log.Printf("ConnActor[%d]: register start", c.connID)
-	platformPID := actor.MustLookup(constant.ActorRpcPlatform)
-	ctx.Request(platformPID, &protoPlatform.RegisterReq{Account: req.Account, Password: req.Password, ServerId: req.ServerId}).
-		Callback(ctx, func(ret interface{}, err error) {
-			log.Printf("ConnActor[%d]: register platform cb elapsed=%v err=%v", c.connID, time.Since(start), err)
-			if err != nil {
-				c.state = stateAnon
-				c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
-				return
-			}
-			AuthAck := ret.(*protoPlatform.AuthAck)
-			c.uid = AuthAck.Uid
-			c.token = AuthAck.Token
-			c.serverID = serverID
-			c.state = stateAuthed
-			c.forward(ctx, req)
-			log.Printf("ConnActor[%d]: uid=%d registered -> server %s", c.connID, c.uid, c.serverID)
-			c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
-		})
+	c.nodeID = inst.NodeID
+	log.Printf("ConnActor[%d]: uid=%d failover server=%s node %s -> %s", c.connID, c.uid, m.ServerID, m.DeadNodeID, c.nodeID)
 }

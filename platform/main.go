@@ -31,8 +31,7 @@ func main() {
 
 			db := rpcmongo.Connect(config.MongoURL, "platform")
 
-			actor.Spawn(constant.ActorPlatformMongo, rpcmongo.NewActor(db))
-			actor.Spawn(constant.ActorPlatformGrpc, platformgrpc.NewActor())
+			actor.Spawn(constant.ActorPlatformGrpc, platformgrpc.NewActor(db))
 			actor.Spawn(constant.ActorPlatformWebhook, &webhook.Actor{})
 
 			actor.Default().Start()

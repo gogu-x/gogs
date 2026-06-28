@@ -1,38 +1,42 @@
 ﻿package service
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
 	"github.com/gogu-x/gogs/platform/auth"
 	"github.com/gogu-x/gogs/platform/store"
-	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
 )
 
-func dbCall(mongoPID actor.PID, msg interface{}) (interface{}, error) {
-	return actor.Default().Request(mongoPID, msg).AwaitTimeout(5 * time.Second)
+const dbTimeout = 5 * time.Second
+
+func bg() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), dbTimeout)
 }
 
-func Register(mongoPID actor.PID, req *protoPlatform.RegisterReq) (*protoPlatform.AuthAck, error) {
+func Register(db *mongo.Database, req *protoPlatform.RegisterReq) (*protoPlatform.AuthAck, error) {
 	if req.ServerId == 0 {
 		return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_ERR_PARAM, Msg: "server_id required"}, nil
 	}
+	ctx, cancel := bg()
+	defer cancel()
 	acc := &store.Account{}
-	err := callFindOne(mongoPID, store.ColAccounts, bson.M{"account": req.Account, "server_id": req.ServerId}, acc)
+	err := db.Collection(store.ColAccounts).FindOne(ctx, bson.M{"account": req.Account, "server_id": req.ServerId}).Decode(acc)
 	if err == nil {
 		return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_ERR_USERNAME_EXISTS, Msg: "account already exists"}, nil
 	}
 	if !errors.Is(err, mongo.ErrNoDocuments) {
 		return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()}, nil
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.MinCost)
 	if err != nil {
 		return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_ERR_INTERNAL, Msg: "internal error"}, nil
 	}
@@ -42,7 +46,9 @@ func Register(mongoPID actor.PID, req *protoPlatform.RegisterReq) (*protoPlatfor
 		PasswordHash: string(hash), UID: uid, CreatedAt: time.Now(),
 		ServerId: req.ServerId,
 	}
-	if _, err := dbCall(mongoPID, &rpcmongo.InsertOne{Collection: store.ColAccounts, Doc: newAcc}); err != nil {
+	ctx2, cancel2 := bg()
+	defer cancel2()
+	if _, err := db.Collection(store.ColAccounts).InsertOne(ctx2, newAcc); err != nil {
 		return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_ERR_INTERNAL, Msg: err.Error()}, nil
 	}
 	token, err := auth.Sign(uid)
@@ -52,9 +58,11 @@ func Register(mongoPID actor.PID, req *protoPlatform.RegisterReq) (*protoPlatfor
 	return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_OK, Uid: uid, Token: token}, nil
 }
 
-func Login(mongoPID actor.PID, req *protoPlatform.AuthLoginReq) (*protoPlatform.AuthAck, error) {
+func Login(db *mongo.Database, req *protoPlatform.AuthLoginReq) (*protoPlatform.AuthAck, error) {
+	ctx, cancel := bg()
+	defer cancel()
 	acc := &store.Account{}
-	if err := callFindOne(mongoPID, store.ColAccounts, bson.M{"account": req.Account, "server_id": req.ServerId}, acc); err != nil {
+	if err := db.Collection(store.ColAccounts).FindOne(ctx, bson.M{"account": req.Account, "server_id": req.ServerId}).Decode(acc); err != nil {
 		return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: "user not found"}, nil
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(acc.PasswordHash), []byte(req.Password)); err != nil {
@@ -75,7 +83,13 @@ func VerifyToken(req *protoPlatform.VerifyTokenReq) (*protoPlatform.VerifyAck, e
 	return &protoPlatform.VerifyAck{Valid: true, Uid: uid}, nil
 }
 
-func callFindOne(mongoPID actor.PID, col string, filter, result interface{}) error {
-	_, err := dbCall(mongoPID, &rpcmongo.FindOne{Collection: col, Filter: filter, Result: result})
+// EnsureIndexes 在启动时建立必要的索引。
+func EnsureIndexes(db *mongo.Database) error {
+	ctx, cancel := bg()
+	defer cancel()
+	_, err := db.Collection(store.ColAccounts).Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "account", Value: 1}, {Key: "server_id", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
 	return err
 }

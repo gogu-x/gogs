@@ -1,12 +1,12 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="gate1" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="gate2" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="gogs" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="--gate-id 1" />
+    <parameters value="--gate-id 2" />
     <kind value="FILE" />
     <package value="github.com/gogu-x/gogs" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$/gate/main.go" />
-    <method v="1" />
+    <method v="2" />
   </configuration>
 </component>

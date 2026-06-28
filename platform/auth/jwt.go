@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/gogu-x/gogs/config"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type claims struct {

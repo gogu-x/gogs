@@ -1,12 +1,14 @@
-package internal
+package base
 
-import "time"
+import (
+	"time"
+)
 
 const saveInterval = 5 * time.Minute
 
 // InitTimers 在 PlayerActor.OnInit 中调用，注册所有定时任务
 func InitTimers(s *Session) {
-	//scheduleSave(s)
+	scheduleSave(s)
 }
 
 func scheduleSave(s *Session) {

@@ -37,9 +37,9 @@ func (r *Actor) OnInit(ctx actor.ActorContext) {
 			if len(instances) == 0 {
 				continue
 			}
-			r.active[serverID] = instances[0].InstID
+			r.active[serverID] = instances[0].NodeID
 			for _, inst := range instances[1:] {
-				natsrpc.PublishShutdown(serverID, inst.InstID)
+				natsrpc.PublishShutdown(serverID, inst.NodeID)
 			}
 		}
 		log.Printf("RegistryActor: loaded %d servers", len(r.active))

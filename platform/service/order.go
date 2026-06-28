@@ -1,35 +1,39 @@
 ﻿package service
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
-	actor "github.com/gogu-x/bigTree"
-	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
 	"github.com/gogu-x/gogs/platform/store"
 )
 
-func CreateOrder(mongoPID actor.PID, req *protoPlatform.CreateOrderReq) (*protoPlatform.OrderAck, error) {
+func CreateOrder(db *mongo.Database, req *protoPlatform.CreateOrderReq) (*protoPlatform.OrderAck, error) {
 	orderID := fmt.Sprintf("%d-%d", req.Uid, time.Now().UnixNano())
 	o := &store.Order{
 		ID: bson.NewObjectID(), OrderID: orderID, UID: req.Uid,
 		ProductID: req.ProductId, ServerID: req.ServerId,
 		Status: protoPlatform.OrderStatus_PENDING, CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
-	if _, err := dbCall(mongoPID, &rpcmongo.InsertOne{Collection: store.ColOrders, Doc: o}); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+	if _, err := db.Collection(store.ColOrders).InsertOne(ctx, o); err != nil {
 		return &protoPlatform.OrderAck{Code: protoCommon.ErrCode_ERR_INTERNAL, Msg: err.Error()}, nil
 	}
 	return &protoPlatform.OrderAck{Code: protoCommon.ErrCode_OK, OrderId: orderID}, nil
 }
 
-func QueryOrder(mongoPID actor.PID, req *protoPlatform.QueryOrderReq) (*protoPlatform.OrderDetail, error) {
+func QueryOrder(db *mongo.Database, req *protoPlatform.QueryOrderReq) (*protoPlatform.OrderDetail, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
 	o := &store.Order{}
-	if err := callFindOne(mongoPID, store.ColOrders, bson.M{"order_id": req.OrderId}, o); err != nil {
+	if err := db.Collection(store.ColOrders).FindOne(ctx, bson.M{"order_id": req.OrderId}).Decode(o); err != nil {
 		return &protoPlatform.OrderDetail{}, nil
 	}
 	return &protoPlatform.OrderDetail{
@@ -38,16 +42,19 @@ func QueryOrder(mongoPID actor.PID, req *protoPlatform.QueryOrderReq) (*protoPla
 	}, nil
 }
 
-func DeliverOrder(mongoPID actor.PID, orderID string) error {
+func DeliverOrder(db *mongo.Database, orderID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
 	o := &store.Order{}
-	if err := callFindOne(mongoPID, store.ColOrders, bson.M{"order_id": orderID}, o); err != nil {
+	if err := db.Collection(store.ColOrders).FindOne(ctx, bson.M{"order_id": orderID}).Decode(o); err != nil {
 		return fmt.Errorf("order not found: %s", orderID)
 	}
-	_, err := dbCall(mongoPID, &rpcmongo.UpdateOne{
-		Collection: store.ColOrders,
-		Filter:     bson.M{"order_id": orderID},
-		Update:     bson.M{"$set": bson.M{"status": protoPlatform.OrderStatus_PAID, "updated_at": time.Now()}},
-	})
+	ctx2, cancel2 := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel2()
+	_, err := db.Collection(store.ColOrders).UpdateOne(ctx2,
+		bson.M{"order_id": orderID},
+		bson.M{"$set": bson.M{"status": protoPlatform.OrderStatus_PAID, "updated_at": time.Now()}},
+	)
 	if err != nil {
 		return err
 	}

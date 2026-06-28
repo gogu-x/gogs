@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/gogu-x/bigTree/log"
 	"github.com/gogu-x/gogs/cluster"
@@ -32,6 +31,12 @@ func main() {
 				Usage:    "server ID (unique per game server group, e.g. 1, 2, 3)",
 				Required: true,
 			},
+			&cli.IntFlag{
+				Name:     "node-id",
+				Aliases:  []string{"node-id"},
+				Usage:    "node ID (unique per game server group, e.g. 1, 2, 3)",
+				Required: true,
+			},
 			&cli.StringFlag{
 				Name:  "port",
 				Usage: "gRPC listen port override (default: 9000+serverID)",
@@ -39,6 +44,8 @@ func main() {
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			config.ServerID = c.Int("server-id")
+			config.NodeId = c.Int("node-id")
+
 			if p := c.String("port"); p != "" {
 				config.GrpcPortOverride = p
 			}
@@ -54,18 +61,17 @@ func main() {
 			defer natsclient.Close()
 
 			serverID := fmt.Sprintf("%d", config.ServerID)
-			instID := fmt.Sprintf("%v", time.Now().Unix())
+			NodeID := fmt.Sprintf("%d", config.NodeId)
 			addr := config.GameAddr()
 
-			fmt.Println(instID)
-			if err := cluster.Register(serverID, instID, addr); err != nil {
+			if err := cluster.Register(serverID, NodeID, addr); err != nil {
 				log.Fatal("cluster register error: " + err.Error())
 			}
-			fmt.Printf("game server [%s] inst=%s registered at %s\n", serverID, instID, addr)
+			fmt.Printf("game server [%s] inst=%s registered at %s\n", serverID, NodeID, addr)
 
-			db := rpcmongo.Connect(config.MongoURL, "game")
+			db := rpcmongo.Connect(config.MongoURL, fmt.Sprintf("game_%v", serverID))
 
-			actor.Spawn(constant.ActorNats, gate.NewNatsActor(instID))
+			actor.Spawn(constant.ActorNats, gate.NewNatsActor(NodeID))
 			actor.Spawn(constant.ActorGuild, guild.NewGuildActor())
 			actor.Spawn(constant.ActorActivity, activity.NewActivityActor())
 			actor.Spawn(constant.ActorGameMongo, rpcmongo.NewActor(db))

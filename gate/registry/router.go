@@ -26,41 +26,41 @@ func (r *Actor) onCheckDelete(_ actor.ActorContext, msg interface{}) {
 	m := msg.(*protoGateway.CheckDeleteMsg)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if !r.pending[m.ServerId] || r.active[m.ServerId] != m.InstId {
+	if !r.pending[m.ServerId] || r.active[m.ServerId] != m.NodeId {
 		return
 	}
 	delete(r.active, m.ServerId)
 	delete(r.pending, m.ServerId)
-	log.Printf("RegistryActor: server=%s inst=%s confirmed down", m.ServerId, m.InstId)
+	log.Printf("RegistryActor: server=%s inst=%s confirmed down", m.ServerId, m.NodeId)
 }
 
 func (r *Actor) handleEvent(_ actor.ActorContext, ev *cluster.InstanceEvent) {
 	switch ev.Type {
 	case "put":
-		if r.active[ev.ServerID] == ev.InstID {
+		if r.active[ev.ServerID] == ev.NodeID {
 			r.pending[ev.ServerID] = false
 			return
 		}
 		if old := r.active[ev.ServerID]; old != "" {
 			natsrpc.PublishShutdown(ev.ServerID, old)
 		}
-		r.active[ev.ServerID] = ev.InstID
+		r.active[ev.ServerID] = ev.NodeID
 		r.pending[ev.ServerID] = false
 		if pid, ok := actor.Lookup(constant.ActorNats); ok {
 			actor.Send(pid, &protoGateway.SwitchMsg{ServerId: ev.ServerID, NewAddr: ev.Addr})
 		}
-		log.Printf("RegistryActor: server=%s switch to %s addr=%s", ev.ServerID, ev.InstID, ev.Addr)
+		log.Printf("RegistryActor: server=%s switch to %s addr=%s", ev.ServerID, ev.NodeID, ev.Addr)
 
 	case "delete":
-		if r.active[ev.ServerID] != ev.InstID {
+		if r.active[ev.ServerID] != ev.NodeID {
 			return
 		}
 		r.pending[ev.ServerID] = true
-		serverID, instID := ev.ServerID, ev.InstID
+		serverID, NodeID := ev.ServerID, ev.NodeID
 		self := actor.MustLookup(constant.ActorRegistry)
 		go func() {
 			time.Sleep(3 * time.Second)
-			actor.Send(self, &protoGateway.CheckDeleteMsg{ServerId: serverID, InstId: instID})
+			actor.Send(self, &protoGateway.CheckDeleteMsg{ServerId: serverID, NodeId: NodeID})
 		}()
 	}
 }

@@ -2,7 +2,7 @@
   <configuration default="false" name="go build github.com/gogu-x/gogs/game1-2" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="gogs" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="--server-id 1 --port 8002" />
+    <parameters value="--server-id 1 --port 8002 --node-id 2" />
     <kind value="DIRECTORY" />
     <package value="github.com/gogu-x/gogs" />
     <directory value="$PROJECT_DIR$/game" />

@@ -136,7 +136,7 @@ sequenceDiagram
     participant GW as Gate
     participant NATS as NATS
     participant SES as SessionActor
-    participant PA as PlayerActor
+    participant PA as Player
     participant CACHE as Redis
     participant DB as MongoDB
 
@@ -147,7 +147,7 @@ sequenceDiagram
 
     NATS->>SES: 投递（按 uid 分片）
     SES->>SES: 检查会话有效性
-    SES->>PA: forward 到 PlayerActor
+    SES->>PA: forward 到 Player
 
     PA->>CACHE: GET player:{uid}
     alt 缓存命中
@@ -172,7 +172,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant PA as PlayerActor<br/>(节点 A)
+    participant PA as Player<br/>(节点 A)
     participant NATS as NATS
     participant N1 as Game 节点 1
     participant N2 as Game 节点 2
@@ -207,7 +207,7 @@ sequenceDiagram
     participant GW1 as Gate-1
     participant GW2 as Gate-2
     participant SES as SessionActor
-    participant PA as PlayerActor
+    participant PA as Player
 
     Note over C,GW1: 玩家原本通过 Gate-1 连接
 
@@ -215,7 +215,7 @@ sequenceDiagram
     GW1->>SES: PlayerDisconnected(uid)
     SES->>SES: 标记 detached<br/>启动重连等待计时器 (60s)
 
-    Note over PA: PlayerActor 仍存活，状态保留
+    Note over PA: Player 仍存活，状态保留
 
     C->>GW2: 重连 (任一 Gate)
     GW2->>GW2: 鉴权（同 token / 重连票据）
@@ -272,9 +272,9 @@ shard 分配 = etcd 中维护 {shard_id → game_node_id}
 
 无论怎么演进，这几条要守住：
 
-1. **每个在线玩家有且仅有一个 PlayerActor**（uid 是全局唯一身份）
+1. **每个在线玩家有且仅有一个 Player**（uid 是全局唯一身份）
 2. **Gate 不持有任何业务状态**（重启 / 扩缩容不丢业务数据）
-3. **PlayerActor 的状态修改必须同时入 cache 和 DB**（DB 是真实之源，cache 是性能优化）
+3. **Player 的状态修改必须同时入 cache 和 DB**（DB 是真实之源，cache 是性能优化）
 4. **跨 actor 通信只走消息**（不通过共享内存或全局变量）
 5. **所有外部 IO 必须有超时和重试**（DB / Redis / NATS）
 

@@ -18,7 +18,7 @@ message StreamMsg {
 // CheckDeleteMsg 延迟确认 active 实例是否真的下线
 message CheckDeleteMsg {
   string server_id = 1;
-  string inst_id   = 2;
+  string node_id   = 2;
 }
 
 // ConnRegMsg ConnActor 上线时注册到 GateServer

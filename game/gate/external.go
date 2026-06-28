@@ -17,11 +17,11 @@ func NewGateActor() actor.Actor {
 }
 
 // NewNatsActor Gate 创建 NatsActor，负责接收消息并 spawn PlayerActor
-func NewNatsActor(instID string) *natsrpc.Actor {
+func NewNatsActor(NodeID string) *natsrpc.Actor {
 	serverID := fmt.Sprintf("%d", config.ServerID)
 	return natsrpc.NewActor(natsrpc.ActorConfig{
 		Subs: []natsrpc.SubConfig{
-			natsrpc.Sub(natsrpc.GameInSubject(serverID), func(frame *natsrpc.Frame) (actor.PID, bool) {
+			natsrpc.Sub(natsrpc.GameInSubject(serverID, NodeID), func(frame *natsrpc.Frame) (actor.PID, bool) {
 				name := constant.PlayerName(frame.Uid)
 				pid, exists := actor.Default().Lookup(name)
 				if !exists {
@@ -29,7 +29,7 @@ func NewNatsActor(instID string) *natsrpc.Actor {
 				}
 				return pid, true
 			}, 1),
-			natsrpc.ShutdownSub(serverID, instID),
+			natsrpc.ShutdownSub(serverID, NodeID),
 		},
 	})
 }

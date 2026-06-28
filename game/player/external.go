@@ -8,51 +8,47 @@ import (
 	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/player/internal"
+	"github.com/gogu-x/gogs/game/player/internal/base"
 	"github.com/gogu-x/gogs/natsrpc"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-// PlayerActor 每个在线玩家独立一个 Actor
-type PlayerActor struct {
+// Player 每个在线玩家独立一个 Actor
+type Player struct {
 	uid    uint64
 	connID uint64
 	router actor.Router
-	s      *internal.Session
+	s      *base.Session
 }
 
-func NewPlayerActor(uid, connID uint64) *PlayerActor {
-	return &PlayerActor{uid: uid, connID: connID}
+func NewPlayerActor(uid, connID uint64) *Player {
+	return &Player{uid: uid, connID: connID}
 }
 
-func (p *PlayerActor) OnInit(ctx actor.ActorContext) {
+func (p *Player) OnInit(ctx actor.ActorContext) {
 	ctx.Register(constant.PlayerName(p.uid))
 
-	internal.Load(ctx, p.uid, func(data *internal.PlayerData, err error) {
-		if err != nil {
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				// 新玩家
-				data = internal.NewPlayerData(p.uid)
-				data.Save()
-			} else {
-				log.Printf("PlayerActor[%d]: load failed: %v", p.uid, err)
-				ctx.Stop()
-				return
-			}
+	// 同步加载玩家数据：阻塞当前 PlayerActor goroutine 直到完成或超时。
+	// 框架在 OnInit 返回后才开始消费 mailbox，因此 OnInit 返回时 p.s 必已就绪，
+	// 任何 Frame 都不可能在 Session 初始化之前被处理，从根上消除空指针竞态。
+	data, err := base.Load(ctx, p.uid)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			data = base.NewPlayerData(p.uid)
+		} else {
+			log.Printf("PlayerActor[%d]: load failed: %v", p.uid, err)
+			ctx.Stop()
+			return
 		}
-		p.s = internal.NewSession(data, ctx)
-		internal.InitRoutes(&p.router, p.s)
-		internal.InitTimers(p.s)
-		log.Printf("PlayerActor[%d]: ready", p.uid)
-	})
+	}
+	p.s = base.NewSession(data, ctx)
+	internal.InitRoutes(&p.router, p.s)
+	base.InitTimers(p.s)
+	log.Printf("PlayerActor[%d]: ready", p.uid)
 
-	// 注册 Frame handler（Load 未完成时消息在 mailbox 缓冲，回调执行后路由生效）
+	// 注册 Frame handler。此时 p.s 已就绪。
 	p.router.Register(&natsrpc.Frame{}, func(ctx actor.ActorContext, msg interface{}) {
 		frame := msg.(*natsrpc.Frame)
-		//if frame.MsgType == natsrpc.MsgTypeDisconnect {
-		//	log.Printf("PlayerActor[%d]: client disconnected, stopping", p.uid)
-		//	ctx.Stop()
-		//	return
-		//}
 		p.s.ConnID = frame.ConnId
 		p.s.GateId = frame.GateId
 		inner, err := codec.ProtoCodec.Unmarshal(frame.Payload)
@@ -64,10 +60,14 @@ func (p *PlayerActor) OnInit(ctx actor.ActorContext) {
 	})
 }
 
-func (p *PlayerActor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
+func (p *Player) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 	p.router.Route(ctx, msg)
 }
 
-func (p *PlayerActor) OnStop(_ actor.ActorContext) {
+func (p *Player) OnStop(_ actor.ActorContext) {
+	if p.s == nil {
+		log.Printf("PlayerActor[%d]: Session nil", p.uid)
+		return
+	}
 	p.s.Data.Save()
 }

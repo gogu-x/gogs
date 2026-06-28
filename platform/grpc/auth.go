@@ -7,17 +7,17 @@ import (
 )
 
 func (a *Actor) onRegister(ctx actor.ActorContext, msg interface{}) {
-	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*protoPlatform.RegisterReq)
+	f, db, req := ctx.Future(), a.db, msg.(*protoPlatform.RegisterReq)
 	go func() {
-		resp, err := service.Register(mongoPID, req)
+		resp, err := service.Register(db, req)
 		f.Respond(resp, err)
 	}()
 }
 
 func (a *Actor) onLogin(ctx actor.ActorContext, msg interface{}) {
-	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*protoPlatform.AuthLoginReq)
+	f, db, req := ctx.Future(), a.db, msg.(*protoPlatform.AuthLoginReq)
 	go func() {
-		resp, err := service.Login(mongoPID, req)
+		resp, err := service.Login(db, req)
 		f.Respond(resp, err)
 	}()
 }

@@ -63,5 +63,11 @@ func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	if c.Subprotocol() == "json" {
 		cd = codec.JsonCodec
 	}
+
+	// gate 链接全部在线的game rpc stream 启动的时候按照etcd 中注册的服务进行链接
+	// 根据用户把携带的serverId 把消息分配到对应的RPC Stream 里面
+	// game和gate 建立的是一个rpc stream 双向流
+	// 如果多个gate 和同一个game 建立双向流。他们之间数据传输是什么样的？ 多个gate和同一组game server 1 建议链接数据又是什么样的？ 这种方案是否合理？
+	// 对于这一套gate 和game 整理的架构 设计师傅合理
 	actor.Spawn(fmt.Sprintf("conn-%p", c), conn.New(c, cd))
 }

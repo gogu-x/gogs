@@ -84,7 +84,7 @@ flowchart TB
 - 性能：整服 CPU 上限 = 单核
 - 扩展：横向扩容只能开新区
 
-> `docs/actor-design.md` 列了 PlayerActor / RoomActor / BattleActor，但**实现里 GameActor 是个大锅**。设计文档与实现脱节。
+> `docs/actor-design.md` 列了 Player / RoomActor / BattleActor，但**实现里 GameActor 是个大锅**。设计文档与实现脱节。
 
 ---
 
@@ -166,7 +166,7 @@ message Frame {
 | 死信队列 | ❓ | 发给不存在 actor 的消息处理未知 |
 | 持久化 mailbox | 无 | 进程崩溃丢消息 |
 
-PlayerActor / RoomActor 拆分推进前，这些基础能力需要先评估或补齐。
+Player / RoomActor 拆分推进前，这些基础能力需要先评估或补齐。
 
 ---
 
@@ -217,13 +217,13 @@ flowchart TB
     subgraph GameLayer["Game 层 (按 uid sharding)"]
         subgraph G_Node1["Game 节点 1"]
             S1["SessionActor pool<br/>(uid % N → shard)"]
-            P1["PlayerActor 池"]
+            P1["Player 池"]
             R1["RoomActor 池"]
             B1["BattleActor 池"]
         end
         subgraph G_Node2["Game 节点 2"]
             S2["SessionActor pool"]
-            P2["PlayerActor 池"]
+            P2["Player 池"]
             R2["RoomActor 池"]
             B2["BattleActor 池"]
         end
@@ -273,7 +273,7 @@ sequenceDiagram
     participant GW as Gate
     participant BUS as NATS
     participant SH as Shard Router
-    participant PA as PlayerActor
+    participant PA as Player
     participant RD as Redis
     participant DB as MongoDB
 
@@ -343,7 +343,7 @@ flowchart LR
 ```
 
 **关键约束**：
-- 每个玩家有且仅有一个 PlayerActor（按 uid 路由）
+- 每个玩家有且仅有一个 Player（按 uid 路由）
 - Session 与 Player 1:1，但 Session 可换 connID（断线重连）
 - Player 同一时刻只在一个 Room
 - Room / Battle 这类有限生命周期 actor 由对应 Supervisor 管理
@@ -379,7 +379,7 @@ gogs/
 每个 `domain/xxx/` 内部自包含：
 ```
 domain/player/
-├── actor.go         # PlayerActor 定义
+├── actor.go         # Player 定义
 ├── messages.go      # 内部消息
 ├── handler.go       # 业务 handler
 ├── repository.go    # 持久化接口（实现在 infra/persist）
@@ -404,7 +404,7 @@ gantt
 
     section P1 架构基础
     引入 SessionActor                    :p1-1, after p0-4, 5
-    引入 PlayerActor (按 uid sharding)   :p1-2, after p1-1, 8
+    引入 Player (按 uid sharding)   :p1-2, after p1-1, 8
     持久化层 (MongoDB Repository)        :p1-3, after p1-2, 5
     缓存层 (Redis)                       :p1-4, after p1-3, 5
     Frame 协议重构 (oneof + 元数据)      :p1-5, after p0-4, 5
@@ -442,14 +442,14 @@ gantt
    - 每个 uid 一个 Session，Session 持有 connID 引用
    - 解决断线重连、多端登录
 
-2. **引入 PlayerActor（按 uid sharding）**
+2. **引入 Player（按 uid sharding）**
    - GameActor 退化为"路由器"，只负责 dispatch
-   - PlayerActor 池由 PlayerSupervisor 管理
+   - Player 池由 PlayerSupervisor 管理
    - 单服并发能力从 1 核 → N 核
 
 3. **持久化层**
    - 定义 `PlayerRepository` 接口
-   - MongoDB 实现，PlayerActor 启动时 load、定期 / 关键操作 save
+   - MongoDB 实现，Player 启动时 load、定期 / 关键操作 save
    - 加 Redis 缓存层
 
 4. **Frame 协议重构**

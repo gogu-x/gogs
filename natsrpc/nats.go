@@ -41,7 +41,7 @@ func (a *Actor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
 	switch m := msg.(type) {
 	case *SendMsg:
 		if err := send(m); err != nil {
-			log.Printf("natsrpc: send [%s/%s]: %v", m.Module, m.NodeID, err)
+			log.Printf("natsrpc: send [%s/%s]: %v", m.Module, m.ID, err)
 		}
 	case *shutdownMsg:
 		a.OnStop(ctx)

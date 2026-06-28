@@ -13,6 +13,13 @@ type WsMsg struct{ Data []byte }
 type WriteMsg struct{ Data []byte } // inbound from NatsActor →write to ws
 type stopMsg struct{}
 
+// NodeFailoverMsg 节点故障通知，GateServer 广播给所有 ConnActor。
+// ConnActor 收到后若自己的 nodeID == DeadNodeID，则重新 hash 选节点实现无感切换。
+type NodeFailoverMsg struct {
+	ServerID   string
+	DeadNodeID string
+}
+
 type connState int
 
 const (
@@ -28,6 +35,7 @@ type Actor struct {
 	uid         uint64
 	connID      uint64
 	serverID    string
+	nodeID      string // hash 选定的 game 节点实例 ID，登录时确定，后续消息固定路由到此节点
 	token       string
 	state       connState
 	middlewares []middlewareFunc
@@ -73,8 +81,9 @@ func (c *Actor) OnStop(ctx actor.ActorContext) {
 	}
 	if c.uid != 0 && c.serverID != "" {
 		ctx.Send(actor.MustLookup(constant.ActorNats), &natsrpc.SendMsg{
-			Module: natsrpc.ModuleGame,
-			NodeID: c.serverID,
+			Module: natsrpc.GameNats,
+			ID:     c.serverID,
+			NodeId: c.nodeID,
 			Frame: &protoGateway.Frame{
 				ConnId:  c.connID,
 				Uid:     c.uid,

@@ -98,6 +98,9 @@ func (a *Actor) onUpdate(ctx actor.ActorContext, msg interface{}) {
 			opts.SetUpsert(true)
 		}
 		_, err := a.db.Collection(m.Collection).UpdateOne(bg(), m.Filter, m.Update, opts)
+		if err != nil {
+			log.Printf("rpc/mongo: UpdateOne [%s] error: %v", m.Collection, err)
+		}
 		if f == nil {
 			return
 		}
@@ -118,11 +121,7 @@ func (a *Actor) onDelete(ctx actor.ActorContext, msg interface{}) {
 }
 
 func bg() context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	go func() {
-		<-ctx.Done()
-		cancel()
-	}()
+	ctx, _ := context.WithTimeout(context.Background(), 8*time.Second)
 	return ctx
 }
 

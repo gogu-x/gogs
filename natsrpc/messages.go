@@ -9,7 +9,8 @@ type Frame = protoGateway.Frame
 // Module 指定目标类型，NodeID 指定目标实例 ID。
 type SendMsg struct {
 	Module string
-	NodeID string
+	ID     string
+	NodeId string
 	Frame  *Frame
 }
 
@@ -37,6 +38,6 @@ func Sub(subject string, route RouteFunc, workers int) SubConfig {
 }
 
 // ShutdownSub 订阅关闭信号。
-func ShutdownSub(serverID, instID string) SubConfig {
-	return SubConfig{kind: kindShutdown, subject: "game.shutdown." + serverID + "." + instID}
+func ShutdownSub(serverID, NodeID string) SubConfig {
+	return SubConfig{kind: kindShutdown, subject: "game.shutdown." + serverID + "." + NodeID}
 }

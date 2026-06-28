@@ -1,4 +1,4 @@
-package internal
+package base
 
 import (
 	"log"
@@ -39,7 +39,7 @@ func (s *Session) Reply(msg proto.Message) {
 	}
 	actor.Send(actor.MustLookup(constant.ActorNats), &natsrpc.SendMsg{
 		Module: natsrpc.ModuleGate,
-		NodeID: s.GateId,
+		ID:     s.GateId,
 		Frame: &protoGateway.Frame{
 			Uid:     s.Data.UID,
 			ConnId:  s.ConnID,

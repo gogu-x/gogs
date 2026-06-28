@@ -5,16 +5,17 @@ import (
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/constant"
+	"github.com/gogu-x/gogs/game/player/internal/base"
 	"github.com/gogu-x/gogs/pb/protoActivity"
 )
 
-func GetActivityList(s *Session, msg interface{}) {
+func GetActivityList(s *base.Session, msg interface{}) {
 	requestActivity(s, msg.(*protoActivity.GetActivityListReq), func(ret interface{}, err error) {
 		s.Reply(ret.(*protoActivity.GetActivityListAck))
 	})
 }
 
-func JoinActivity(s *Session, msg interface{}) {
+func JoinActivity(s *base.Session, msg interface{}) {
 	req := msg.(*protoActivity.JoinActivityReq)
 	req.Uid = s.Data.UID
 	requestActivity(s, req, func(ret interface{}, err error) {
@@ -22,7 +23,7 @@ func JoinActivity(s *Session, msg interface{}) {
 	})
 }
 
-func GetProgress(s *Session, msg interface{}) {
+func GetProgress(s *base.Session, msg interface{}) {
 	req := msg.(*protoActivity.GetProgressReq)
 	req.Uid = s.Data.UID
 	requestActivity(s, req, func(ret interface{}, err error) {
@@ -30,7 +31,7 @@ func GetProgress(s *Session, msg interface{}) {
 	})
 }
 
-func ClaimReward(s *Session, msg interface{}) {
+func ClaimReward(s *base.Session, msg interface{}) {
 	req := msg.(*protoActivity.ClaimRewardReq)
 	req.Uid = s.Data.UID
 	requestActivity(s, req, func(ret interface{}, err error) {
@@ -38,7 +39,7 @@ func ClaimReward(s *Session, msg interface{}) {
 	})
 }
 
-func requestActivity(s *Session, msg interface{ ProtoMessage() }, cb func(interface{}, error)) {
+func requestActivity(s *base.Session, msg interface{ ProtoMessage() }, cb func(interface{}, error)) {
 	s.Request(actor.MustLookup(constant.ActorActivity), msg, func(ret interface{}, err error) {
 		if err != nil {
 			log.Printf("requestActivity error: %v", err)

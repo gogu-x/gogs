@@ -7,6 +7,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -21,11 +24,14 @@ import (
 )
 
 var (
-	addr        = flag.String("addr", "ws://127.0.0.1:8081/ws", "gate websocket address")
+	addrs       = flag.String("addrs", "ws://127.0.0.1:8081/ws,ws://127.0.0.1:8082/ws", "gate websocket addresses (comma-separated)")
 	serverID    = flag.Int("server-id", 1, "game server id")
-	users       = flag.Int("users", 10000, "total user count")
-	concurrency = flag.Int("c", 200, "max concurrent connections")
-	timeout     = flag.Duration("timeout", 5*time.Second, "per-message read timeout")
+	users       = flag.Int("users", 20000, "total user count")
+	concurrency = flag.Int("c", 1000, "max concurrent connections")
+	dialRate    = flag.Int("dial-rate", 5000, "max new dials per second")
+	timeout     = flag.Duration("timeout", 10*time.Second, "per-message read timeout")
+
+	gateAddrs []string
 )
 
 // ── 轻量 ws 客户端 ────────────────────────────────────────────────────────────
@@ -37,12 +43,20 @@ var dialer = websocket.Dialer{
 	HandshakeTimeout: 5 * time.Second,
 }
 
-func dial() (*client, error) {
-	conn, _, err := dialer.Dial(*addr, nil)
-	if err != nil {
-		return nil, err
+func dial(idx int) (*client, error) {
+	target := gateAddrs[idx%len(gateAddrs)] // 轮询分配到各 Gate
+	var (
+		conn *websocket.Conn
+		err  error
+	)
+	for i := range 3 {
+		conn, _, err = dialer.Dial(target, nil)
+		if err == nil {
+			return &client{conn}, nil
+		}
+		time.Sleep(time.Duration(i+1) * 100 * time.Millisecond)
 	}
-	return &client{conn}, nil
+	return nil, err
 }
 
 func (c *client) close() { c.conn.Close() }
@@ -76,7 +90,7 @@ func (c *client) recv() (proto.Message, error) {
 // ── 单用户流程 ────────────────────────────────────────────────────────────────
 
 func runUser(idx int) error {
-	c, err := dial()
+	c, err := dial(idx)
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
@@ -121,40 +135,62 @@ func runUser(idx int) error {
 
 func main() {
 	flag.Parse()
-	log.Printf("压测开始: addr=%s users=%d", *addr, *users)
+	gateAddrs = strings.Split(*addrs, ",")
+	log.Printf("压测开始: addrs=%v users=%d", gateAddrs, *users)
 
 	var (
-		wg         sync.WaitGroup
-		success    int64
-		failure    int64
-		start      = time.Now()
-		sampleOnce sync.Once
-		sem        = make(chan struct{}, *concurrency)
+		wg      sync.WaitGroup
+		success int64
+		failure int64
+		start   = time.Now()
+		sem     = make(chan struct{}, *concurrency)
+
+		errMu    sync.Mutex
+		errCount = map[string]int{}
 	)
 
+	// dialRate 限速：每秒最多建 dialRate 个新连接，避免瞬间冲击 OS backlog
+	ticker := time.NewTicker(time.Second / time.Duration(*dialRate))
+	defer ticker.Stop()
+
+	wg.Add(*users)
 	for i := range *users {
-		wg.Add(1)
+		<-ticker.C // 控制建连速率
 		sem <- struct{}{}
 		go func(idx int) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			if err := runUser(idx); err != nil {
 				atomic.AddInt64(&failure, 1)
-				sampleOnce.Do(func() { log.Printf("sample error: %v", err) })
+				// 按错误前缀（"dial:"/"register recv:"等）分类计数
+				key := err.Error()
+				if idx := len(key); idx > 40 {
+					key = key[:40]
+				}
+				errMu.Lock()
+				errCount[key]++
+				errMu.Unlock()
 			} else {
 				n := atomic.AddInt64(&success, 1)
-				if n%500 == 0 {
+				if n%int64(*dialRate) == 0 {
 					log.Printf("progress: %d/%d done", n, *users)
 				}
 			}
 		}(i)
 	}
-
 	wg.Wait()
+
 	elapsed := time.Since(start)
 
 	total := success + failure
 	log.Printf("===== 压测结束 =====")
 	log.Printf("总用户: %d  成功: %d  失败: %d  耗时: %v  QPS: %.0f",
 		total, success, failure, elapsed, float64(total)/elapsed.Seconds())
+	for msg, cnt := range errCount {
+		log.Printf("  失败[%d]: %s", cnt, msg)
+	}
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
 }

@@ -12,25 +12,25 @@ import (
 type deliverReq struct{ orderID string }
 
 func (a *Actor) onCreateOrder(ctx actor.ActorContext, msg interface{}) {
-	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*protoPlatform.CreateOrderReq)
+	f, db, req := ctx.Future(), a.db, msg.(*protoPlatform.CreateOrderReq)
 	go func() {
-		resp, err := service.CreateOrder(mongoPID, req)
+		resp, err := service.CreateOrder(db, req)
 		f.Respond(resp, err)
 	}()
 }
 
 func (a *Actor) onQueryOrder(ctx actor.ActorContext, msg interface{}) {
-	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*protoPlatform.QueryOrderReq)
+	f, db, req := ctx.Future(), a.db, msg.(*protoPlatform.QueryOrderReq)
 	go func() {
-		resp, err := service.QueryOrder(mongoPID, req)
+		resp, err := service.QueryOrder(db, req)
 		f.Respond(resp, err)
 	}()
 }
 
 func (a *Actor) onDeliver(ctx actor.ActorContext, msg interface{}) {
-	f, mongoPID, req := ctx.Future(), a.mongoPID, msg.(*deliverReq)
+	f, db, req := ctx.Future(), a.db, msg.(*deliverReq)
 	go func() {
-		err := service.DeliverOrder(mongoPID, req.orderID)
+		err := service.DeliverOrder(db, req.orderID)
 		f.Respond(nil, err)
 	}()
 }

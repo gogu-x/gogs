@@ -17,6 +17,7 @@ func initRouter(c *Actor) {
 
 	c.router.Register(&protoGateway.LoginReq{}, c.onLogin)
 	c.router.Register(&protoGateway.RegisterReq{}, c.onRegister)
+	c.router.Register(&NodeFailoverMsg{}, c.onNodeFailover)
 }
 
 func (c *Actor) onWsMsg(ctx actor.ActorContext, msg interface{}) {

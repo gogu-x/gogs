@@ -1,6 +1,8 @@
-package internal
+package base
 
 import (
+	"time"
+
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/player/module/asset"
@@ -13,6 +15,9 @@ import (
 
 const collPlayer = "player"
 
+// loadTimeout 是同步加载玩家数据的最大等待时间，超时则放弃，避免 goroutine 永久阻塞。
+const loadTimeout = 5 * time.Second
+
 // PlayerData 玩家全量数据，随 PlayerActor 生命周期存活，同时作为 MongoDB 文档
 type PlayerData struct {
 	UID   uint64 `bson:"_id"`
@@ -22,7 +27,7 @@ type PlayerData struct {
 
 	AssetMgr     *asset.Mgr     `bson:"asset"`
 	BagMgr       *bag.Mgr       `bson:"bag"`
-	CardGroupMgr *cardgroup.Mgr `bson:"cardgroup"`
+	CardGroupMgr *cardgroup.Mgr `bson:"card_group"`
 	ShopMgr      *shop.Mgr      `bson:"shop"`
 }
 
@@ -36,25 +41,21 @@ func NewPlayerData(uid uint64) *PlayerData {
 	}
 }
 
-// Load 异步从 MongoDB 加载玩家数据，结果通过 cb 回调（在 Actor goroutine 内执行）。
-// cb 参数：data 非 nil 表示加载成功；data 为 nil 且 err 为 nil 表示新玩家（不存在）；err 非 nil 表示 DB 故障。
-func Load(ctx actor.ActorContext, uid uint64, cb func(data *PlayerData, err error)) {
+// Load 用 AwaitTimeout 兜底，避免 mongo 卡死导致 PlayerActor goroutine 永久阻塞泄漏。
+func Load(ctx actor.ActorContext, uid uint64) (*PlayerData, error) {
 	data := NewPlayerData(uid)
-	ctx.Request(
+	_, err := ctx.Request(
 		actor.MustLookup(constant.ActorGameMongo),
 		&mongoRpc.FindOne{
 			Collection: collPlayer,
 			Filter:     bson.M{"_id": uid},
 			Result:     data,
 		},
-	).Callback(ctx, func(ret interface{}, err error) {
-		if err != nil {
-			// ErrNoDocuments 也通过 err 传入，由 cb 自行判断
-			cb(nil, err)
-			return
-		}
-		cb(data, nil)
-	})
+	).AwaitTimeout(loadTimeout)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 // Save fire-and-forget，upsert 玩家全量数据，不等待结果。
