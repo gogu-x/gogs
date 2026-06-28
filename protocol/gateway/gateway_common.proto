@@ -4,12 +4,13 @@ option go_package = "github.com/gogu-x/gogs/pb/protoGateway";
 
 // 通用消息帧，Gate↔Game gRPC 传输单元
 message Frame {
-  uint64 uid       = 1;
-  string server_id = 2;
-  string gate_id   = 3;
-  uint64 conn_id   = 4;
-  bytes  payload   = 5;
-  string msg_type  = 6;
+  uint64 uid        = 1;
+  string server_id  = 2;
+  string gate_id    = 3;
+  uint64 conn_id    = 4;
+  bytes  payload    = 5;
+  string msg_type   = 6;
+  string request_id = 7; // 跨节点 request
 }
 
 

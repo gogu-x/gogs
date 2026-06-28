@@ -51,6 +51,8 @@ func (p *Player) OnInit(ctx actor.ActorContext) {
 		frame := msg.(*natsrpc.Frame)
 		p.s.ConnID = frame.ConnId
 		p.s.GateId = frame.GateId
+		p.s.SetCurrentFrame(frame)
+		defer p.s.SetCurrentFrame(nil)
 		inner, err := codec.ProtoCodec.Unmarshal(frame.Payload)
 		if err != nil {
 			log.Printf("PlayerActor[%d]: unmarshal payload: %v", p.uid, err)

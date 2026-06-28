@@ -15,17 +15,21 @@ import (
 
 // Session 每次请求携带的网络上下文
 type Session struct {
-	ConnID uint64
-	GateId string
-	Data   *PlayerData
-	ctx    actor.ActorContext
+	ConnID       uint64
+	GateId       string
+	Data         *PlayerData
+	ctx          actor.ActorContext
+	currentFrame *protoGateway.Frame // 当前正在处理的 Frame，Reply 据此判断回包路径
 }
 
 func NewSession(data *PlayerData, ctx actor.ActorContext) *Session {
 	return &Session{Data: data, ctx: ctx}
 }
 
-// AfterFunc 在 Actor goroutine 内调度一个定时回调，可在任意地方调用
+// SetCurrentFrame 由框架在处理 Frame 前后调用，业务层无需感知
+func (s *Session) SetCurrentFrame(f *protoGateway.Frame) {
+	s.currentFrame = f
+}
 func (s *Session) AfterFunc(d time.Duration, cb func()) {
 	s.ctx.AfterFunc(d, func(_ actor.ActorContext) { cb() })
 }

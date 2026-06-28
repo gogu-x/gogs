@@ -3,6 +3,7 @@ package natsrpc
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -46,4 +47,8 @@ func PublishShutdown(serverID, instID string) error {
 
 func PublishDeliver(serverID string, msg proto.Message) error {
 	return publish(fmt.Sprintf(subDeliver, serverID), msg)
+}
+
+func newRequestId() string {
+	return uuid.NewString()
 }

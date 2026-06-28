@@ -30,6 +30,7 @@ type Frame struct {
 	ConnId        uint64                 `protobuf:"varint,4,opt,name=conn_id,json=connId,proto3" json:"conn_id,omitempty"`
 	Payload       []byte                 `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
 	MsgType       string                 `protobuf:"bytes,6,opt,name=msg_type,json=msgType,proto3" json:"msg_type,omitempty"`
+	RequestId     string                 `protobuf:"bytes,7,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // 跨节点 request-reply 关联 ID（NATS _INBOX subject）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -106,18 +107,27 @@ func (x *Frame) GetMsgType() string {
 	return ""
 }
 
+func (x *Frame) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
 var File_gateway_gateway_common_proto protoreflect.FileDescriptor
 
 const file_gateway_gateway_common_proto_rawDesc = "" +
 	"\n" +
-	"\x1cgateway/gateway_common.proto\"\x9d\x01\n" +
+	"\x1cgateway/gateway_common.proto\"\xbc\x01\n" +
 	"\x05Frame\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x1b\n" +
 	"\tserver_id\x18\x02 \x01(\tR\bserverId\x12\x17\n" +
 	"\agate_id\x18\x03 \x01(\tR\x06gateId\x12\x17\n" +
 	"\aconn_id\x18\x04 \x01(\x04R\x06connId\x12\x18\n" +
 	"\apayload\x18\x05 \x01(\fR\apayload\x12\x19\n" +
-	"\bmsg_type\x18\x06 \x01(\tR\amsgType2'\n" +
+	"\bmsg_type\x18\x06 \x01(\tR\amsgType\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\a \x01(\tR\trequestId2'\n" +
 	"\aGateway\x12\x1c\n" +
 	"\x06Stream\x12\x06.Frame\x1a\x06.Frame(\x010\x01B(Z&github.com/gogu-x/gogs/pb/protoGatewayb\x06proto3"
 

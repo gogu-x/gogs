@@ -1,17 +1,34 @@
 package natsrpc
 
-import "github.com/gogu-x/gogs/pb/protoGateway"
+import (
+	"time"
+
+	actor "github.com/gogu-x/bigTree"
+	"github.com/gogu-x/gogs/pb/protoGateway"
+)
 
 // Frame 统一的消息帧格式。
 type Frame = protoGateway.Frame
 
 // SendMsg 统一的 NATS 发送消息。
-// Module 指定目标类型，NodeID 指定目标实例 ID。
 type SendMsg struct {
 	Module string
 	ID     string
 	NodeId string
 	Frame  *Frame
+}
+
+// RequestMsg 跨节点 request-reply，通过 NatsActor 中转。
+// NatsActor 内部生成 RequestId、维护 pending map、处理超时，业务层无需感知。
+// Callback 在发起方 Actor goroutine 内执行，第一个参数为回包的 Frame.Payload（[]byte）。
+type RequestMsg struct {
+	Module    string
+	ID        string
+	NodeId    string
+	Frame     *Frame
+	Timeout   time.Duration
+	CallerPID actor.PID
+	Callback  func(interface{}, error)
 }
 
 // shutdownMsg 关闭信号。

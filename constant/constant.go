@@ -2,12 +2,11 @@ package constant
 
 import "fmt"
 
-// ─── RPC Actors（客户端，各进程按需 Spawn）────────────────────────────────────
-const ActorRpcPlatform = "rpc_platform"
+const ActorRpcPlatform = "Pf"
 
-const ActorNats = "nats"
+const ActorNats = "NATS"
 
-const ActorGameMongo = "game_mongo" // game 进程的 MongoDB actor
+const ActorGameMongo = "GMongo" // game 进程的 MongoDB actor
 
 // ─── Platform Actors ──────────────────────────────────────────────────────────
 const (
@@ -26,7 +25,7 @@ const (
 	ActorActivity = "activity"
 
 	// ActorGate 旧 gRPC 网关 Actor，新架构已由 NATS 替代，保留供旧代码引用
-	ActorGate = "gate"
+	ActorGate = "Gate"
 )
 
 func PlayerName(uid uint64) string { return fmt.Sprintf("player-%d", uid) }
