@@ -1,190 +1,322 @@
-# gogs
+# gogs 架构文档
 
-基于 [bigTree](https://github.com/gogu-x/bigTree) Actor 模型构建的分布式游戏服务器框架。
-
-## 架构
+## 整体架构
 
 ```
-Client (WebSocket)
-        │
-        ▼
-┌─────────────────────────────────┐
-│           Gate 进程              │
-│  WsServer (:808x)               │
-│  ConnActor  ──→  NATS           │
-└──────────────┬──────────────────┘
-               │ NATS (game:{serverID}:{nodeID})
-               ▼
-┌─────────────────────────────────┐
-│           Game 进程              │
-│  NatsActor                      │
-│  PlayerActor → Router → Service │
-│  GuildActor / ActivityActor     │
-└─────────────────────────────────┘
-               │
-               ▼
-        etcd  MongoDB  NATS
+┌──────────────────────────────────────────────────────────────┐
+│  Client                                                       │
+│  WebSocket (protobuf / json)                                  │
+└───────────────────────────┬──────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Gate 进程（可水平扩展，多个 gate-id）                          │
+│                                                               │
+│  WsServer(:808x) ──upgrade──► ConnActor(每连接一个)            │
+│                                    │                          │
+│                               NATS Publish                    │
+│                          game:{serverID}:{nodeID}             │
+│                                                               │
+│  etcd watch ──► UpdateNodes ──► HashPick(fnv(uid)%nodeCount)  │
+│                      └──► NodeFailoverMsg ──► ConnActor       │
+└───────────────────────────┬──────────────────────────────────┘
+                            │ NATS
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Game 进程（server-id + node-id，同 server-id 可多实例）        │
+│                                                               │
+│  NatsActor(subscribe game:{serverID}:{nodeID})                │
+│       │                                                       │
+│       ├──► PlayerActor(uid) ──► Router ──► Ctl               │
+│       │         └── Session.Reply ──► NATS gate.out.{gateId}  │
+│       ├──► GuildActor                                         │
+│       └──► ActivityActor                                      │
+│                                                               │
+│  etcd 注册：/game/server/{serverID}/{nodeID} = grpcAddr        │
+└───────────────────────────┬──────────────────────────────────┘
+                            │
+               ┌────────────┼────────────┐
+               ▼            ▼            ▼
+             etcd        MongoDB        NATS
+┌──────────────────────────────────────────────────────────────┐
+│  Platform 进程                                                 │
+│  gRPC Server(:7000) ──► AuthService / OrderService            │
+│       └── MongoDB(platform db)                                │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-**Gate** 处理 WebSocket 连接，通过 NATS 将消息路由到对应的 **Game** 节点。
+---
 
-**Game** 节点向 etcd 注册，Gate 启动时加载全部节点并监听变化。同一 `server-id` 可以部署多个 `node-id` 实例，Gate 使用 `fnv(uid) % nodeCount` 将用户固定路由到某个节点。节点下线时，Gate 自动将受影响的在线用户无感切换到存活节点。
+## 进程说明
 
-## 快速启动
+### Gate
 
+负责 WebSocket 接入，无业务状态，可任意水平扩展。
+
+| Actor | 职责 |
+|-------|------|
+| `WsServer` | HTTP 升级 WebSocket，为每个连接 Spawn `ConnActor` |
+| `ConnActor` | 维护单个 WS 连接的生命周期，鉴权、编解码、forward 到 Game |
+| `NatsActor` | 订阅 `gate.out.{gateID}`，将 Game 回包转发给对应 `ConnActor` |
+
+**启动参数：**
 ```bash
-# 启动基础设施
-docker-compose up -d
+./gate --gate-id=1   # 监听 :8081（8080 + gate-id）
+./gate --gate-id=2   # 监听 :8082
+```
 
-# 启动 platform
-./platform
+---
 
-# 启动 gate（--gate-id 决定监听端口，实际端口 = 8080 + gate-id）
-./gate --gate-id=1   # 监听 :8081
+### Game
 
-# 启动 game（同一 server-id 可以启动多个 node-id 实现水平扩展）
+有状态业务节点，每个玩家的数据常驻内存。
+
+| Actor | 职责 |
+|-------|------|
+| `NatsActor` | 订阅 `game:{serverID}:{nodeID}`，收到 Frame 后路由给 `PlayerActor`（不存在则 Spawn） |
+| `PlayerActor` | 每个在线玩家独立 Actor，持有完整玩家数据，串行处理所有消息 |
+| `GuildActor` | 工会逻辑，全局单例 |
+| `ActivityActor` | 活动逻辑，全局单例 |
+| `MongoActor` | MongoDB 操作序列化，fire-and-forget 写入 |
+
+**启动参数：**
+```bash
 ./game --server-id=1 --node-id=1 --port=9001
 ./game --server-id=1 --node-id=2 --port=9002
 ```
 
-## 目录结构
+同一 `server-id` 的多个节点共享同一个 MongoDB 库（`game_{serverID}`）。
 
-```
-gogs/
-├── gate/                   # Gate 进程（WebSocket 接入层）
-│   ├── main.go
-│   ├── conn/               # ConnActor：每个连接一个 Actor
-│   │   ├── actor.go        # 状态、生命周期
-│   │   ├── handler.go      # 消息处理、forward、节点故障切换
-│   │   ├── service.go      # 登录/注册，hash 选节点
-│   │   ├── middleware.go   # 鉴权中间件
-│   │   └── router.go       # 消息路由注册
-│   ├── wsserver/           # WsServer Actor，管理所有连接，广播
-│   └── nats/               # Gate 侧 NATS 订阅（接收 game 回包）
-├── game/                   # Game 进程（业务逻辑层）
-│   ├── main.go
-│   ├── gate/               # NatsActor：接收 Gate 消息，派发给 PlayerActor
-│   ├── player/             # PlayerActor：每个在线玩家独立 Actor
-│   │   ├── external.go
-│   │   ├── internal/base/  # Session、PlayerData、定时存档
-│   │   └── internal/       # 各业务 ctl（auth/chat/guild/activity）
-│   ├── guild/              # GuildActor
-│   └── activity/           # ActivityActor
-├── platform/               # 平台服（账号/鉴权/订单）gRPC
-├── cluster/                # etcd 服务注册与发现 + hash 路由
-│   ├── cluster.go          # UpdateNodes / HashPick
-│   ├── hash.go             # fnv hash 取模路由
-│   └── event.go            # WatchInstances
-├── natsrpc/                # NATS 收发封装
-├── codec/                  # Protobuf / JSON 双 codec
-├── config/                 # 配置（支持环境变量覆盖）
-├── pb/                     # 生成的 protobuf 代码
-└── bigTree/                # Actor 框架（submodule）
-```
+---
 
-## 消息流
+### Platform
 
-**Client → Server：**
-```
-WS frame → ConnActor.forward
-         → NATS game:{serverID}:{nodeID}
-         → Game NatsActor
-         → PlayerActor → Service
-```
+账号/鉴权/订单服务，通过 gRPC 对 Gate 提供服务。
 
-**Server → Client：**
-```
-Service → Session.Reply
-        → NATS gate.out.{gateID}
-        → Gate NatsActor
-        → ConnActor → WS
-```
+| Actor | 职责 |
+|-------|------|
+| `PlatformGrpcActor` | gRPC Server，处理注册/登录/订单请求 |
+| `WebhookActor` | HTTP Webhook，处理支付回调 |
 
-## 路由策略
+---
 
-同一 `server-id` 下有多个 `node-id` 时，Gate 在登录时选定节点：
+## 路由机制
+
+### 登录时节点选定
+
+Gate 在登录成功后通过 `cluster.HashPick` 选定目标 Game 节点，并将 `nodeID` 写入 `ConnActor` 状态，后续所有消息固定发往该节点：
 
 ```
 nodeID = nodes[ fnv32(uid) % len(nodes) ]
 ```
 
-- 节点列表不变 → 相同 uid 永远路由到同一节点
-- 节点下线 → etcd delete 事件触发，Gate 重建路由表，受影响用户自动切换到存活节点
+- 节点列表不变 → 相同 uid 始终路由到同一节点
+- 扩容新节点 → 只接收新登录用户，存量用户不受影响
 
-## 添加新消息处理器
+### 节点故障自动切换
 
-**1. 定义 proto：**
-```protobuf
-// protocol/gateway/game_req.proto
-message MoveReq {
-  float x = 1;
-  float y = 2;
-}
+```
+Game 节点下线
+    │
+    ▼
+etcd delete 事件
+    │
+    ├── cluster.UpdateNodes(serverID, 剩余节点)  // 重建路由表
+    │
+    └── NodeFailoverMsg → WsServer → 广播所有 ConnActor
+                                          │
+                                          ▼
+                              if connActor.nodeID == deadNode:
+                                  nodeID = HashPick(serverID, uid)
+                                  // 后续消息自动路由到新节点，用户无感
 ```
 
-**2. 生成代码：**
-```bash
-make proto
+---
+
+## 消息流
+
+### Client → Server
+
+```
+WS frame
+  │
+  ▼
+ConnActor.handleWsMsg
+  ├── codec.Unmarshal
+  ├── middleware（鉴权）
+  └── router.Route
+        ├── LoginReq → onLogin（Platform gRPC 鉴权 → 选节点）
+        └── 其他消息 → forward
+                          │
+                          ▼
+                    NATS Publish
+                    game:{serverID}:{nodeID}
+                          │
+                          ▼
+                    Game NatsActor
+                          │
+                          ▼
+                    PlayerActor.HandleMessage
+                          │
+                          ▼
+                    Router → Ctl 业务逻辑
 ```
 
-**3. 在 `game/player/internal/` 添加 ctl：**
-```go
-func Move(s *base.Session, msg interface{}) {
-    req := msg.(*pb.MoveReq)
-    // 业务逻辑
-    s.Reply(&pb.MoveAck{})
-}
+### Server → Client
+
+```
+Ctl 业务逻辑
+  │
+  ▼
+Session.Reply(proto.Message)
+  │
+  ▼
+codec.Marshal + NATS Publish
+gate.out.{gateID}
+  │
+  ▼
+Gate NatsActor
+  │
+  ▼
+ConnActor → ws.WriteMessage
+  │
+  ▼
+Client
 ```
 
-**4. 在 `game/player/internal/router.go` 注册：**
-```go
-r.Register(&pb.MoveReq{}, s.Handle(Move))
+---
+
+## NATS Subject 规范
+
+| Subject | 方向 | 说明 |
+|---------|------|------|
+| `game:{serverID}:{nodeID}` | Gate → Game | 玩家消息，按 server+node 路由 |
+| `gate.out.{gateID}` | Game → Gate | 回包，按 gateID 路由 |
+| `game.shutdown.{serverID}.{nodeID}` | 内部 | 节点关闭信号 |
+| `platform.deliver.{serverID}` | Platform → Game | 平台下发（充值等） |
+
+---
+
+## PlayerActor 生命周期
+
+```
+NatsActor 收到 Frame（uid 未登录）
+    │
+    ▼
+Spawn PlayerActor(uid, connID)
+    │
+    ▼
+OnInit:
+  1. MongoDB 同步加载玩家数据（最长等 5s）
+  2. 初始化 Session、Router、定时存档
+    │
+    ▼
+HandleMessage: 串行处理所有消息（线程安全）
+    │
+    ▼
+OnStop（WS 断开 / 节点关闭）:
+  PlayerData.Save() → MongoDB upsert
 ```
 
-## Codec
+**定时存档：** 每隔 1 分钟触发一次 `PlayerData.Save()`，通过 `ActorSystem` 共享 `TimeWheel` 调度，不阻塞消息处理。
 
-| Codec | 格式 | 消息 ID |
-|-------|------|---------|
-| ProtoCodec | `[2-byte msgID][protobuf body]` | FNV-32a hash of type name |
-| JsonCodec | `{"TypeName": {...}}` | type name lookup |
+---
 
-WebSocket 子协议选择：
-- `Sec-WebSocket-Protocol: protobuf` → ProtoCodec（默认）
-- `Sec-WebSocket-Protocol: json` → JsonCodec
+## Actor 框架要点（bigTree）
 
-## 配置
+| 特性 | 说明 |
+|------|------|
+| 每个 Actor 独立 goroutine | 消息串行处理，业务代码无需加锁 |
+| Mailbox | 带缓冲 channel，默认大小可通过 `WithMailboxSize` 配置 |
+| 共享 TimeWheel | 整个 ActorSystem 共用一个时间轮，避免每个 Actor 独立创建 goroutine |
+| Request/Future | 跨 Actor 请求响应，回调在发起方 goroutine 执行 |
+| 系统消息优先 | Stop 信号走独立 channel，优先于用户消息处理 |
 
-所有配置项均支持环境变量覆盖：
+**ConnActor mailbox 大小：** 连接型 Actor 消息速率低，使用 `WithMailboxSize(64)` 避免默认 6048 导致的内存浪费（2万连接节省 ~1.8GB）。
+
+---
+
+## 目录结构
+
+```
+gogs/
+├── gate/
+│   ├── main.go
+│   ├── conn/
+│   │   ├── actor.go        # ConnActor 结构、生命周期
+│   │   ├── handler.go      # handleWsMsg、forward、NodeFailover
+│   │   ├── service.go      # onLogin、onRegister，HashPick 选节点
+│   │   ├── middleware.go   # checkAuth 鉴权中间件
+│   │   └── router.go       # 消息路由注册
+│   ├── wsserver/
+│   │   ├── server.go       # HTTP/WS 服务，Spawn ConnActor
+│   │   └── router.go       # ConnReg/Unreg/Broadcast/NodeFailover
+│   └── nats/
+│       └── actor.go        # 订阅 gate.out.{gateID}，派发给 ConnActor
+├── game/
+│   ├── main.go
+│   ├── gate/
+│   │   └── external.go     # NewNatsActor，订阅 game:{serverID}:{nodeID}
+│   ├── player/
+│   │   ├── external.go     # PlayerActor 入口
+│   │   ├── internal/base/
+│   │   │   ├── player.go   # PlayerData、Load、Save
+│   │   │   ├── session.go  # Session、Reply、AfterFunc
+│   │   │   └── timer.go    # scheduleSave 定时存档
+│   │   └── internal/
+│   │       ├── router.go   # 注册所有消息处理器
+│   │       └── ctl_*.go    # 各业务模块（auth/chat/guild/activity）
+│   ├── guild/
+│   └── activity/
+├── platform/
+│   ├── main.go
+│   ├── grpc/               # gRPC Server（auth/order）
+│   ├── service/            # 业务逻辑
+│   ├── store/              # MongoDB 操作
+│   ├── auth/               # JWT
+│   └── webhook/            # 支付回调
+├── cluster/
+│   ├── cluster.go          # UpdateNodes、HashPick、Register
+│   ├── hash.go             # fnv hash 取模
+│   ├── etcd.go             # etcd client 初始化
+│   └── event.go            # GetInstances、WatchInstances
+├── natsrpc/
+│   ├── nats.go             # NatsActor（订阅/发送统一入口）
+│   ├── publish.go          # subject 命名规范、publish
+│   ├── messages.go         # SendMsg、SubConfig
+│   └── constant.go         # 模块常量
+├── codec/
+│   ├── proto.go            # ProtoCodec（FNV-32a msgID + protobuf body）
+│   └── json.go             # JsonCodec（TypeName + JSON body）
+├── rpc/
+│   ├── platform/           # Platform gRPC 客户端 Actor
+│   └── mongo/              # MongoDB Actor（序列化所有 DB 操作）
+├── config/                 # 配置，全部支持环境变量覆盖
+├── pb/                     # protobuf 生成代码
+├── protocol/               # .proto 源文件
+└── bigTree/                # Actor 框架（git submodule）
+```
+
+---
+
+## 配置参考
 
 | 环境变量 | 默认值 | 说明 |
 |---------|--------|------|
 | `ETCD_ENDPOINTS` | `localhost:2379` | etcd 地址（逗号分隔） |
-| `GRPC_HOST` | `127.0.0.1` | Game 节点对外暴露的 host |
-| `MONGO_URL` | `mongodb://localhost:27017` | MongoDB 连接地址 |
-| `NATS_URL` | `nats://localhost:4222` | NATS 连接地址 |
-| `PLATFORM_ADDR` | `:7000` | Platform gRPC 监听地址 |
+| `GRPC_HOST` | `127.0.0.1` | Game 节点对外 host（容器部署需改） |
+| `MONGO_URL` | `mongodb://localhost:27017` | MongoDB |
+| `NATS_URL` | `nats://localhost:4222` | NATS |
+| `PLATFORM_ADDR` | `:7000` | Platform gRPC 监听 |
 | `PLATFORM_GRPC_ADDR` | `127.0.0.1:7000` | Platform gRPC 连接地址 |
-| `JWT_SECRET` | `changeme-secret` | JWT 签名密钥 |
+| `JWT_SECRET` | `changeme-secret` | JWT 密钥（生产必须修改） |
 
-Gate 监听端口 = `8080 + gate-id`，Game gRPC 端口 = `9000 + server-id`（可用 `--port` 覆盖）。
+---
 
 ## 基础设施
 
-| 服务 | 镜像 | 端口 |
-|------|------|------|
-| etcd | bitnami/etcd:3.5 | 2379 |
-| MongoDB | mongo:7 | 27017 |
-| NATS (JetStream) | nats:2.10-alpine | 4222 / 8222 |
-
-## 依赖
-
-- [github.com/gogu-x/bigTree](https://github.com/gogu-x/bigTree) — Actor 模型、定时器、日志
-- [gorilla/websocket](https://github.com/gorilla/websocket)
-- [nats-io/nats.go](https://github.com/nats-io/nats.go)
-- [etcd/client/v3](https://github.com/etcd-io/etcd)
-- [mongo-driver/v2](https://github.com/mongodb/mongo-go-driver)
-- [urfave/cli/v3](https://github.com/urfave/cli)
-
-## License
-
-Apache 2.0
+| 服务 | 镜像 | 端口 | 用途 |
+|------|------|------|------|
+| etcd | bitnami/etcd:3.5 | 2379 | Game 节点注册与发现 |
+| MongoDB | mongo:7 | 27017 | 玩家数据、平台账号 |
+| NATS | nats:2.10-alpine | 4222 / 8222 | Gate↔Game 消息总线 |
