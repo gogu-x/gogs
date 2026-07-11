@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/gate/conn"
+	actor "github.com/gogu-x/tree"
 
 	"github.com/gorilla/websocket"
 )
@@ -30,7 +30,7 @@ func New(addr string) *Server {
 	return &Server{addr: addr, conns: make(map[uint64]struct{})}
 }
 
-func (s *Server) OnInit(_ actor.ActorContext) {
+func (s *Server) OnInit(_ actor.Context) {
 	initRouter(s)
 
 	mux := http.NewServeMux()
@@ -48,11 +48,11 @@ func (s *Server) OnInit(_ actor.ActorContext) {
 	}()
 }
 
-func (s *Server) HandleMessage(ctx actor.ActorContext, msg interface{}) {
+func (s *Server) HandleMessage(ctx actor.Context, msg interface{}) {
 	s.router.Route(ctx, msg)
 }
 
-func (s *Server) OnStop(_ actor.ActorContext) {}
+func (s *Server) OnStop(_ actor.Context) {}
 
 func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)

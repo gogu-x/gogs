@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.100ppi.com)",
+      "WebSearch"
+    ]
+  }
+}

@@ -3,8 +3,8 @@ package stream
 import (
 	"log"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	actor "github.com/gogu-x/tree"
 )
 
 func initRouter(s *Actor) {
@@ -12,7 +12,7 @@ func initRouter(s *Actor) {
 	s.router.Register(&stopMsg{}, s.onStop)
 }
 
-func (s *Actor) onStreamMsg(ctx actor.ActorContext, msg interface{}) {
+func (s *Actor) onStreamMsg(ctx actor.Context, msg interface{}) {
 	if s.stream == nil {
 		return
 	}
@@ -22,6 +22,6 @@ func (s *Actor) onStreamMsg(ctx actor.ActorContext, msg interface{}) {
 	}
 }
 
-func (s *Actor) onStop(ctx actor.ActorContext, _ interface{}) {
+func (s *Actor) onStop(ctx actor.Context, _ interface{}) {
 	ctx.Stop()
 }

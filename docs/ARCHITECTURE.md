@@ -53,7 +53,7 @@
 
 负责 WebSocket 接入，无业务状态，可任意水平扩展。
 
-| Actor | 职责 |
+| Platform | 职责 |
 |-------|------|
 | `WsServer` | HTTP 升级 WebSocket，为每个连接 Spawn `ConnActor` |
 | `ConnActor` | 维护单个 WS 连接的生命周期，鉴权、编解码、forward 到 Game |
@@ -71,10 +71,10 @@
 
 有状态业务节点，每个玩家的数据常驻内存。
 
-| Actor | 职责 |
+| Platform | 职责 |
 |-------|------|
 | `NatsActor` | 订阅 `game:{serverID}:{nodeID}`，收到 Frame 后路由给 `PlayerActor`（不存在则 Spawn） |
-| `PlayerActor` | 每个在线玩家独立 Actor，持有完整玩家数据，串行处理所有消息 |
+| `PlayerActor` | 每个在线玩家独立 Platform，持有完整玩家数据，串行处理所有消息 |
 | `GuildActor` | 工会逻辑，全局单例 |
 | `ActivityActor` | 活动逻辑，全局单例 |
 | `MongoActor` | MongoDB 操作序列化，fire-and-forget 写入 |
@@ -93,7 +93,7 @@
 
 账号/鉴权/订单服务，通过 gRPC 对 Gate 提供服务。
 
-| Actor | 职责 |
+| Platform | 职责 |
 |-------|------|
 | `PlatformGrpcActor` | gRPC Server，处理注册/登录/订单请求 |
 | `WebhookActor` | HTTP Webhook，处理支付回调 |
@@ -218,21 +218,21 @@ OnStop（WS 断开 / 节点关闭）:
   PlayerData.Save() → MongoDB upsert
 ```
 
-**定时存档：** 每隔 1 分钟触发一次 `PlayerData.Save()`，通过 `ActorSystem` 共享 `TimeWheel` 调度，不阻塞消息处理。
+**定时存档：** 每隔 1 分钟触发一次 `PlayerData.Save()`，通过 `Tree` 共享 `TimeWheel` 调度，不阻塞消息处理。
 
 ---
 
-## Actor 框架要点（bigTree）
+## Platform 框架要点（bigTree）
 
 | 特性 | 说明 |
 |------|------|
-| 每个 Actor 独立 goroutine | 消息串行处理，业务代码无需加锁 |
+| 每个 Platform 独立 goroutine | 消息串行处理，业务代码无需加锁 |
 | Mailbox | 带缓冲 channel，默认大小可通过 `WithMailboxSize` 配置 |
-| 共享 TimeWheel | 整个 ActorSystem 共用一个时间轮，避免每个 Actor 独立创建 goroutine |
-| Request/Future | 跨 Actor 请求响应，回调在发起方 goroutine 执行 |
+| 共享 TimeWheel | 整个 Tree 共用一个时间轮，避免每个 Platform 独立创建 goroutine |
+| Request/Future | 跨 Platform 请求响应，回调在发起方 goroutine 执行 |
 | 系统消息优先 | Stop 信号走独立 channel，优先于用户消息处理 |
 
-**ConnActor mailbox 大小：** 连接型 Actor 消息速率低，使用 `WithMailboxSize(64)` 避免默认 6048 导致的内存浪费（2万连接节省 ~1.8GB）。
+**ConnActor mailbox 大小：** 连接型 Platform 消息速率低，使用 `WithMailboxSize(64)` 避免默认 6048 导致的内存浪费（2万连接节省 ~1.8GB）。
 
 ---
 
@@ -289,12 +289,12 @@ gogs/
 │   ├── proto.go            # ProtoCodec（FNV-32a msgID + protobuf body）
 │   └── json.go             # JsonCodec（TypeName + JSON body）
 ├── rpc/
-│   ├── platform/           # Platform gRPC 客户端 Actor
-│   └── mongo/              # MongoDB Actor（序列化所有 DB 操作）
+│   ├── platform/           # Platform gRPC 客户端 Platform
+│   └── mongo/              # MongoDB Platform（序列化所有 DB 操作）
 ├── config/                 # 配置，全部支持环境变量覆盖
 ├── pb/                     # protobuf 生成代码
 ├── protocol/               # .proto 源文件
-└── bigTree/                # Actor 框架（git submodule）
+└── bigTree/                # Platform 框架（git submodule）
 ```
 
 ---

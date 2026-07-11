@@ -5,16 +5,16 @@ import (
 	"log"
 	"os"
 
-	actor "github.com/gogu-x/bigTree"
+	actor "github.com/gogu-x/tree"
 	"github.com/urfave/cli/v3"
 
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
-	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
 	natsclient "github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
 	"github.com/gogu-x/gogs/platform/webhook"
+	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
 )
 
 func main() {
@@ -31,6 +31,7 @@ func main() {
 
 			db := rpcmongo.Connect(config.MongoURL, "platform")
 
+			actor.Spawn(constant.ActorNats, natsclient.NewActor(natsclient.ActorConfig{}))
 			actor.Spawn(constant.ActorPlatformGrpc, platformgrpc.NewActor(db))
 			actor.Spawn(constant.ActorPlatformWebhook, &webhook.Actor{})
 

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	actor "github.com/gogu-x/tree"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,7 +26,7 @@ func New(serverID string) *Actor { return &Actor{serverID: serverID} }
 
 func Name(serverID string) string { return fmt.Sprintf("stream-%s", serverID) }
 
-func (s *Actor) OnInit(ctx actor.ActorContext) {
+func (s *Actor) OnInit(ctx actor.Context) {
 	initRouter(s)
 
 	addr, err := cluster.GetAddr(s.serverID)
@@ -65,11 +65,11 @@ func (s *Actor) OnInit(ctx actor.ActorContext) {
 	}()
 }
 
-func (s *Actor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
+func (s *Actor) HandleMessage(ctx actor.Context, msg interface{}) {
 	s.router.Route(ctx, msg)
 }
 
-func (s *Actor) OnStop(_ actor.ActorContext) {
+func (s *Actor) OnStop(_ actor.Context) {
 	if s.stream != nil {
 		_ = s.stream.CloseSend()
 	}

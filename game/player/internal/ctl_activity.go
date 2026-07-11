@@ -3,10 +3,10 @@ package internal
 import (
 	"log"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/player/internal/base"
 	"github.com/gogu-x/gogs/pb/protoActivity"
+	actor "github.com/gogu-x/tree"
 )
 
 func GetActivityList(s *base.Session, msg interface{}) {

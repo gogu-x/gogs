@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"time"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
+	actor "github.com/gogu-x/tree"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -30,7 +30,7 @@ func (a *Actor) register(req any, method string, newResp func() any) {
 	a.routes[reflect.TypeOf(req)] = route{method, newResp}
 }
 
-func (a *Actor) OnInit(_ actor.ActorContext) {
+func (a *Actor) OnInit(_ actor.Context) {
 	conn, err := grpc.NewClient(config.PlatformGrpcAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		protoPlatform.ForceJSONCodec(),
@@ -43,7 +43,7 @@ func (a *Actor) OnInit(_ actor.ActorContext) {
 	log.Printf("rpc/platform: connected to %s", config.PlatformGrpcAddr)
 }
 
-func (a *Actor) HandleMessage(ctx actor.ActorContext, msg any) {
+func (a *Actor) HandleMessage(ctx actor.Context, msg any) {
 	r, ok := a.routes[reflect.TypeOf(msg)]
 	if !ok {
 		ctx.Response(nil, fmt.Errorf("rpc/platform: no route for %T", msg))
@@ -63,7 +63,7 @@ func (a *Actor) HandleMessage(ctx actor.ActorContext, msg any) {
 	}()
 }
 
-func (a *Actor) OnStop(_ actor.ActorContext) {
+func (a *Actor) OnStop(_ actor.Context) {
 	if a.conn != nil {
 		a.conn.Close()
 	}

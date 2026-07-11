@@ -6,23 +6,23 @@ import (
 	"net"
 	"time"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
 	"github.com/gogu-x/gogs/platform/service"
+	"github.com/gogu-x/tree"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"google.golang.org/grpc"
 )
 
-type Actor struct {
-	router     actor.Router
+type Platform struct {
+	router     tree.Router
 	grpcServer *grpc.Server
 	db         *mongo.Database
 }
 
-func NewActor(db *mongo.Database) *Actor { return &Actor{db: db} }
+func NewActor(db *mongo.Database) *Platform { return &Platform{db: db} }
 
-func (a *Actor) OnInit(ctx actor.ActorContext) {
+func (a *Platform) OnInit(ctx tree.Context) {
 	if err := service.EnsureIndexes(a.db); err != nil {
 		log.Printf("GrpcActor: EnsureIndexes: %v", err)
 	}
@@ -51,11 +51,11 @@ func (a *Actor) OnInit(ctx actor.ActorContext) {
 	}()
 }
 
-func (a *Actor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
+func (a *Platform) HandleMessage(ctx tree.Context, msg interface{}) {
 	a.router.Route(ctx, msg)
 }
 
-func (a *Actor) OnStop(_ actor.ActorContext) {
+func (a *Platform) OnStop(_ tree.Context) {
 	if a.grpcServer != nil {
 		a.grpcServer.GracefulStop()
 	}
@@ -64,11 +64,11 @@ func (a *Actor) OnStop(_ actor.ActorContext) {
 type svcHandler struct {
 	protoPlatform.UnimplementedAuthServiceServer
 	protoPlatform.UnimplementedOrderServiceServer
-	pid actor.PID
+	pid tree.PID
 }
 
 func (s *svcHandler) call(msg interface{}) (interface{}, error) {
-	return actor.Default().Request(s.pid, msg).AwaitTimeout(5 * time.Second)
+	return tree.Default().Request(s.pid, msg).AwaitTimeout(5 * time.Second)
 }
 
 func (s *svcHandler) Register(_ context.Context, req *protoPlatform.RegisterReq) (*protoPlatform.AuthAck, error) {

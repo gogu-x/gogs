@@ -3,7 +3,7 @@ package constant
 import "fmt"
 
 const (
-	ActorNats       = "nats"
+	ActorNats       = "NATS"
 	ActorRegistry   = "registry"
 	ActorGateServer = "gate-server"
 )

@@ -5,11 +5,10 @@ import (
 	"reflect"
 	"time"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/codec"
-	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/tree"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -18,11 +17,11 @@ type Session struct {
 	ConnID       uint64
 	GateId       string
 	Data         *PlayerData
-	ctx          actor.ActorContext
+	ctx          tree.Context
 	currentFrame *protoGateway.Frame // 当前正在处理的 Frame，Reply 据此判断回包路径
 }
 
-func NewSession(data *PlayerData, ctx actor.ActorContext) *Session {
+func NewSession(data *PlayerData, ctx tree.Context) *Session {
 	return &Session{Data: data, ctx: ctx}
 }
 
@@ -31,7 +30,7 @@ func (s *Session) SetCurrentFrame(f *protoGateway.Frame) {
 	s.currentFrame = f
 }
 func (s *Session) AfterFunc(d time.Duration, cb func()) {
-	s.ctx.AfterFunc(d, func(_ actor.ActorContext) { cb() })
+	s.ctx.AfterFunc(d, func(_ tree.Context) { cb() })
 }
 
 // Reply 将回包通过 NATS 发回 Gate
@@ -41,27 +40,25 @@ func (s *Session) Reply(msg proto.Message) {
 		log.Printf("Reply marshal error: %v", err)
 		return
 	}
-	actor.Send(actor.MustLookup(constant.ActorNats), &natsrpc.SendMsg{
-		Module: natsrpc.ModuleGate,
-		ID:     s.GateId,
-		Frame: &protoGateway.Frame{
-			Uid:     s.Data.UID,
-			ConnId:  s.ConnID,
-			GateId:  s.GateId,
-			Payload: body,
-			MsgType: reflect.TypeOf(msg).Elem().Name(),
-		},
-	})
+	if err := natsrpc.Cast(natsrpc.ModuleGate, s.GateId, "", &protoGateway.Frame{
+		Uid:     s.Data.UID,
+		ConnId:  s.ConnID,
+		GateId:  s.GateId,
+		Payload: body,
+		MsgType: reflect.TypeOf(msg).Elem().Name(),
+	}); err != nil {
+		log.Printf("Reply cast error: %v", err)
+	}
 }
 
 // Request 向目标 Actor 发请求，回调在本 Actor goroutine 内执行
-func (s *Session) Request(pid actor.PID, msg interface{}, cb func(interface{}, error)) {
+func (s *Session) Request(pid tree.PID, msg interface{}, cb func(interface{}, error)) {
 	s.ctx.Request(pid, msg).Callback(s.ctx, cb)
 }
 
 // Handle 将 ctl 层函数包装为 actor.Handler
-func (s *Session) Handle(fn func(*Session, interface{})) actor.Handler {
-	return func(ctx actor.ActorContext, msg interface{}) {
+func (s *Session) Handle(fn func(*Session, interface{})) tree.Handler {
+	return func(ctx tree.Context, msg interface{}) {
 		fn(s, msg)
 	}
 }

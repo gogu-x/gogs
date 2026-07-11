@@ -3,8 +3,9 @@ module github.com/gogu-x/gogs
 go 1.26.0
 
 require (
-	github.com/gogu-x/bigTree v0.2.1
+	github.com/gogu-x/tree v0.0.0-00010101000000-000000000000
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/nats-io/nats.go v1.52.0
 	github.com/urfave/cli/v3 v3.9.0
@@ -19,8 +20,8 @@ require (
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/gogu-x/bigTree v0.2.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/name5566/leaf v0.0.0-20221021105039-af71eb082cda // indirect
@@ -42,4 +43,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 )
 
-replace github.com/gogu-x/bigTree => ../gogs/bigTree
+replace github.com/gogu-x/tree => ./tree

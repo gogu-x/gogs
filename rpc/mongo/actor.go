@@ -8,7 +8,7 @@ import (
 	"log"
 	"time"
 
-	actor "github.com/gogu-x/bigTree"
+	actor "github.com/gogu-x/tree"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
@@ -47,7 +47,7 @@ type Actor struct {
 
 func NewActor(db *mongo.Database) *Actor { return &Actor{db: db} }
 
-func (a *Actor) OnInit(_ actor.ActorContext) {
+func (a *Actor) OnInit(_ actor.Context) {
 	a.router.Register(&InsertOne{}, a.onInsert)
 	a.router.Register(&FindOne{}, a.onFind)
 	a.router.Register(&UpdateOne{}, a.onUpdate)
@@ -55,13 +55,13 @@ func (a *Actor) OnInit(_ actor.ActorContext) {
 	log.Printf("rpc/mongo: ready, db=%s", a.db.Name())
 }
 
-func (a *Actor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
+func (a *Actor) HandleMessage(ctx actor.Context, msg interface{}) {
 	a.router.Route(ctx, msg)
 }
 
-func (a *Actor) OnStop(_ actor.ActorContext) {}
+func (a *Actor) OnStop(_ actor.Context) {}
 
-func (a *Actor) onInsert(ctx actor.ActorContext, msg interface{}) {
+func (a *Actor) onInsert(ctx actor.Context, msg interface{}) {
 	m := msg.(*InsertOne)
 	f := ctx.Future()
 	go func() {
@@ -77,7 +77,7 @@ func (a *Actor) onInsert(ctx actor.ActorContext, msg interface{}) {
 	}()
 }
 
-func (a *Actor) onFind(ctx actor.ActorContext, msg interface{}) {
+func (a *Actor) onFind(ctx actor.Context, msg interface{}) {
 	m := msg.(*FindOne)
 	f := ctx.Future()
 	go func() {
@@ -89,7 +89,7 @@ func (a *Actor) onFind(ctx actor.ActorContext, msg interface{}) {
 	}()
 }
 
-func (a *Actor) onUpdate(ctx actor.ActorContext, msg interface{}) {
+func (a *Actor) onUpdate(ctx actor.Context, msg interface{}) {
 	m := msg.(*UpdateOne)
 	f := ctx.Future()
 	go func() {
@@ -108,7 +108,7 @@ func (a *Actor) onUpdate(ctx actor.ActorContext, msg interface{}) {
 	}()
 }
 
-func (a *Actor) onDelete(ctx actor.ActorContext, msg interface{}) {
+func (a *Actor) onDelete(ctx actor.Context, msg interface{}) {
 	m := msg.(*DeleteOne)
 	f := ctx.Future()
 	go func() {

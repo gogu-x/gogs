@@ -3,13 +3,13 @@ package base
 import (
 	"time"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/player/module/asset"
 	"github.com/gogu-x/gogs/game/player/module/bag"
 	"github.com/gogu-x/gogs/game/player/module/cardgroup"
 	"github.com/gogu-x/gogs/game/player/module/shop"
 	mongoRpc "github.com/gogu-x/gogs/rpc/mongo"
+	"github.com/gogu-x/tree"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -42,10 +42,10 @@ func NewPlayerData(uid uint64) *PlayerData {
 }
 
 // Load 用 AwaitTimeout 兜底，避免 mongo 卡死导致 PlayerActor goroutine 永久阻塞泄漏。
-func Load(ctx actor.ActorContext, uid uint64) (*PlayerData, error) {
+func Load(ctx tree.Context, uid uint64) (*PlayerData, error) {
 	data := NewPlayerData(uid)
 	_, err := ctx.Request(
-		actor.MustLookup(constant.ActorGameMongo),
+		tree.MustLookup(constant.ActorGameMongo),
 		&mongoRpc.FindOne{
 			Collection: collPlayer,
 			Filter:     bson.M{"_id": uid},
@@ -60,8 +60,8 @@ func Load(ctx actor.ActorContext, uid uint64) (*PlayerData, error) {
 
 // Save fire-and-forget，upsert 玩家全量数据，不等待结果。
 func (p *PlayerData) Save() {
-	actor.Send(
-		actor.MustLookup(constant.ActorGameMongo),
+	tree.Send(
+		tree.MustLookup(constant.ActorGameMongo),
 		&mongoRpc.UpdateOne{
 			Collection: collPlayer,
 			Filter:     bson.M{"_id": p.UID},

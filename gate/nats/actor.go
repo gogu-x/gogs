@@ -3,10 +3,10 @@ package nats
 import (
 	"fmt"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/natsrpc"
+	actor "github.com/gogu-x/tree"
 )
 
 func NewActor() *natsrpc.Actor {

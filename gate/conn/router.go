@@ -3,8 +3,8 @@ package conn
 import (
 	"log"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	actor "github.com/gogu-x/tree"
 	"github.com/gorilla/websocket"
 )
 
@@ -20,11 +20,11 @@ func initRouter(c *Actor) {
 	c.router.Register(&NodeFailoverMsg{}, c.onNodeFailover)
 }
 
-func (c *Actor) onWsMsg(ctx actor.ActorContext, msg interface{}) {
+func (c *Actor) onWsMsg(ctx actor.Context, msg interface{}) {
 	c.handleWsMsg(ctx, msg.(*WsMsg).Data)
 }
 
-func (c *Actor) onFrame(ctx actor.ActorContext, msg interface{}) {
+func (c *Actor) onFrame(ctx actor.Context, msg interface{}) {
 	m := msg.(*protoGateway.Frame)
 	if len(m.Payload) == 0 {
 		return
@@ -35,10 +35,10 @@ func (c *Actor) onFrame(ctx actor.ActorContext, msg interface{}) {
 	}
 }
 
-func (c *Actor) onBroadcast(_ actor.ActorContext, msg interface{}) {
+func (c *Actor) onBroadcast(_ actor.Context, msg interface{}) {
 	_ = c.conn.WriteMessage(websocket.BinaryMessage, msg.(*protoGateway.BroadcastMsg).Data)
 }
 
-func (c *Actor) onStop(ctx actor.ActorContext, _ interface{}) {
+func (c *Actor) onStop(ctx actor.Context, _ interface{}) {
 	ctx.Stop()
 }

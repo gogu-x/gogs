@@ -5,15 +5,15 @@ import (
 	"log"
 	"time"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
+	actor "github.com/gogu-x/tree"
 )
 
-func (c *Actor) onLogin(ctx actor.ActorContext, msg interface{}) {
+func (c *Actor) onLogin(ctx actor.Context, msg interface{}) {
 	req := msg.(*protoGateway.LoginReq)
 	serverID := fmt.Sprintf("%d", req.ServerId)
 	c.state = stateLogging
@@ -44,7 +44,7 @@ func (c *Actor) onLogin(ctx actor.ActorContext, msg interface{}) {
 		})
 }
 
-func (c *Actor) onRegister(ctx actor.ActorContext, msg interface{}) {
+func (c *Actor) onRegister(ctx actor.Context, msg interface{}) {
 	req := msg.(*protoGateway.RegisterReq)
 	serverID := fmt.Sprintf("%d", req.ServerId)
 	c.state = stateLogging

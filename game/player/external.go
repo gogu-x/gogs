@@ -4,12 +4,12 @@ import (
 	"errors"
 	"log"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/player/internal"
 	"github.com/gogu-x/gogs/game/player/internal/base"
 	"github.com/gogu-x/gogs/natsrpc"
+	"github.com/gogu-x/tree"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
@@ -17,7 +17,7 @@ import (
 type Player struct {
 	uid    uint64
 	connID uint64
-	router actor.Router
+	router tree.Router
 	s      *base.Session
 }
 
@@ -25,7 +25,7 @@ func NewPlayerActor(uid, connID uint64) *Player {
 	return &Player{uid: uid, connID: connID}
 }
 
-func (p *Player) OnInit(ctx actor.ActorContext) {
+func (p *Player) OnInit(ctx tree.Context) {
 	ctx.Register(constant.PlayerName(p.uid))
 
 	// 同步加载玩家数据：阻塞当前 PlayerActor goroutine 直到完成或超时。
@@ -47,7 +47,7 @@ func (p *Player) OnInit(ctx actor.ActorContext) {
 	log.Printf("PlayerActor[%d]: ready", p.uid)
 
 	// 注册 Frame handler。此时 p.s 已就绪。
-	p.router.Register(&natsrpc.Frame{}, func(ctx actor.ActorContext, msg interface{}) {
+	p.router.Register(&natsrpc.Frame{}, func(ctx tree.Context, msg interface{}) {
 		frame := msg.(*natsrpc.Frame)
 		p.s.ConnID = frame.ConnId
 		p.s.GateId = frame.GateId
@@ -62,11 +62,11 @@ func (p *Player) OnInit(ctx actor.ActorContext) {
 	})
 }
 
-func (p *Player) HandleMessage(ctx actor.ActorContext, msg interface{}) {
+func (p *Player) HandleMessage(ctx tree.Context, msg interface{}) {
 	p.router.Route(ctx, msg)
 }
 
-func (p *Player) OnStop(_ actor.ActorContext) {
+func (p *Player) OnStop(_ tree.Context) {
 	if p.s == nil {
 		log.Printf("PlayerActor[%d]: Session nil", p.uid)
 		return

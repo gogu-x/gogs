@@ -26,9 +26,9 @@ import (
 var (
 	addrs       = flag.String("addrs", "ws://127.0.0.1:8081/ws,ws://127.0.0.1:8082/ws", "gate websocket addresses (comma-separated)")
 	serverID    = flag.Int("server-id", 1, "game server id")
-	users       = flag.Int("users", 20000, "total user count")
-	concurrency = flag.Int("c", 1000, "max concurrent connections")
-	dialRate    = flag.Int("dial-rate", 5000, "max new dials per second")
+	users       = flag.Int("users", 100, "total user count")
+	concurrency = flag.Int("c", 100, "max concurrent connections")
+	dialRate    = flag.Int("dial-rate", 1000, "max new dials per second")
 	timeout     = flag.Duration("timeout", 10*time.Second, "per-message read timeout")
 
 	gateAddrs []string
@@ -44,7 +44,7 @@ var dialer = websocket.Dialer{
 }
 
 func dial(idx int) (*client, error) {
-	target := gateAddrs[idx%len(gateAddrs)] // 轮询分配到各 Gate
+	target := gateAddrs[idx%1] // 轮询分配到各 Gate
 	var (
 		conn *websocket.Conn
 		err  error

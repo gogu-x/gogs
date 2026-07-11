@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gogu-x/bigTree/log"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
@@ -15,8 +14,9 @@ import (
 	natsclient "github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
 	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
+	"github.com/gogu-x/tree/log"
 
-	actor "github.com/gogu-x/bigTree"
+	"github.com/gogu-x/tree"
 	"github.com/urfave/cli/v3"
 )
 
@@ -71,11 +71,11 @@ func main() {
 
 			db := rpcmongo.Connect(config.MongoURL, fmt.Sprintf("game_%v", serverID))
 
-			actor.Spawn(constant.ActorNats, gate.NewNatsActor(NodeID))
-			actor.Spawn(constant.ActorGuild, guild.NewGuildActor())
-			actor.Spawn(constant.ActorActivity, activity.NewActivityActor())
-			actor.Spawn(constant.ActorGameMongo, rpcmongo.NewActor(db))
-			actor.Default().Start()
+			tree.Spawn(constant.ActorNats, gate.NewNatsActor(NodeID))
+			tree.Spawn(constant.ActorGuild, guild.NewGuildActor())
+			tree.Spawn(constant.ActorActivity, activity.NewActivityActor())
+			tree.Spawn(constant.ActorGameMongo, rpcmongo.NewActor(db))
+			tree.Default().Start()
 
 			return nil
 		},

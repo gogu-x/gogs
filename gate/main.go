@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	actor "github.com/gogu-x/bigTree"
-	"github.com/gogu-x/bigTree/log"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
@@ -17,6 +15,8 @@ import (
 	natsclient "github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
 	rpcplatform "github.com/gogu-x/gogs/rpc/platform"
+	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/log"
 	"github.com/urfave/cli/v3"
 )
 
@@ -54,8 +54,8 @@ func main() {
 					cluster.UpdateNodes(ev.ServerID, instances)
 					// 节点下线：通知 GateServer 广播 failover，让受影响连接无感切换
 					if ev.Type == "delete" {
-						if pid, ok := actor.Lookup(gateconstant.ActorGateServer); ok {
-							actor.Send(pid, &conn.NodeFailoverMsg{
+						if pid, ok := tree.Lookup(gateconstant.ActorGateServer); ok {
+							tree.Send(pid, &conn.NodeFailoverMsg{
 								ServerID:   ev.ServerID,
 								DeadNodeID: ev.NodeID,
 							})
@@ -70,12 +70,12 @@ func main() {
 			defer natsclient.Close()
 
 			//actor.Spawn(gateconstant.ActorRegistry, &registry.Actor{})
-			actor.Spawn(gateconstant.ActorNats, gatenats.NewActor())
-			actor.Spawn(gateconstant.ActorGateServer, wsserver.New(config.GateAddr()))
-			actor.Spawn(constant.ActorRpcPlatform, rpcplatform.NewActor())
+			tree.Spawn(gateconstant.ActorNats, gatenats.NewActor())
+			tree.Spawn(gateconstant.ActorGateServer, wsserver.New(config.GateAddr()))
+			tree.Spawn(constant.ActorRpcPlatform, rpcplatform.NewActor())
 
 			fmt.Printf("gate server [%d] starting, listen: %s\n", config.GateID, config.GateAddr())
-			actor.Default().Start()
+			tree.Default().Start()
 			return nil
 		},
 	}

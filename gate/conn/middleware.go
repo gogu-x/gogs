@@ -3,9 +3,9 @@
 import (
 	"reflect"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	actor "github.com/gogu-x/tree"
 )
 
 var noAuthRequired = map[reflect.Type]bool{
@@ -13,7 +13,7 @@ var noAuthRequired = map[reflect.Type]bool{
 	reflect.TypeOf(&protoGateway.RegisterReq{}): true,
 }
 
-func (c *Actor) checkAuth(_ actor.ActorContext, msg interface{}) bool {
+func (c *Actor) checkAuth(_ actor.Context, msg interface{}) bool {
 	if noAuthRequired[reflect.TypeOf(msg)] {
 		return true
 	}

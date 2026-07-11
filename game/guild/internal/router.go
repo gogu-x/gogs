@@ -1,9 +1,9 @@
 package internal
 
 import (
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/game/util"
 	"github.com/gogu-x/gogs/pb/protoGuild"
+	actor "github.com/gogu-x/tree"
 )
 
 func InitRoutes(r *actor.Router, s *Store) {

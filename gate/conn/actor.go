@@ -1,11 +1,13 @@
 package conn
 
 import (
-	actor "github.com/gogu-x/bigTree"
+	"log"
+
 	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/tree"
 	"github.com/gorilla/websocket"
 )
 
@@ -28,7 +30,7 @@ const (
 	stateAuthed                   // 已登录
 )
 
-type middlewareFunc func(actor.ActorContext, interface{}) bool
+type middlewareFunc func(tree.Context, interface{}) bool
 
 type Actor struct {
 	conn        *websocket.Conn
@@ -39,7 +41,7 @@ type Actor struct {
 	token       string
 	state       connState
 	middlewares []middlewareFunc
-	router      actor.Router
+	router      tree.Router
 	codec       codec.Codec
 }
 
@@ -47,7 +49,7 @@ func New(c *websocket.Conn, cd codec.Codec) *Actor {
 	return &Actor{conn: c, codec: cd}
 }
 
-func (c *Actor) OnInit(ctx actor.ActorContext) {
+func (c *Actor) OnInit(ctx tree.Context) {
 	c.connID = ctx.Self().ID
 	ctx.Register(constant.ConnName(c.connID))
 
@@ -60,36 +62,33 @@ func (c *Actor) OnInit(ctx actor.ActorContext) {
 
 	self := ctx.Self()
 	go func() {
-		defer actor.Send(self, &stopMsg{})
+		defer tree.Send(self, &stopMsg{})
 		for {
 			_, data, err := c.conn.ReadMessage()
 			if err != nil {
 				return
 			}
-			actor.Send(self, &WsMsg{Data: data})
+			tree.Send(self, &WsMsg{Data: data})
 		}
 	}()
 }
 
-func (c *Actor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
+func (c *Actor) HandleMessage(ctx tree.Context, msg interface{}) {
 	c.router.Route(ctx, msg)
 }
 
-func (c *Actor) OnStop(ctx actor.ActorContext) {
+func (c *Actor) OnStop(ctx tree.Context) {
 	if pid, ok := ctx.Lookup(constant.ActorGateServer); ok {
 		ctx.Send(pid, &protoGateway.ConnUnregMsg{ConnId: c.connID})
 	}
 	if c.uid != 0 && c.serverID != "" {
-		ctx.Send(actor.MustLookup(constant.ActorNats), &natsrpc.SendMsg{
-			Module: natsrpc.GameNats,
-			ID:     c.serverID,
-			NodeId: c.nodeID,
-			Frame: &protoGateway.Frame{
-				ConnId:  c.connID,
-				Uid:     c.uid,
-				MsgType: natsrpc.MsgTypeDisconnect,
-			},
-		})
+		if err := natsrpc.Cast(natsrpc.GameNats, c.serverID, c.nodeID, &protoGateway.Frame{
+			ConnId:  c.connID,
+			Uid:     c.uid,
+			MsgType: natsrpc.MsgTypeDisconnect,
+		}); err != nil {
+			log.Printf("ConnActor[%d]: disconnect cast error: %v", c.connID, err)
+		}
 	}
 	if c.conn != nil {
 		_ = c.conn.Close()

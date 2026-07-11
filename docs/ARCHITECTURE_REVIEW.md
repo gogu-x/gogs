@@ -77,7 +77,7 @@ flowchart TB
 - Game 进程崩了 = 整个区服下线
 - 加机器只能开新区服，不能分担现有区服压力
 
-**这与 Actor 模型的本意相悖。** Actor 的扩展性来自"按 actor key 分片"，而不是把所有玩家挤进一个 actor。
+**这与 Platform 模型的本意相悖。** Platform 的扩展性来自"按 actor key 分片"，而不是把所有玩家挤进一个 actor。
 
 **影响**：
 - 容错：单点故障
@@ -156,7 +156,7 @@ message Frame {
 
 ---
 
-### 2.6 Actor 框架（bigTree）的能力空缺
+### 2.6 Platform 框架（bigTree）的能力空缺
 
 | 能力 | 是否有 | 影响 |
 |------|--------|------|
@@ -293,11 +293,11 @@ sequenceDiagram
     GW->>C: WS Frame (BattleResp)
 ```
 
-### 3.3 Actor 层级模型
+### 3.3 Platform 层级模型
 
 ```mermaid
 flowchart LR
-    subgraph SystemRoot["ActorSystem (每个 Game 进程)"]
+    subgraph SystemRoot["Tree (每个 Game 进程)"]
         ROOT["RootSupervisor"]
 
         subgraph Sessions["会话域"]
@@ -356,7 +356,7 @@ gogs/
 │   ├── gate/        # Gate 进程入口
 │   └── game/        # Game 进程入口
 ├── domain/
-│   ├── session/     # 会话：Actor + 消息 + handler
+│   ├── session/     # 会话：Platform + 消息 + handler
 │   ├── player/      # 玩家
 │   ├── battle/      # 战斗
 │   ├── room/        # 房间
@@ -504,4 +504,4 @@ gantt
 
 - [`OPTIMIZATION.md`](./OPTIMIZATION.md) — 代码层面的具体缺陷与修复建议
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — 当前架构说明
-- [`actor-design.md`](./actor-design.md) — Actor 拆分原则
+- [`actor-design.md`](./actor-design.md) — Platform 拆分原则

@@ -5,17 +5,16 @@ import (
 	"log"
 	"reflect"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	actor "github.com/gogu-x/tree"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 )
 
-func (c *Actor) handleWsMsg(ctx actor.ActorContext, data []byte) {
+func (c *Actor) handleWsMsg(ctx actor.Context, data []byte) {
 	inner, err := c.codec.Unmarshal(data)
 	if err != nil {
 		log.Printf("ConnActor[%d]: unmarshal error: %v", c.connID, err)
@@ -26,13 +25,13 @@ func (c *Actor) handleWsMsg(ctx actor.ActorContext, data []byte) {
 			return
 		}
 	}
-	c.router.SetFallback(func(ctx actor.ActorContext, _ interface{}) {
+	c.router.SetFallback(func(ctx actor.Context, _ interface{}) {
 		c.forward(ctx, inner)
 	})
 	c.router.Route(ctx, inner)
 }
 
-func (c *Actor) forward(ctx actor.ActorContext, inner interface{}) {
+func (c *Actor) forward(ctx actor.Context, inner interface{}) {
 	protoMsg, ok := inner.(proto.Message)
 	if !ok {
 		return
@@ -41,19 +40,16 @@ func (c *Actor) forward(ctx actor.ActorContext, inner interface{}) {
 	if c.serverID == "" || c.nodeID == "" {
 		return
 	}
-	ctx.Send(actor.MustLookup(constant.ActorNats), &natsrpc.SendMsg{
-		Module: natsrpc.GameNats,
-		ID:     c.serverID,
-		NodeId: c.nodeID,
-		Frame: &protoGateway.Frame{
-			ConnId:   c.connID,
-			Uid:      c.uid,
-			ServerId: c.serverID,
-			GateId:   fmt.Sprintf("%d", config.GateID),
-			Payload:  body,
-			MsgType:  reflect.TypeOf(inner).Elem().Name(),
-		},
-	})
+	if err := natsrpc.Cast(natsrpc.GameNats, c.serverID, c.nodeID, &protoGateway.Frame{
+		ConnId:   c.connID,
+		Uid:      c.uid,
+		ServerId: c.serverID,
+		GateId:   fmt.Sprintf("%d", config.GateID),
+		Payload:  body,
+		MsgType:  reflect.TypeOf(inner).Elem().Name(),
+	}); err != nil {
+		log.Printf("ConnActor[%d]: forward cast error: %v", c.connID, err)
+	}
 }
 
 func (c *Actor) Reply(msg proto.Message) {
@@ -64,7 +60,7 @@ func (c *Actor) Reply(msg proto.Message) {
 	_ = c.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
-func (c *Actor) onNodeFailover(_ actor.ActorContext, msg interface{}) {
+func (c *Actor) onNodeFailover(_ actor.Context, msg interface{}) {
 	m := msg.(*NodeFailoverMsg)
 	if c.state != stateAuthed || c.serverID != m.ServerID || c.nodeID != m.DeadNodeID {
 		return

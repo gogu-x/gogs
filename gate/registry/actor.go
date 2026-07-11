@@ -6,9 +6,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/natsrpc"
+	actor "github.com/gogu-x/tree"
 )
 
 var Global *Actor
@@ -22,7 +22,7 @@ type Actor struct {
 	router  actor.Router
 }
 
-func (r *Actor) OnInit(ctx actor.ActorContext) {
+func (r *Actor) OnInit(ctx actor.Context) {
 	Global = r
 	r.active = make(map[string]string)
 	r.pending = make(map[string]bool)
@@ -55,11 +55,11 @@ func (r *Actor) OnInit(ctx actor.ActorContext) {
 	}()
 }
 
-func (r *Actor) HandleMessage(ctx actor.ActorContext, msg interface{}) {
+func (r *Actor) HandleMessage(ctx actor.Context, msg interface{}) {
 	r.router.Route(ctx, msg)
 }
 
-func (r *Actor) OnStop(_ actor.ActorContext) {
+func (r *Actor) OnStop(_ actor.Context) {
 	if r.cancel != nil {
 		r.cancel()
 	}

@@ -3,11 +3,11 @@ package internal
 import (
 	"log"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/player/internal/base"
 	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoGuild"
+	actor "github.com/gogu-x/tree"
 )
 
 func CreateGuild(s *base.Session, msg interface{}) {

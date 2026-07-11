@@ -4,14 +4,14 @@ import (
 	"log"
 	"net/http"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/config"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
+	"github.com/gogu-x/tree"
 )
 
 type Actor struct{}
 
-func (a *Actor) OnInit(_ actor.ActorContext) {
+func (a *Actor) OnInit(_ tree.Context) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook/pay", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: 验证支付平台签名
@@ -34,5 +34,5 @@ func (a *Actor) OnInit(_ actor.ActorContext) {
 	}()
 }
 
-func (a *Actor) HandleMessage(_ actor.ActorContext, _ interface{}) {}
-func (a *Actor) OnStop(_ actor.ActorContext)                       {}
+func (a *Actor) HandleMessage(_ tree.Context, _ interface{}) {}
+func (a *Actor) OnStop(_ tree.Context)                       {}

@@ -1,9 +1,9 @@
 package internal
 
 import (
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/pb/protoActivity"
 	"github.com/gogu-x/gogs/pb/protoCommon"
+	"github.com/gogu-x/tree"
 )
 
 type Activity struct {
@@ -48,7 +48,7 @@ func NewMgr() *Mgr {
 	}
 }
 
-func (s *Mgr) GetList(ctx actor.ActorContext, _ *protoActivity.GetActivityListReq) {
+func (s *Mgr) GetList(ctx tree.Context, _ *protoActivity.GetActivityListReq) {
 	list := make([]*protoActivity.ActivityInfo, 0, len(s.activities))
 	for _, a := range s.activities {
 		if a.Status == protoActivity.ActivityStatus_ONGOING {
@@ -58,7 +58,7 @@ func (s *Mgr) GetList(ctx actor.ActorContext, _ *protoActivity.GetActivityListRe
 	ctx.Response(&protoActivity.GetActivityListAck{Activities: list}, nil)
 }
 
-func (s *Mgr) Join(ctx actor.ActorContext, req *protoActivity.JoinActivityReq) {
+func (s *Mgr) Join(ctx tree.Context, req *protoActivity.JoinActivityReq) {
 	ack := &protoActivity.JoinActivityAck{}
 	defer ctx.Response(ack, nil)
 	act, ok := s.activities[req.ActivityId]
@@ -75,7 +75,7 @@ func (s *Mgr) Join(ctx actor.ActorContext, req *protoActivity.JoinActivityReq) {
 	s.setProgress(req.Uid, &Progress{ActivityID: req.ActivityId, UID: req.Uid, Target: 100})
 }
 
-func (s *Mgr) GetProgress(ctx actor.ActorContext, req *protoActivity.GetProgressReq) {
+func (s *Mgr) GetProgress(ctx tree.Context, req *protoActivity.GetProgressReq) {
 	ack := &protoActivity.GetProgressAck{Code: protoCommon.ErrCode_ERR_UNKNOWN}
 	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.Uid, req.ActivityId)
@@ -86,7 +86,7 @@ func (s *Mgr) GetProgress(ctx actor.ActorContext, req *protoActivity.GetProgress
 	ack.Progress = p.ToProto()
 }
 
-func (s *Mgr) ClaimReward(ctx actor.ActorContext, req *protoActivity.ClaimRewardReq) {
+func (s *Mgr) ClaimReward(ctx tree.Context, req *protoActivity.ClaimRewardReq) {
 	ack := &protoActivity.ClaimRewardAck{}
 	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.Uid, req.ActivityId)

@@ -359,7 +359,7 @@ Prometheus + 一行 middleware 就能上。后续可加 OpenTelemetry tracing �
 
 `Ctrl+C` 时：
 - WS 不会通知客户端
-- ActorSystem 不会等 actor 跑完
+- Tree 不会等 actor 跑完
 - gRPC stream 不会 `CloseSend`
 - etcd lease 不会主动 revoke（要等 30s 才下线）
 
@@ -367,7 +367,7 @@ Prometheus + 一行 middleware 就能上。后续可加 OpenTelemetry tracing �
 
 1. 停止接受新连接（关闭 listener）
 2. 通知所有 actor stop
-3. 等 ActorSystem drain
+3. 等 Tree drain
 4. revoke etcd lease
 5. 关闭 etcd / NATS / Mongo 连接
 

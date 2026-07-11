@@ -26,19 +26,13 @@ func publish(subject string, msg proto.Message) error {
 	return nc.Publish(subject, data)
 }
 
-func send(m *SendMsg) error {
-	switch m.Module {
-	case GameNats:
-		return publish(fmt.Sprintf(subGameIn, m.ID, m.NodeId), m.Frame)
-	case ModuleGate:
-		return publish(fmt.Sprintf(subGateOut, m.ID), m.Frame)
-	case ModuleCross:
-		return publish(fmt.Sprintf(subCross, m.ID), m.Frame)
-	case ModuleDeliver:
-		return publish(fmt.Sprintf(subDeliver, m.ID), m.Frame)
-	default:
-		return fmt.Errorf("unknown module: %s", m.Module)
+// publishTo 按 (module, id, nodeID) 查表寻址并发送 Frame。
+func publishTo(module, id, nodeID string, frame *Frame) error {
+	subject, err := subjectFor(module, id, nodeID)
+	if err != nil {
+		return err
 	}
+	return publish(subject, frame)
 }
 
 func PublishShutdown(serverID, instID string) error {

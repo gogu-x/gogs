@@ -4,11 +4,11 @@ import (
 	"log"
 	"time"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	actor "github.com/gogu-x/tree"
 )
 
 func initRouter(r *Actor) {
@@ -16,13 +16,13 @@ func initRouter(r *Actor) {
 	r.router.Register(&protoGateway.CheckDeleteMsg{}, r.onCheckDelete)
 }
 
-func (r *Actor) onInstanceEvent(ctx actor.ActorContext, msg interface{}) {
+func (r *Actor) onInstanceEvent(ctx actor.Context, msg interface{}) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.handleEvent(ctx, msg.(*cluster.InstanceEvent))
 }
 
-func (r *Actor) onCheckDelete(_ actor.ActorContext, msg interface{}) {
+func (r *Actor) onCheckDelete(_ actor.Context, msg interface{}) {
 	m := msg.(*protoGateway.CheckDeleteMsg)
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -34,7 +34,7 @@ func (r *Actor) onCheckDelete(_ actor.ActorContext, msg interface{}) {
 	log.Printf("RegistryActor: server=%s inst=%s confirmed down", m.ServerId, m.NodeId)
 }
 
-func (r *Actor) handleEvent(_ actor.ActorContext, ev *cluster.InstanceEvent) {
+func (r *Actor) handleEvent(_ actor.Context, ev *cluster.InstanceEvent) {
 	switch ev.Type {
 	case "put":
 		if r.active[ev.ServerID] == ev.NodeID {
