@@ -6,8 +6,8 @@ import (
 
 	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/constant"
-	"github.com/gogu-x/gogs/game/player/internal"
-	"github.com/gogu-x/gogs/game/player/internal/base"
+	"github.com/gogu-x/gogs/game/play/internal"
+	"github.com/gogu-x/gogs/game/play/internal/base"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/tree"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -25,9 +25,11 @@ func NewPlayerActor(uid, connID uint64) *Player {
 	return &Player{uid: uid, connID: connID}
 }
 
-func (p *Player) OnInit(ctx tree.Context) {
-	ctx.Register(constant.PlayerName(p.uid))
+// Name PlayerActor 以 uid 寻址，Spawn 时即写入 registry，
+// 无需再在 OnInit 里 Register。
+func (p *Player) Name() string { return constant.PlayerName(p.uid) }
 
+func (p *Player) OnInit(ctx tree.Context) {
 	// 同步加载玩家数据：阻塞当前 PlayerActor goroutine 直到完成或超时。
 	// 框架在 OnInit 返回后才开始消费 mailbox，因此 OnInit 返回时 p.s 必已就绪，
 	// 任何 Frame 都不可能在 Session 初始化之前被处理，从根上消除空指针竞态。

@@ -1,13 +1,13 @@
 package wsserver
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/gate/conn"
+	"github.com/gogu-x/gogs/gate/constant"
 	actor "github.com/gogu-x/tree"
 
 	"github.com/gorilla/websocket"
@@ -29,6 +29,8 @@ type Server struct {
 func New(addr string) *Server {
 	return &Server{addr: addr, conns: make(map[uint64]struct{})}
 }
+
+func (s *Server) Name() string { return constant.ActorGateServer }
 
 func (s *Server) OnInit(_ actor.Context) {
 	initRouter(s)
@@ -69,5 +71,5 @@ func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	// game和gate 建立的是一个rpc stream 双向流
 	// 如果多个gate 和同一个game 建立双向流。他们之间数据传输是什么样的？ 多个gate和同一组game server 1 建议链接数据又是什么样的？ 这种方案是否合理？
 	// 对于这一套gate 和game 整理的架构 设计师傅合理
-	actor.Spawn(fmt.Sprintf("conn-%p", c), conn.New(c, cd))
+	actor.SpawnOne(conn.New(c, cd))
 }

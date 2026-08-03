@@ -13,7 +13,7 @@ import (
 type deliverReq struct{ orderID string }
 
 func (a *Platform) onCreateOrder(ctx tree.Context, msg interface{}) {
-	f, db, req := ctx.Future(), a.db, msg.(*protoPlatform.CreateOrderReq)
+	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*protoPlatform.CreateOrderReq)
 	go func() {
 		resp, err := service.CreateOrder(db, req)
 		f.Respond(resp, err)
@@ -21,7 +21,7 @@ func (a *Platform) onCreateOrder(ctx tree.Context, msg interface{}) {
 }
 
 func (a *Platform) onQueryOrder(ctx tree.Context, msg interface{}) {
-	f, db, req := ctx.Future(), a.db, msg.(*protoPlatform.QueryOrderReq)
+	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*protoPlatform.QueryOrderReq)
 	go func() {
 		resp, err := service.QueryOrder(db, req)
 		f.Respond(resp, err)
@@ -29,7 +29,7 @@ func (a *Platform) onQueryOrder(ctx tree.Context, msg interface{}) {
 }
 
 func (a *Platform) onDeliver(ctx tree.Context, msg interface{}) {
-	f, db, req := ctx.Future(), a.db, msg.(*deliverReq)
+	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*deliverReq)
 	go func() {
 		err := service.DeliverOrder(db, req.orderID)
 		f.Respond(nil, err)
@@ -38,7 +38,7 @@ func (a *Platform) onDeliver(ctx tree.Context, msg interface{}) {
 
 // DeliverByOrderID 由 webhook 调用，向 GrpcActor mailbox 发送 deliverReq
 func DeliverByOrderID(orderID string) error {
-	pid, ok := tree.Default().Lookup(constant.ActorPlatformGrpc)
+	pid, ok := tree.Default().Lookup(constant.PF)
 	if !ok {
 		return actor.ErrActorNotFound
 	}

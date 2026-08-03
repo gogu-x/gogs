@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"github.com/gogu-x/gogs/game/player/internal/base"
+	"github.com/gogu-x/gogs/game/play/internal/base"
 	"github.com/gogu-x/gogs/pb/protoActivity"
 	"github.com/gogu-x/gogs/pb/protoChat"
 	"github.com/gogu-x/gogs/pb/protoGateway"
@@ -9,7 +9,7 @@ import (
 	"github.com/gogu-x/tree"
 )
 
-func InitRoutes(r *tree.Router, s *base.Session) {
+func InitRoutes(r *tree.Router, s *base.PlayContext) {
 	r.Register(&protoGateway.LoginReq{}, s.Handle(AutoLogin))
 	r.Register(&protoGateway.RegisterReq{}, s.Handle(AutoRegister))
 	r.Register(&protoChat.ChatReq{}, s.Handle(ChatService))

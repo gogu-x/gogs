@@ -41,11 +41,16 @@ type DeleteOne struct {
 }
 
 type Actor struct {
+	name   string
 	router actor.Router
 	db     *mongo.Database
 }
 
-func NewActor(db *mongo.Database) *Actor { return &Actor{db: db} }
+// NewActor 创建 MongoDB Actor。name 由调用方指定（如 constant.ActorGameMongo /
+// constant.ActorPlatformMongo），因为同一进程可能需要多个库各一个 Actor。
+func NewActor(name string, db *mongo.Database) *Actor { return &Actor{name: name, db: db} }
+
+func (a *Actor) Name() string { return a.name }
 
 func (a *Actor) OnInit(_ actor.Context) {
 	a.router.Register(&InsertOne{}, a.onInsert)
@@ -63,7 +68,7 @@ func (a *Actor) OnStop(_ actor.Context) {}
 
 func (a *Actor) onInsert(ctx actor.Context, msg interface{}) {
 	m := msg.(*InsertOne)
-	f := ctx.Future()
+	f := ctx.RequestEnvelope()
 	go func() {
 		res, err := a.db.Collection(m.Collection).InsertOne(bg(), m.Doc)
 		if f == nil {
@@ -79,7 +84,7 @@ func (a *Actor) onInsert(ctx actor.Context, msg interface{}) {
 
 func (a *Actor) onFind(ctx actor.Context, msg interface{}) {
 	m := msg.(*FindOne)
-	f := ctx.Future()
+	f := ctx.RequestEnvelope()
 	go func() {
 		err := a.db.Collection(m.Collection).FindOne(bg(), m.Filter).Decode(m.Result)
 		if f == nil {
@@ -91,7 +96,7 @@ func (a *Actor) onFind(ctx actor.Context, msg interface{}) {
 
 func (a *Actor) onUpdate(ctx actor.Context, msg interface{}) {
 	m := msg.(*UpdateOne)
-	f := ctx.Future()
+	f := ctx.RequestEnvelope()
 	go func() {
 		opts := options.UpdateOne()
 		if m.Upsert {
@@ -110,7 +115,7 @@ func (a *Actor) onUpdate(ctx actor.Context, msg interface{}) {
 
 func (a *Actor) onDelete(ctx actor.Context, msg interface{}) {
 	m := msg.(*DeleteOne)
-	f := ctx.Future()
+	f := ctx.RequestEnvelope()
 	go func() {
 		_, err := a.db.Collection(m.Collection).DeleteOne(bg(), m.Filter)
 		if f == nil {
