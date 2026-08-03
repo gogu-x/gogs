@@ -28,7 +28,7 @@
 │  NatsActor(subscribe game:{serverID}:{nodeID})                │
 │       │                                                       │
 │       ├──► PlayerActor(uid) ──► Router ──► Ctl               │
-│       │         └── Session.Reply ──► NATS gate.out.{gateId}  │
+│       │         └── PlayContext.Reply ──► NATS gate.out.{gateId}  │
 │       ├──► GuildActor                                         │
 │       └──► ActivityActor                                      │
 │                                                               │
@@ -168,7 +168,7 @@ ConnActor.handleWsMsg
 Ctl 业务逻辑
   │
   ▼
-Session.Reply(proto.Message)
+PlayContext.Reply(proto.Message)
   │
   ▼
 codec.Marshal + NATS Publish
@@ -208,7 +208,7 @@ Spawn PlayerActor(uid, connID)
     ▼
 OnInit:
   1. MongoDB 同步加载玩家数据（最长等 5s）
-  2. 初始化 Session、Router、定时存档
+  2. 初始化 PlayContext、Router、定时存档
     │
     ▼
 HandleMessage: 串行处理所有消息（线程安全）
@@ -261,7 +261,7 @@ gogs/
 │   │   ├── external.go     # PlayerActor 入口
 │   │   ├── internal/base/
 │   │   │   ├── player.go   # PlayerData、Load、Save
-│   │   │   ├── session.go  # Session、Reply、AfterFunc
+│   │   │   ├── session.go  # PlayContext、Reply、AfterFunc
 │   │   │   └── timer.go    # scheduleSave 定时存档
 │   │   └── internal/
 │   │       ├── router.go   # 注册所有消息处理器

@@ -1,4 +1,4 @@
-package wsserver
+package ws
 
 import (
 	"log"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/codec"
+	"github.com/gogu-x/gogs/comm"
 	"github.com/gogu-x/gogs/gate/conn"
 	"github.com/gogu-x/gogs/gate/constant"
 	actor "github.com/gogu-x/tree"
@@ -21,13 +22,20 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	addr   string
-	conns  map[uint64]struct{}
-	router actor.Router
+	addr    string
+	clients map[uint64]struct{}
+	router  actor.Router
+	idGen   *comm.IDGenerator
 }
 
-func New(addr string) *Server {
-	return &Server{addr: addr, conns: make(map[uint64]struct{})}
+// New 创建 GateServer，gateID 用作 connID 生成器的节点位，
+// 确保同一 gate 进程内的所有连接 ID 全局唯一（跨 gate 进程也不冲突）。
+func New(addr string, gateID int64) *Server {
+	idGen, err := comm.NewIDGenerator(gateID)
+	if err != nil {
+		panic(err)
+	}
+	return &Server{addr: addr, clients: make(map[uint64]struct{}), idGen: idGen}
 }
 
 func (s *Server) Name() string { return constant.ActorGateServer }
@@ -65,11 +73,5 @@ func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	if c.Subprotocol() == "json" {
 		cd = codec.JsonCodec
 	}
-
-	// gate 链接全部在线的game rpc stream 启动的时候按照etcd 中注册的服务进行链接
-	// 根据用户把携带的serverId 把消息分配到对应的RPC Stream 里面
-	// game和gate 建立的是一个rpc stream 双向流
-	// 如果多个gate 和同一个game 建立双向流。他们之间数据传输是什么样的？ 多个gate和同一组game server 1 建议链接数据又是什么样的？ 这种方案是否合理？
-	// 对于这一套gate 和game 整理的架构 设计师傅合理
-	actor.SpawnOne(conn.New(c, cd))
+	actor.SpawnOne(conn.New(s.idGen.NextUint64(), c, cd))
 }

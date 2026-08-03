@@ -13,9 +13,9 @@ import (
 // natsActorPID 返回本进程内 NatsActor 的 PID，Cast/Call 都通过它中转发送。
 // 各进程（gate/game/platform）启动时须以 constant.ActorNats 名字 Spawn 一个 natsrpc.Actor。
 func natsActorPID() (actor.PID, error) {
-	pid, ok := actor.Lookup(constant.ActorNats)
+	pid, ok := actor.Lookup(constant.Nats)
 	if !ok {
-		return actor.PID{}, fmt.Errorf("natsrpc: NatsActor(%q) not spawned in this process", constant.ActorNats)
+		return actor.PID{}, fmt.Errorf("natsrpc: NatsActor(%q) not spawned in this process", constant.Nats)
 	}
 	return pid, nil
 }

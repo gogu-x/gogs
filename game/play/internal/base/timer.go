@@ -2,18 +2,24 @@ package base
 
 import (
 	"time"
+
+	"github.com/gogu-x/tree"
 )
 
 const saveInterval = 5 * time.Minute
 
-// InitTimers 在 PlayerActor.OnInit 中调用，注册所有定时任务
-func InitTimers(s *PlayContext) {
-	scheduleSave(s)
+// InitTimers 在 App.Init 中调用，注册模块级定时任务。
+func InitTimers(a *App) {
+	scheduleSave(a)
 }
 
-func scheduleSave(s *PlayContext) {
-	s.AfterFunc(saveInterval, func() {
-		s.Data.Save()
-		scheduleSave(s)
+// scheduleSave 周期性存档，回调在 Play Actor goroutine 内执行，不需要加锁。
+func scheduleSave(a *App) {
+	if a.ctx == nil {
+		return
+	}
+	a.ctx.AfterFunc(saveInterval, func(_ tree.Context) {
+		a.Players.Save()
+		scheduleSave(a)
 	})
 }

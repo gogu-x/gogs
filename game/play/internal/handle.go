@@ -2,25 +2,31 @@ package internal
 
 import (
 	"github.com/gogu-x/gogs/game/play/internal/base"
+	"github.com/gogu-x/gogs/game/play/internal/ctl_activity"
+	"github.com/gogu-x/gogs/game/play/internal/ctl_auth"
+	"github.com/gogu-x/gogs/game/play/internal/ctl_chat"
 	"github.com/gogu-x/gogs/pb/protoActivity"
 	"github.com/gogu-x/gogs/pb/protoChat"
 	"github.com/gogu-x/gogs/pb/protoGateway"
-	"github.com/gogu-x/gogs/pb/protoGuild"
-	"github.com/gogu-x/tree"
 )
 
-func InitRoutes(r *tree.Router, s *base.PlayContext) {
-	r.Register(&protoGateway.LoginReq{}, s.Handle(AutoLogin))
-	r.Register(&protoGateway.RegisterReq{}, s.Handle(AutoRegister))
-	r.Register(&protoChat.ChatReq{}, s.Handle(ChatService))
+// InitRoutes 注册 play 模块所有路由。
+//
+// 三类注册语义：
+//   - RegisterAnon  ：来自 gate、登录前即可处理（PlayContext.Player 可能为 nil）
+//   - RegisterPlayer：来自 gate、要求玩家在线（PlayContext.Player 保证非 nil）
+//   - RegisterSys   ：其他模块投递 / 内部异步消息（SysContext，不做登录判断）
+func InitRoutes(app *base.App) {
+	d := app.Dispatcher()
 
-	r.Register(&protoGuild.CreateGuildReq{}, s.Handle(CreateGuild))
-	r.Register(&protoGuild.JoinGuildReq{}, s.Handle(JoinGuild))
-	r.Register(&protoGuild.LeaveGuildReq{}, s.Handle(LeaveGuild))
-	r.Register(&protoGuild.GetGuildReq{}, s.Handle(GetGuild))
+	// 免登录白名单
+	base.RegisterAnon(d, &protoGateway.LoginReq{}, ctl_auth.AutoLogin)
+	base.RegisterAnon(d, &protoGateway.RegisterReq{}, ctl_auth.AutoRegister)
 
-	r.Register(&protoActivity.GetActivityListReq{}, s.Handle(GetActivityList))
-	r.Register(&protoActivity.JoinActivityReq{}, s.Handle(JoinActivity))
-	r.Register(&protoActivity.GetProgressReq{}, s.Handle(GetProgress))
-	r.Register(&protoActivity.ClaimRewardReq{}, s.Handle(ClaimReward))
+	// 需要玩家在线
+	base.RegisterPlayer(d, &protoChat.ChatReq{}, ctl_chat.ChatService)
+	base.RegisterPlayer(d, &protoActivity.GetActivityListReq{}, ctl_activity.GetActivityList)
+	base.RegisterPlayer(d, &protoActivity.JoinActivityReq{}, ctl_activity.JoinActivity)
+	base.RegisterPlayer(d, &protoActivity.GetProgressReq{}, ctl_activity.GetProgress)
+	base.RegisterPlayer(d, &protoActivity.ClaimRewardReq{}, ctl_activity.ClaimReward)
 }

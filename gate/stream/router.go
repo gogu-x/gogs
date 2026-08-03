@@ -9,7 +9,6 @@ import (
 
 func initRouter(s *Actor) {
 	s.router.Register(&protoGateway.StreamMsg{}, s.onStreamMsg)
-	s.router.Register(&stopMsg{}, s.onStop)
 }
 
 func (s *Actor) onStreamMsg(ctx actor.Context, msg interface{}) {

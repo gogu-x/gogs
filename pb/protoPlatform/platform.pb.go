@@ -200,6 +200,7 @@ type AuthAck struct {
 	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
 	Uid           uint64                 `protobuf:"varint,3,opt,name=uid,proto3" json:"uid,omitempty"`
 	Token         string                 `protobuf:"bytes,4,opt,name=token,proto3" json:"token,omitempty"`
+	ServerId      uint64                 `protobuf:"varint,5,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -260,6 +261,13 @@ func (x *AuthAck) GetToken() string {
 		return x.Token
 	}
 	return ""
+}
+
+func (x *AuthAck) GetServerId() uint64 {
+	if x != nil {
+		return x.ServerId
+	}
+	return 0
 }
 
 type VerifyTokenReq struct {
@@ -678,12 +686,13 @@ const file_platform_platform_proto_rawDesc = "" +
 	"\fAuthLoginReq\x12\x18\n" +
 	"\aaccount\x18\x01 \x01(\tR\aaccount\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1b\n" +
-	"\tserver_id\x18\x03 \x01(\x05R\bserverId\"a\n" +
+	"\tserver_id\x18\x03 \x01(\x05R\bserverId\"~\n" +
 	"\aAuthAck\x12\x1c\n" +
 	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x10\n" +
 	"\x03msg\x18\x02 \x01(\tR\x03msg\x12\x10\n" +
 	"\x03uid\x18\x03 \x01(\x04R\x03uid\x12\x14\n" +
-	"\x05token\x18\x04 \x01(\tR\x05token\"&\n" +
+	"\x05token\x18\x04 \x01(\tR\x05token\x12\x1b\n" +
+	"\tserver_id\x18\x05 \x01(\x04R\bserverId\"&\n" +
 	"\x0eVerifyTokenReq\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"3\n" +
 	"\tVerifyAck\x12\x14\n" +

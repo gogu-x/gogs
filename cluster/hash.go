@@ -6,7 +6,7 @@ import (
 )
 
 // HashPick 根据 uid hash 取模选取节点，节点列表不变时结果固定。
-func HashPick(serverID string, uid uint64) (InstInfo, bool) {
+func HashPick(serverID uint64, uid uint64) (InstInfo, bool) {
 	ringsMu.RLock()
 	nodes := rings[serverID]
 	ringsMu.RUnlock()

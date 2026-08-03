@@ -1,4 +1,4 @@
-package internal
+package ctl_chat
 
 import (
 	"log"

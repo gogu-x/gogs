@@ -17,3 +17,9 @@ message RegisterReq {
 message LogoutReq {
   uint64 uid = 1;
 }
+
+
+message LoginGameReq {
+  uint64 uid = 1;
+  uint64  server_id = 2;
+}

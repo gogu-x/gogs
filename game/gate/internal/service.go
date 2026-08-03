@@ -14,31 +14,22 @@ import (
 	"github.com/gogu-x/tree"
 
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 )
-
-type InboundMsg struct {
-	Msg    proto.Message
-	UID    uint64
-	ConnID uint64
-	GateId string
-}
 
 type GateActor struct {
 	grpcServer *grpc.Server
-	gamePID    tree.PID
+	playPID    tree.PID
 	stream     protoGateway.Gateway_StreamServer
 	router     tree.Router
 }
 
 func NewGateActor() *GateActor { return &GateActor{} }
 
-func (g *GateActor) OnInit(ctx tree.Context) {
-	g.gamePID = tree.MustLookup(constant.ActorNats)
+func (g *GateActor) Name() string { return constant.Gate }
 
-	g.router.Register(&InboundMsg{}, func(ctx tree.Context, msg interface{}) {
-		ctx.Send(g.gamePID, msg)
-	})
+func (g *GateActor) OnInit(ctx tree.Context) {
+	g.playPID = tree.MustLookup(constant.PLAY)
+
 	g.router.Register(&protoGateway.Frame{}, func(_ tree.Context, msg interface{}) {
 		if g.stream != nil {
 			if err := g.stream.Send(msg.(*protoGateway.Frame)); err != nil {
@@ -87,7 +78,7 @@ type gatewayService struct {
 
 func (s *gatewayService) Stream(stream protoGateway.Gateway_StreamServer) error {
 	s.actor.stream = stream
-	self := tree.MustLookup(constant.ActorGate)
+	playPID := tree.MustLookup(constant.PLAY)
 
 	for {
 		frame, err := stream.Recv()
@@ -95,24 +86,7 @@ func (s *gatewayService) Stream(stream protoGateway.Gateway_StreamServer) error 
 			s.actor.stream = nil
 			return err
 		}
-		if len(frame.Payload) == 0 {
-			continue
-		}
-		inner, err := s.codec.Unmarshal(frame.Payload)
-		if err != nil {
-			log.Printf("gatewayService: unmarshal error: %v", err)
-			continue
-		}
-		protoMsg, ok := inner.(proto.Message)
-		if !ok {
-			log.Printf("inner: proto.Message error: %v", err)
-			continue
-		}
-		tree.Send(self, &InboundMsg{
-			Msg:    protoMsg,
-			UID:    frame.Uid,
-			ConnID: frame.ConnId,
-			GateId: frame.GateId,
-		})
+		// 入口统一为 Frame：解码与登录校验都由 Play 模块内部完成。
+		tree.Send(playPID, frame)
 	}
 }

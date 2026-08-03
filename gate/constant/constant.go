@@ -9,3 +9,5 @@ const (
 )
 
 func ConnName(connID uint64) string { return fmt.Sprintf("conn-%d", connID) }
+
+func StreamName(serverID uint64) string { return fmt.Sprintf("stream-%v", serverID) }

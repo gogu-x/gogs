@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/config"
+	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
 	actor "github.com/gogu-x/tree"
 	"google.golang.org/grpc"
@@ -25,6 +26,8 @@ type Actor struct {
 }
 
 func NewActor() *Actor { return &Actor{routes: make(map[reflect.Type]route)} }
+
+func (a *Actor) Name() string { return constant.PF }
 
 func (a *Actor) register(req any, method string, newResp func() any) {
 	a.routes[reflect.TypeOf(req)] = route{method, newResp}
@@ -49,7 +52,7 @@ func (a *Actor) HandleMessage(ctx actor.Context, msg any) {
 		ctx.Response(nil, fmt.Errorf("rpc/platform: no route for %T", msg))
 		return
 	}
-	f := ctx.Future()
+	f := ctx.RequestEnvelope()
 	conn := a.conn
 	go func() {
 		rctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

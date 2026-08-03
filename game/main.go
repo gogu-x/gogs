@@ -11,6 +11,8 @@ import (
 	"github.com/gogu-x/gogs/game/activity"
 	"github.com/gogu-x/gogs/game/gate"
 	"github.com/gogu-x/gogs/game/guild"
+	gamenats "github.com/gogu-x/gogs/game/nats"
+	"github.com/gogu-x/gogs/game/play"
 	natsclient "github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
 	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
@@ -71,10 +73,14 @@ func main() {
 
 			db := rpcmongo.Connect(config.MongoURL, fmt.Sprintf("game_%v", serverID))
 
-			tree.Spawn(constant.ActorNats, gate.NewNatsActor(NodeID))
-			tree.Spawn(constant.ActorGuild, guild.NewGuildActor())
-			tree.Spawn(constant.ActorActivity, activity.NewActivityActor())
-			tree.Spawn(constant.ActorGameMongo, rpcmongo.NewActor(db))
+			tree.Spawn(
+				play.NewPlayActor(),
+				gate.NewGateActor(),
+				guild.NewGuildActor(),
+				activity.NewActivityActor(),
+				rpcmongo.NewActor(constant.Mongo, db),
+				gamenats.NewActor(serverID, NodeID),
+			)
 			tree.Default().Start()
 
 			return nil

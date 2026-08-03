@@ -5,11 +5,14 @@ import (
 	"net/http"
 
 	"github.com/gogu-x/gogs/config"
+	"github.com/gogu-x/gogs/constant"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
 	"github.com/gogu-x/tree"
 )
 
 type Actor struct{}
+
+func (a *Actor) Name() string { return constant.Web }
 
 func (a *Actor) OnInit(_ tree.Context) {
 	mux := http.NewServeMux()

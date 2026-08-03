@@ -1,4 +1,4 @@
-﻿package conn
+package conn
 
 import (
 	"reflect"
@@ -13,7 +13,7 @@ var noAuthRequired = map[reflect.Type]bool{
 	reflect.TypeOf(&protoGateway.RegisterReq{}): true,
 }
 
-func (c *Actor) checkAuth(_ actor.Context, msg interface{}) bool {
+func (c *Conn) checkAuth(_ actor.Context, msg interface{}) bool {
 	if noAuthRequired[reflect.TypeOf(msg)] {
 		return true
 	}

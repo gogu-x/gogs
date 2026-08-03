@@ -1,6 +1,7 @@
 package guild
 
 import (
+	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/guild/internal"
 	"github.com/gogu-x/tree"
 )
@@ -14,6 +15,8 @@ type GuildActor struct {
 func NewGuildActor() *GuildActor {
 	return &GuildActor{store: internal.NewStore()}
 }
+
+func (g *GuildActor) Name() string { return constant.Guild }
 
 func (g *GuildActor) OnInit(_ tree.Context) {
 	internal.InitRoutes(&g.router, g.store)

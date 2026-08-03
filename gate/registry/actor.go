@@ -3,84 +3,85 @@ package registry
 import (
 	"context"
 	"log"
-	"sync"
 	"sync/atomic"
 
 	"github.com/gogu-x/gogs/cluster"
-	"github.com/gogu-x/gogs/natsrpc"
-	actor "github.com/gogu-x/tree"
+	"github.com/gogu-x/gogs/gate/constant"
+	"github.com/gogu-x/gogs/gate/stream"
+	"github.com/gogu-x/tree"
 )
 
-var Global *Actor
-
 type Actor struct {
-	mu      sync.RWMutex
-	active  map[string]string
+	active  map[uint64]string
 	pending map[string]bool
 	cursor  atomic.Uint64
 	cancel  context.CancelFunc
-	router  actor.Router
+	router  tree.Router
 }
 
-func (r *Actor) OnInit(ctx actor.Context) {
-	Global = r
-	r.active = make(map[string]string)
-	r.pending = make(map[string]bool)
-	initRouter(r)
+func NewActor() *Actor {
+	return &Actor{
+		active:  make(map[uint64]string),
+		pending: make(map[string]bool),
+	}
+}
 
-	all, err := cluster.GetAll()
-	if err != nil {
-		log.Printf("RegistryActor: GetAll error: %v", err)
+func (r *Actor) Name() string { return constant.ActorRegistry }
+
+func (r *Actor) OnInit(ctx tree.Context) {
+	// 启动时从 etcd 加载所有节点，初始化 hash 路由缓存
+	if all, err := cluster.GetAll(); err != nil {
+		log.Fatal("cluster.GetAll: " + err.Error())
 	} else {
 		for serverID := range all {
 			instances, _ := cluster.GetInstances(serverID)
-			if len(instances) == 0 {
-				continue
-			}
-			r.active[serverID] = instances[0].NodeID
-			for _, inst := range instances[1:] {
-				natsrpc.PublishShutdown(serverID, inst.NodeID)
-			}
+			cluster.UpdateNodes(serverID, instances)
+			tree.SpawnOne(stream.New(serverID))
 		}
-		log.Printf("RegistryActor: loaded %d servers", len(r.active))
 	}
 
-	watchCtx, cancel := context.WithCancel(context.Background())
-	r.cancel = cancel
-	self := ctx.Self()
+	// 监听 etcd 节点变化，动态维护 hash 路由缓存。
+	// cancel 保存到 Actor 字段，交由 OnStop 释放；不能用 defer，
+	// 否则 OnInit 函数返回时就会立即取消 watch，导致后续事件全部收不到。
+	watchCtx, watchCancel := context.WithCancel(context.Background())
+	r.cancel = watchCancel
 	go func() {
 		for ev := range cluster.WatchInstances(watchCtx) {
-			actor.Send(self, &ev)
+			instances, _ := cluster.GetInstances(ev.ServerID)
+			cluster.UpdateNodes(ev.ServerID, instances)
+			// 节点下线：通知 GateServer 广播 failover，让受影响连接无感切换
+			if ev.Type == "delete" {
+				//这里关闭，
+			}
+			if ev.Type == "put" {
+				tree.SpawnOne(stream.New(ev.ServerID))
+			}
 		}
 	}()
 }
 
-func (r *Actor) HandleMessage(ctx actor.Context, msg interface{}) {
+func (r *Actor) HandleMessage(ctx tree.Context, msg interface{}) {
 	r.router.Route(ctx, msg)
 }
 
-func (r *Actor) OnStop(_ actor.Context) {
+func (r *Actor) OnStop(_ tree.Context) {
 	if r.cancel != nil {
 		r.cancel()
 	}
 }
 
-func (r *Actor) HasServer(serverID string) bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (r *Actor) HasServer(serverID uint64) bool {
 	_, ok := r.active[serverID]
 	return ok
 }
 
 func (r *Actor) Pick() string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	servers := make([]string, 0, len(r.active))
+	servers := make([]uint64, 0, len(r.active))
 	for id := range r.active {
 		servers = append(servers, id)
 	}
 	if len(servers) == 0 {
 		return ""
 	}
-	return servers[r.cursor.Add(1)%uint64(len(servers))]
+	return ""
 }

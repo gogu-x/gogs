@@ -2,7 +2,6 @@ package stream
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/gogu-x/gogs/cluster"
@@ -14,17 +13,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-type stopMsg struct{}
-
 type Actor struct {
-	serverID string
+	serverID uint64
 	stream   protoGateway.Gateway_StreamClient
 	router   actor.Router
 }
 
-func New(serverID string) *Actor { return &Actor{serverID: serverID} }
+func New(serverID uint64) *Actor { return &Actor{serverID: serverID} }
 
-func Name(serverID string) string { return fmt.Sprintf("stream-%s", serverID) }
+func (s *Actor) Name() string { return constant.StreamName(s.serverID) }
 
 func (s *Actor) OnInit(ctx actor.Context) {
 	initRouter(s)
@@ -49,13 +46,11 @@ func (s *Actor) OnInit(ctx actor.Context) {
 	}
 	s.stream = stream
 
-	self := ctx.Self()
 	go func() {
 		for {
 			frame, err := stream.Recv()
 			if err != nil {
 				log.Printf("StreamActor[%s]: recv error: %v", s.serverID, err)
-				actor.Send(self, &stopMsg{})
 				return
 			}
 			if pid, ok := actor.Lookup(constant.ConnName(frame.ConnId)); ok {

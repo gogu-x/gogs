@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,10 +17,10 @@ type InstInfo struct {
 }
 
 // GetInstances 返回 serverID 下所有实例，按注册时间降序（最新的在前）
-func GetInstances(serverID string) ([]InstInfo, error) {
+func GetInstances(serverID uint64) ([]InstInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	prefix := gameServerPrefix + serverID + "/"
+	prefix := fmt.Sprintf("%v%v/", gameServerPrefix, serverID)
 	resp, err := Client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
@@ -42,7 +43,7 @@ func GetInstances(serverID string) ([]InstInfo, error) {
 }
 
 // GetAddr 返回 serverID 下最新注册的实例地址
-func GetAddr(serverID string) (string, error) {
+func GetAddr(serverID uint64) (string, error) {
 	instances, err := GetInstances(serverID)
 	if err != nil {
 		return "", err
@@ -54,21 +55,22 @@ func GetAddr(serverID string) (string, error) {
 }
 
 // GetAll 获取所有已注册节点 serverID -> addr（取每个 serverID 的第一个实例）
-func GetAll() (map[string]string, error) {
+func GetAll() (map[uint64]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	resp, err := Client.Get(ctx, gameServerPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[string]string)
+	result := make(map[uint64]string)
 	for _, kv := range resp.Kvs {
 		// key = /game/server/{serverID}/{NodeID}
 		parts := strings.TrimPrefix(string(kv.Key), gameServerPrefix)
 		segs := strings.SplitN(parts, "/", 2)
 		if len(segs) == 2 {
-			if _, exists := result[segs[0]]; !exists {
-				result[segs[0]] = string(kv.Value)
+			serverID, _ := strconv.ParseUint(segs[0], 10, 64)
+			if _, exists := result[serverID]; !exists {
+				result[serverID] = string(kv.Value)
 			}
 		}
 	}
@@ -77,8 +79,8 @@ func GetAll() (map[string]string, error) {
 
 // InstanceEvent 实例变更事件
 type InstanceEvent struct {
-	ServerID string
-	NodeID   string
+	ServerID uint64
+	NodeID   uint64
 	Addr     string // delete 时为空
 	Type     string // "put" | "delete" | "drain"
 }
@@ -100,13 +102,12 @@ func WatchInstances(ctx context.Context) <-chan InstanceEvent {
 				t := "put"
 				if ev.Type == clientv3.EventTypeDelete {
 					t = "delete"
-				} else if ev.Kv.CreateRevision != ev.Kv.ModRevision {
-					// keepalive 续期，忽略
-					continue
 				}
+				serverID, _ := strconv.ParseUint(segs[0], 10, 64)
+				nodeID, _ := strconv.ParseUint(segs[1], 10, 64)
 				ch <- InstanceEvent{
-					ServerID: segs[0],
-					NodeID:   segs[1],
+					ServerID: serverID,
+					NodeID:   nodeID,
 					Addr:     string(ev.Kv.Value),
 					Type:     t,
 				}
@@ -127,9 +128,11 @@ func WatchInstances(ctx context.Context) <-chan InstanceEvent {
 				if len(segs) != 2 {
 					continue
 				}
+				serverID, _ := strconv.ParseUint(segs[0], 10, 64)
+				nodeID, _ := strconv.ParseUint(segs[1], 10, 64)
 				ch <- InstanceEvent{
-					ServerID: segs[0],
-					NodeID:   segs[1],
+					ServerID: serverID,
+					NodeID:   nodeID,
 					Type:     "drain",
 				}
 			}

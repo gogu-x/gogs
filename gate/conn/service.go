@@ -1,77 +1,78 @@
 package conn
 
 import (
-	"fmt"
 	"log"
-	"time"
 
-	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
-	actor "github.com/gogu-x/tree"
+	"github.com/gogu-x/tree"
 )
 
-func (c *Actor) onLogin(ctx actor.Context, msg interface{}) {
+func (c *Conn) onLogin(ctx tree.Context, msg interface{}) {
 	req := msg.(*protoGateway.LoginReq)
-	serverID := fmt.Sprintf("%d", req.ServerId)
 	c.state = stateLogging
-	platformPID := actor.MustLookup(constant.ActorRpcPlatform)
-	ctx.Request(platformPID, &protoPlatform.AuthLoginReq{Account: req.Account, Password: req.Password, ServerId: req.ServerId}).
-		Callback(ctx, func(ret interface{}, err error) {
-			if err != nil {
-				c.state = stateAnon
-				log.Printf("ConnActor[%d]: uid=%d AuthLoginReq err: %s", c.connID, c.uid, err.Error())
-				c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
-				return
-			}
-			AuthAck := ret.(*protoPlatform.AuthAck)
-			inst, ok := cluster.HashPick(serverID, AuthAck.Uid)
-			if !ok {
-				c.state = stateAnon
-				c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_SERVER_NOT_FOUND, Msg: "server not available"})
-				return
-			}
-			c.uid = AuthAck.Uid
-			c.token = AuthAck.Token
-			c.serverID = serverID
-			c.nodeID = inst.NodeID
-			c.state = stateAuthed
-			c.forward(ctx, req)
-			log.Printf("ConnActor[%d]: uid=%d logged in -> server=%s node=%s", c.connID, c.uid, c.serverID, c.nodeID)
-			c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
-		})
+	platformPID := tree.MustLookup(constant.PF)
+	plReq := &protoPlatform.AuthLoginReq{
+		Account:  req.Account,
+		Password: req.Password,
+		ServerId: req.ServerId,
+	}
+	ctx.RequestCallback(platformPID, plReq, c.LoginCb)
 }
 
-func (c *Actor) onRegister(ctx actor.Context, msg interface{}) {
+func (c *Conn) LoginCb(ctx tree.Context, ret interface{}, err error) {
+	if err != nil {
+		c.state = stateAnon
+		log.Printf("ConnActor[%d]: uid=%d AuthLoginReq err: %s", c.connID, c.uid, err.Error())
+		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
+		return
+	}
+	AuthAck := ret.(*protoPlatform.AuthAck)
+	if AuthAck.Code != protoCommon.ErrCode_OK {
+		return
+	}
+	c.uid = AuthAck.Uid
+	c.token = AuthAck.Token
+	c.serverID = AuthAck.ServerId
+	c.nodeID = ""
+	c.state = stateAuthed
+	req := &protoGateway.LoginGameReq{
+		Uid:      AuthAck.Uid,
+		ServerId: AuthAck.ServerId,
+	}
+	c.forward(ctx, req)
+	log.Printf("ConnActor[%d]: uid=%d logged in -> server=%s node=%s", c.connID, c.uid, c.serverID, c.nodeID)
+	c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
+}
+
+func (c *Conn) onRegister(ctx tree.Context, msg interface{}) {
 	req := msg.(*protoGateway.RegisterReq)
-	serverID := fmt.Sprintf("%d", req.ServerId)
 	c.state = stateLogging
-	start := time.Now()
-	platformPID := actor.MustLookup(constant.ActorRpcPlatform)
-	ctx.Request(platformPID, &protoPlatform.RegisterReq{Account: req.Account, Password: req.Password, ServerId: req.ServerId}).
-		Callback(ctx, func(ret interface{}, err error) {
-			log.Printf("ConnActor[%d]: register platform cb elapsed=%v err=%v", c.connID, time.Since(start), err)
-			if err != nil {
-				c.state = stateAnon
-				c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
-				return
-			}
-			AuthAck := ret.(*protoPlatform.AuthAck)
-			inst, ok := cluster.HashPick(serverID, AuthAck.Uid)
-			if !ok {
-				c.state = stateAnon
-				c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_ERR_SERVER_NOT_FOUND, Msg: "server not available"})
-				return
-			}
-			c.uid = AuthAck.Uid
-			c.token = AuthAck.Token
-			c.serverID = serverID
-			c.nodeID = inst.NodeID
-			c.state = stateAuthed
-			c.forward(ctx, req)
-			log.Printf("ConnActor[%d]: uid=%d registered -> server=%s node=%s", c.connID, c.uid, c.serverID, c.nodeID)
-			c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
-		})
+	platformPID := tree.MustLookup(constant.PF)
+	plReq := &protoPlatform.RegisterReq{
+		Account:  req.Account,
+		Password: req.Password,
+		ServerId: req.ServerId,
+	}
+	ctx.RequestCallback(platformPID, plReq, c.regCb)
+}
+
+func (c *Conn) regCb(ctx tree.Context, ret interface{}, err error) {
+
+	if err != nil {
+		c.state = stateAnon
+		c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
+		return
+	}
+
+	AuthAck := ret.(*protoPlatform.AuthAck)
+	c.uid = AuthAck.Uid
+	c.token = AuthAck.Token
+	c.serverID = AuthAck.ServerId
+	c.nodeID = ""
+	c.state = stateAuthed
+	log.Printf("ConnActor[%d]: uid=%d registered -> server=%s node=%s", c.connID, c.uid, c.serverID, c.nodeID)
+	c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/constant"
 	natsclient "github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
@@ -31,9 +30,11 @@ func main() {
 
 			db := rpcmongo.Connect(config.MongoURL, "platform")
 
-			actor.Spawn(constant.ActorNats, natsclient.NewActor(natsclient.ActorConfig{}))
-			actor.Spawn(constant.ActorPlatformGrpc, platformgrpc.NewActor(db))
-			actor.Spawn(constant.ActorPlatformWebhook, &webhook.Actor{})
+			actor.Spawn(
+				natsclient.NewActor(natsclient.ActorConfig{}),
+				platformgrpc.NewActor(db),
+				&webhook.Actor{},
+			)
 
 			actor.Default().Start()
 			return nil

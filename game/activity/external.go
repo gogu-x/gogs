@@ -1,6 +1,7 @@
 package activity
 
 import (
+	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/activity/internal"
 	"github.com/gogu-x/tree"
 )
@@ -15,6 +16,8 @@ type ActivityActor struct {
 func NewActivityActor() *ActivityActor {
 	return &ActivityActor{mgr: internal.NewMgr()}
 }
+
+func (a *ActivityActor) Name() string { return constant.ActorActivity }
 
 func (a *ActivityActor) OnInit(c tree.Context) {
 	a.context = c

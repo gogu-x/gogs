@@ -32,6 +32,7 @@ message AuthAck {
   string  msg   = 2;
   uint64  uid   = 3;
   string  token = 4;
+  uint64 server_id = 5;
 }
 
 message VerifyTokenReq {

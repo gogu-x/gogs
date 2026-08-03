@@ -1,77 +1,45 @@
-package player
+package play
 
 import (
-	"errors"
 	"log"
 
-	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/play/internal"
 	"github.com/gogu-x/gogs/game/play/internal/base"
-	"github.com/gogu-x/gogs/natsrpc"
+	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-// Player 每个在线玩家独立一个 Actor
-type Player struct {
-	uid    uint64
-	connID uint64
-	router tree.Router
-	s      *base.Session
+// Play 游戏模块 Actor 壳：只负责生命周期与消息分流，状态与路由都在 base.App。
+type Play struct {
+	app *base.App
 }
 
-func NewPlayerActor(uid, connID uint64) *Player {
-	return &Player{uid: uid, connID: connID}
+func NewPlayActor() *Play {
+	return &Play{app: base.NewApp()}
 }
 
-// Name PlayerActor 以 uid 寻址，Spawn 时即写入 registry，
-// 无需再在 OnInit 里 Register。
-func (p *Player) Name() string { return constant.PlayerName(p.uid) }
+// Name Play 以固定名字寻址，Spawn 时即写入 registry。
+func (p *Play) Name() string { return constant.PLAY }
 
-func (p *Player) OnInit(ctx tree.Context) {
-	// 同步加载玩家数据：阻塞当前 PlayerActor goroutine 直到完成或超时。
-	// 框架在 OnInit 返回后才开始消费 mailbox，因此 OnInit 返回时 p.s 必已就绪，
-	// 任何 Frame 都不可能在 Session 初始化之前被处理，从根上消除空指针竞态。
-	data, err := base.Load(ctx, p.uid)
-	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			data = base.NewPlayerData(p.uid)
-		} else {
-			log.Printf("PlayerActor[%d]: load failed: %v", p.uid, err)
-			ctx.Stop()
-			return
-		}
-	}
-	p.s = base.NewSession(data, ctx)
-	internal.InitRoutes(&p.router, p.s)
-	base.InitTimers(p.s)
-	log.Printf("PlayerActor[%d]: ready", p.uid)
-
-	// 注册 Frame handler。此时 p.s 已就绪。
-	p.router.Register(&natsrpc.Frame{}, func(ctx tree.Context, msg interface{}) {
-		frame := msg.(*natsrpc.Frame)
-		p.s.ConnID = frame.ConnId
-		p.s.GateId = frame.GateId
-		p.s.SetCurrentFrame(frame)
-		defer p.s.SetCurrentFrame(nil)
-		inner, err := codec.ProtoCodec.Unmarshal(frame.Payload)
-		if err != nil {
-			log.Printf("PlayerActor[%d]: unmarshal payload: %v", p.uid, err)
-			return
-		}
-		p.router.Route(ctx, inner)
-	})
+func (p *Play) OnInit(ctx tree.Context) {
+	internal.InitRoutes(p.app)
+	p.app.Init(ctx)
 }
 
-func (p *Player) HandleMessage(ctx tree.Context, msg interface{}) {
-	p.router.Route(ctx, msg)
-}
-
-func (p *Player) OnStop(_ tree.Context) {
-	if p.s == nil {
-		log.Printf("PlayerActor[%d]: Session nil", p.uid)
+// HandleMessage 按入口分流：
+//   - *protoGateway.Frame：来自 gate（NATS/gRPC）的玩家请求，走 HandleFrame（含登录校验）；
+//   - 其他类型：其他模块投递或内部异步消息，走 HandleSystem（无 uid，不判断登录）。
+func (p *Play) HandleMessage(ctx tree.Context, msg interface{}) {
+	if f, ok := msg.(*protoGateway.Frame); ok {
+		p.app.HandleFrame(ctx, f)
 		return
 	}
-	p.s.Data.Save()
+	if !p.app.HandleSystem(ctx, msg) {
+		log.Printf("play: no system route for %T", msg)
+	}
+}
+
+func (p *Play) OnStop(_ tree.Context) {
+	p.app.Stop()
 }

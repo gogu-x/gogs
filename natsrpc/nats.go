@@ -8,6 +8,7 @@ import (
 	natsgo "github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/tree"
 )
 
@@ -16,6 +17,8 @@ type RouteFunc func(frame *Frame) (tree.PID, bool)
 
 // ActorConfig 配置订阅列表。
 type ActorConfig struct {
+	// Name 注册名，为空时使用 constant.ActorNats（每个进程一个 NatsActor）。
+	Name string
 	Subs []SubConfig
 }
 
@@ -48,6 +51,14 @@ type Actor struct {
 
 func NewActor(cfg ActorConfig) *Actor {
 	return &Actor{cfg: cfg, pendingMap: make(map[string]*pending)}
+}
+
+// Name 实现 tree.Actor，注册名默认为 constant.ActorNats。
+func (a *Actor) Name() string {
+	if a.cfg.Name != "" {
+		return a.cfg.Name
+	}
+	return constant.Nats
 }
 
 func (a *Actor) OnInit(ctx tree.Context) {
@@ -208,14 +219,5 @@ func (a *Actor) subscribeShutdown(self tree.PID, sub SubConfig) {
 
 // sendFrameCallback 包装 actor.SendCallback，适配 func(*Frame, error) 签名。
 func sendFrameCallback(pid tree.PID, cb func(*Frame, error), frame *Frame, err error) bool {
-	if cb == nil {
-		return false
-	}
-	return tree.SendCallback(pid, func(v interface{}, e error) {
-		if v == nil {
-			cb(nil, e)
-			return
-		}
-		cb(v.(*Frame), e)
-	}, frame, err)
+	return false
 }

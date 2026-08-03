@@ -185,6 +185,58 @@ func (x *LogoutReq) GetUid() uint64 {
 	return 0
 }
 
+type LoginGameReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Uid           uint64                 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	ServerId      uint64                 `protobuf:"varint,2,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginGameReq) Reset() {
+	*x = LoginGameReq{}
+	mi := &file_gateway_gateway_req_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginGameReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginGameReq) ProtoMessage() {}
+
+func (x *LoginGameReq) ProtoReflect() protoreflect.Message {
+	mi := &file_gateway_gateway_req_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginGameReq.ProtoReflect.Descriptor instead.
+func (*LoginGameReq) Descriptor() ([]byte, []int) {
+	return file_gateway_gateway_req_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *LoginGameReq) GetUid() uint64 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+func (x *LoginGameReq) GetServerId() uint64 {
+	if x != nil {
+		return x.ServerId
+	}
+	return 0
+}
+
 var File_gateway_gateway_req_proto protoreflect.FileDescriptor
 
 const file_gateway_gateway_req_proto_rawDesc = "" +
@@ -199,7 +251,10 @@ const file_gateway_gateway_req_proto_rawDesc = "" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1b\n" +
 	"\tserver_id\x18\x03 \x01(\x05R\bserverId\"\x1d\n" +
 	"\tLogoutReq\x12\x10\n" +
-	"\x03uid\x18\x01 \x01(\x04R\x03uidB(Z&github.com/gogu-x/gogs/pb/protoGatewayb\x06proto3"
+	"\x03uid\x18\x01 \x01(\x04R\x03uid\"=\n" +
+	"\fLoginGameReq\x12\x10\n" +
+	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x1b\n" +
+	"\tserver_id\x18\x02 \x01(\x04R\bserverIdB(Z&github.com/gogu-x/gogs/pb/protoGatewayb\x06proto3"
 
 var (
 	file_gateway_gateway_req_proto_rawDescOnce sync.Once
@@ -213,11 +268,12 @@ func file_gateway_gateway_req_proto_rawDescGZIP() []byte {
 	return file_gateway_gateway_req_proto_rawDescData
 }
 
-var file_gateway_gateway_req_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_gateway_gateway_req_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_gateway_gateway_req_proto_goTypes = []any{
-	(*LoginReq)(nil),    // 0: LoginReq
-	(*RegisterReq)(nil), // 1: RegisterReq
-	(*LogoutReq)(nil),   // 2: LogoutReq
+	(*LoginReq)(nil),     // 0: LoginReq
+	(*RegisterReq)(nil),  // 1: RegisterReq
+	(*LogoutReq)(nil),    // 2: LogoutReq
+	(*LoginGameReq)(nil), // 3: LoginGameReq
 }
 var file_gateway_gateway_req_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -238,7 +294,7 @@ func file_gateway_gateway_req_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gateway_gateway_req_proto_rawDesc), len(file_gateway_gateway_req_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/config"
+	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/pb/protoPlatform"
 	"github.com/gogu-x/gogs/platform/service"
 	"github.com/gogu-x/tree"
@@ -21,6 +22,8 @@ type Platform struct {
 }
 
 func NewActor(db *mongo.Database) *Platform { return &Platform{db: db} }
+
+func (a *Platform) Name() string { return constant.PF }
 
 func (a *Platform) OnInit(ctx tree.Context) {
 	if err := service.EnsureIndexes(a.db); err != nil {
