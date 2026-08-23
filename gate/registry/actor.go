@@ -7,7 +7,6 @@ import (
 
 	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/gate/constant"
-	"github.com/gogu-x/gogs/gate/stream"
 	"github.com/gogu-x/tree"
 )
 
@@ -36,7 +35,6 @@ func (r *Actor) OnInit(ctx tree.Context) {
 		for serverID := range all {
 			instances, _ := cluster.GetInstances(serverID)
 			cluster.UpdateNodes(serverID, instances)
-			tree.SpawnOne(stream.New(serverID))
 		}
 	}
 
@@ -54,7 +52,6 @@ func (r *Actor) OnInit(ctx tree.Context) {
 				//这里关闭，
 			}
 			if ev.Type == "put" {
-				tree.SpawnOne(stream.New(ev.ServerID))
 			}
 		}
 	}()

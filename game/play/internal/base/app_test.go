@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/codec"
-	"github.com/gogu-x/gogs/game/play/module/player"
+	"github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
 	"github.com/gogu-x/gogs/pb/protoChat"
@@ -19,23 +19,23 @@ import (
 // stubCtx 是 tree.Context 的最小实现，仅供单测使用。
 type stubCtx struct{}
 
-func (stubCtx) Self() tree.PID                                 { return tree.PID{Name: "play"} }
-func (stubCtx) Sender() tree.PID                               { return tree.PID{} }
-func (stubCtx) Message() interface{}                           { return nil }
-func (stubCtx) Send(tree.PID, interface{}) bool                { return true }
-func (stubCtx) TrySend(tree.PID, interface{}) bool             { return true }
-func (stubCtx) Request(tree.PID, interface{}) *tree.Envelope   { return nil }
+func (stubCtx) Self() tree.PID                               { return tree.PID{Name: "play"} }
+func (stubCtx) Sender() tree.PID                             { return tree.PID{} }
+func (stubCtx) Message() interface{}                         { return nil }
+func (stubCtx) Send(tree.PID, interface{}) bool              { return true }
+func (stubCtx) TrySend(tree.PID, interface{}) bool           { return true }
+func (stubCtx) Request(tree.PID, interface{}) *tree.Envelope { return nil }
 func (stubCtx) RequestCallback(tree.PID, interface{}, func(tree.Context, interface{}, error)) *tree.Envelope {
 	return nil
 }
-func (stubCtx) Response(interface{}, error)        {}
-func (stubCtx) RequestEnvelope() *tree.Envelope    { return nil }
-func (stubCtx) Stop()                              {}
-func (stubCtx) Lookup(string) (tree.PID, bool)     { return tree.PID{}, false }
-func (stubCtx) Register(string)                    {}
-func (stubCtx) System() *tree.Tree                 { return nil }
-func (stubCtx) SetValue(string, interface{})       {}
-func (stubCtx) GetValue(string) interface{}        { return nil }
+func (stubCtx) Response(interface{}, error)     {}
+func (stubCtx) RequestEnvelope() *tree.Envelope { return nil }
+func (stubCtx) Stop()                           {}
+func (stubCtx) Lookup(string) (tree.PID, bool)  { return tree.PID{}, false }
+func (stubCtx) Register(string)                 {}
+func (stubCtx) System() *tree.Tree              { return nil }
+func (stubCtx) SetValue(string, interface{})    {}
+func (stubCtx) GetValue(string) interface{}     { return nil }
 
 func (stubCtx) AfterFunc(time.Duration, func(tree.Context)) *timer.WheelTimer { return nil }
 func (stubCtx) CronFunc(*timer.CronExpr, func(tree.Context)) *timer.WheelCron { return nil }
@@ -119,8 +119,8 @@ func TestHandleFrameAnonymousRouteAllowsNilPlayer(t *testing.T) {
 		if s.Player != nil {
 			t.Error("Player should be nil before login")
 		}
-		if s.UID != 100 || s.ConnID != 7 || s.GateId != "1" {
-			t.Errorf("ctx meta = uid:%d conn:%d gate:%s", s.UID, s.ConnID, s.GateId)
+		if s.PlayerId != 100 || s.ConnID != 7 || s.GateId != "1" {
+			t.Errorf("ctx meta = uid:%d conn:%d gate:%s", s.PlayerId, s.ConnID, s.GateId)
 		}
 		if s.App != app {
 			t.Error("ctx should carry the play module")
@@ -217,7 +217,7 @@ func TestReplyRouting(t *testing.T) {
 	app, sender := newTestApp()
 
 	// 无 RequestId：Cast 到 gate.out.{gateID}
-	s := &PlayContext{SysContext: SysContext{App: app, ctx: stubCtx{}}, UID: 100, ConnID: 7, GateId: "3"}
+	s := &PlayContext{SysContext: SysContext{App: app, ctx: stubCtx{}}, PlayerId: 100, ConnID: 7, GateId: "3"}
 	s.Reply(&protoChat.ChatAck{State: 2})
 	if sender.gateID != "3" || sender.castFrame == nil {
 		t.Fatalf("cast gateID = %q, frame = %v", sender.gateID, sender.castFrame)
@@ -235,7 +235,7 @@ func TestReplyRouting(t *testing.T) {
 
 	// 有 RequestId：回到发起方 inbox
 	req := &protoGateway.Frame{Uid: 100, RequestId: "_INBOX.abc.1"}
-	s2 := &PlayContext{SysContext: SysContext{App: app, ctx: stubCtx{}}, UID: 100, RequestId: req.RequestId, frame: req}
+	s2 := &PlayContext{SysContext: SysContext{App: app, ctx: stubCtx{}}, PlayerId: 100, RequestId: req.RequestId, frame: req}
 	s2.Reply(&protoChat.ChatAck{State: 1})
 	if sender.replyResp == nil || sender.replyReq != req {
 		t.Fatalf("replyReq = %v, replyResp = %v", sender.replyReq, sender.replyResp)

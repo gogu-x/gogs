@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/codec"
-	"github.com/gogu-x/gogs/game/play/module/player"
+	gamegate "github.com/gogu-x/gogs/game/gate"
+	"github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree"
@@ -52,9 +53,9 @@ type PlayContext struct {
 	// Player 需登录路由下一定非 nil；免登录路由（登录/注册）可能为 nil。
 	Player *player.Player
 
-	UID    uint64
-	ConnID uint64
-	GateId string
+	PlayerId uint64
+	ConnID   uint64
+	GateId   string
 	// RequestId 非空表示这是一次跨节点 request-reply，回包走 inbox 而不是 gate。
 	RequestId string
 
@@ -74,7 +75,7 @@ func (s *PlayContext) Reply(msg proto.Message) {
 		return
 	}
 	resp := &protoGateway.Frame{
-		Uid:     s.UID,
+		Uid:     s.PlayerId,
 		ConnId:  s.ConnID,
 		GateId:  s.GateId,
 		Payload: body,
@@ -101,6 +102,9 @@ type Sender interface {
 type natsSender struct{}
 
 func (natsSender) CastGate(gateID string, f *protoGateway.Frame) error {
+	if gamegate.PushToConn(gateID, f.GetConnId(), f) {
+		return nil
+	}
 	return natsrpc.Cast(natsrpc.ModuleGate, gateID, "", f)
 }
 

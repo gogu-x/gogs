@@ -69,60 +69,52 @@ func (a *Actor) OnStop(_ actor.Context) {}
 func (a *Actor) onInsert(ctx actor.Context, msg interface{}) {
 	m := msg.(*InsertOne)
 	f := ctx.RequestEnvelope()
-	go func() {
-		res, err := a.db.Collection(m.Collection).InsertOne(bg(), m.Doc)
-		if f == nil {
-			return
-		}
-		if err != nil {
-			f.Respond(nil, err)
-			return
-		}
-		f.Respond(res.InsertedID, nil)
-	}()
+	res, err := a.db.Collection(m.Collection).InsertOne(bg(), m.Doc)
+	if f == nil {
+		return
+	}
+	if err != nil {
+		f.Respond(nil, err)
+		return
+	}
+	f.Respond(res.InsertedID, nil)
 }
 
 func (a *Actor) onFind(ctx actor.Context, msg interface{}) {
 	m := msg.(*FindOne)
 	f := ctx.RequestEnvelope()
-	go func() {
-		err := a.db.Collection(m.Collection).FindOne(bg(), m.Filter).Decode(m.Result)
-		if f == nil {
-			return
-		}
-		f.Respond(m.Result, err)
-	}()
+	err := a.db.Collection(m.Collection).FindOne(bg(), m.Filter).Decode(m.Result)
+	if f == nil {
+		return
+	}
+	f.Respond(m.Result, err)
 }
 
 func (a *Actor) onUpdate(ctx actor.Context, msg interface{}) {
 	m := msg.(*UpdateOne)
 	f := ctx.RequestEnvelope()
-	go func() {
-		opts := options.UpdateOne()
-		if m.Upsert {
-			opts.SetUpsert(true)
-		}
-		_, err := a.db.Collection(m.Collection).UpdateOne(bg(), m.Filter, m.Update, opts)
-		if err != nil {
-			log.Printf("rpc/mongo: UpdateOne [%s] error: %v", m.Collection, err)
-		}
-		if f == nil {
-			return
-		}
-		f.Respond(nil, err)
-	}()
+	opts := options.UpdateOne()
+	if m.Upsert {
+		opts.SetUpsert(true)
+	}
+	_, err := a.db.Collection(m.Collection).UpdateOne(bg(), m.Filter, m.Update, opts)
+	if err != nil {
+		log.Printf("rpc/mongo: UpdateOne [%s] error: %v", m.Collection, err)
+	}
+	if f == nil {
+		return
+	}
+	f.Respond(nil, err)
 }
 
 func (a *Actor) onDelete(ctx actor.Context, msg interface{}) {
 	m := msg.(*DeleteOne)
 	f := ctx.RequestEnvelope()
-	go func() {
-		_, err := a.db.Collection(m.Collection).DeleteOne(bg(), m.Filter)
-		if f == nil {
-			return
-		}
-		f.Respond(nil, err)
-	}()
+	_, err := a.db.Collection(m.Collection).DeleteOne(bg(), m.Filter)
+	if f == nil {
+		return
+	}
+	f.Respond(nil, err)
 }
 
 func bg() context.Context {
@@ -130,9 +122,18 @@ func bg() context.Context {
 	return ctx
 }
 
-// Connect connects to MongoDB and returns the named database.
-func Connect(uri, dbName string) *mongo.Database {
-	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+// Connect connects to MongoDB and returns the named database. Empty credentials
+// leave authentication disabled.
+func Connect(uri, username, password, dbName string) *mongo.Database {
+	clientOptions := options.Client().ApplyURI(uri)
+	if username != "" || password != "" {
+		clientOptions.SetAuth(options.Credential{
+			Username: username,
+			Password: password,
+		})
+	}
+
+	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		log.Fatalf("rpc/mongo.Connect: %v", err)
 	}

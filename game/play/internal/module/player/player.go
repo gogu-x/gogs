@@ -1,10 +1,10 @@
 package player
 
 import (
-	"github.com/gogu-x/gogs/game/play/module/asset"
-	"github.com/gogu-x/gogs/game/play/module/bag"
-	"github.com/gogu-x/gogs/game/play/module/cardgroup"
-	"github.com/gogu-x/gogs/game/play/module/shop"
+	"github.com/gogu-x/gogs/game/play/internal/module/asset"
+	"github.com/gogu-x/gogs/game/play/internal/module/bag"
+	"github.com/gogu-x/gogs/game/play/internal/module/cardgroup"
+	"github.com/gogu-x/gogs/game/play/internal/module/shop"
 )
 
 type Player struct {

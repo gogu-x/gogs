@@ -22,12 +22,11 @@ func main() {
 	cmd := &cli.Command{
 		Name:  "gate",
 		Usage: "gate server",
-		Flags: []cli.Flag{
-			&cli.IntFlag{Name: "gate-id", Aliases: []string{"id"}, Required: true},
-		},
+		Flags: config.ConnectionFlags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			config.GateID = c.Int("gate-id")
-
+			if err := config.LoadAndApply(c); err != nil {
+				return err
+			}
 			if err := cluster.Init(config.EtcdEndpoints); err != nil {
 				log.Fatal("cluster init: " + err.Error())
 			}

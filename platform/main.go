@@ -20,7 +20,12 @@ func main() {
 	cmd := &cli.Command{
 		Name:  "platform",
 		Usage: "platform server",
+		Flags: config.ConnectionFlags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
+			if err := config.LoadAndApply(c); err != nil {
+				return err
+			}
+
 			protoPlatform.RegisterJSONCodec()
 
 			if err := natsclient.Init(config.NatsURL); err != nil {
@@ -28,7 +33,12 @@ func main() {
 			}
 			defer natsclient.Close()
 
-			db := rpcmongo.Connect(config.MongoURL, "platform")
+			db := rpcmongo.Connect(
+				config.MongoURL,
+				config.MongoUsername,
+				config.MongoPassword,
+				"platform",
+			)
 
 			actor.Spawn(
 				natsclient.NewActor(natsclient.ActorConfig{}),

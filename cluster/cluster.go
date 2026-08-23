@@ -22,12 +22,12 @@ const (
 
 // game节点数量  hash 路由到对应的game
 var (
-	rings   = make(map[uint64][]InstInfo) // serverID -> 节点列表
+	rings   = make(map[int32][]InstInfo) // serverID -> 节点列表
 	ringsMu sync.RWMutex
 )
 
 // UpdateNodes 更新指定 serverID 下的节点列表，由 gate 在 etcd 事件回调中调用。
-func UpdateNodes(serverID uint64, nodes []InstInfo) {
+func UpdateNodes(serverID int32, nodes []InstInfo) {
 	ringsMu.Lock()
 	if len(nodes) == 0 {
 		delete(rings, serverID)

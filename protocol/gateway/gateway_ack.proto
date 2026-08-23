@@ -13,3 +13,14 @@ message RegisterAck {
   ErrCode code = 1;
   string  msg  = 2;
 }
+
+message ServerAccount {
+  int32  server_id = 1;
+  uint64 uid       = 2;
+}
+
+message ServerListAck {
+  ErrCode                 code     = 1;
+  string                  msg      = 2;
+  repeated ServerAccount accounts = 3;
+}

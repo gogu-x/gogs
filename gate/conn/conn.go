@@ -6,6 +6,7 @@ import (
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree"
 	"github.com/gorilla/websocket"
+	"google.golang.org/grpc"
 )
 
 type WsMsg struct{ Data []byte }
@@ -33,11 +34,13 @@ type Conn struct {
 	conn        *websocket.Conn
 	uid         uint64
 	connID      uint64
-	serverID    uint64
-	nodeID      string // hash 选定的 game 节点实例 ID，登录时确定，后续消息固定路由到此节点
+	serverID    int32
+	nodeID      string
 	token       string
 	state       connState
 	middlewares []middlewareFunc
+	stream      protoGateway.Gateway_StreamClient
+	grpcConn    *grpc.ClientConn
 	router      tree.Router
 	codec       codec.Codec
 }
@@ -83,6 +86,14 @@ func (c *Conn) OnStop(ctx tree.Context) {
 	}
 	if c.uid != 0 && c.serverID != 0 {
 
+	}
+	if c.stream != nil {
+		_ = c.stream.CloseSend()
+		c.stream = nil
+	}
+	if c.grpcConn != nil {
+		_ = c.grpcConn.Close()
+		c.grpcConn = nil
 	}
 	if c.conn != nil {
 		_ = c.conn.Close()

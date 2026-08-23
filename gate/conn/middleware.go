@@ -9,8 +9,9 @@ import (
 )
 
 var noAuthRequired = map[reflect.Type]bool{
-	reflect.TypeOf(&protoGateway.LoginReq{}):    true,
-	reflect.TypeOf(&protoGateway.RegisterReq{}): true,
+	reflect.TypeOf(&protoGateway.LoginReq{}):         true,
+	reflect.TypeOf(&protoGateway.RegisterReq{}):      true,
+	reflect.TypeOf(&protoGateway.GetServerListReq{}): true,
 }
 
 func (c *Conn) checkAuth(_ actor.Context, msg interface{}) bool {

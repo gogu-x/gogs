@@ -18,8 +18,13 @@ message LogoutReq {
   uint64 uid = 1;
 }
 
+// GetServerListReq may be sent before login to discover an account's registrations.
+message GetServerListReq {
+  string account = 1;
+}
+
 
 message LoginGameReq {
   uint64 uid = 1;
-  uint64  server_id = 2;
+  int32  server_id = 2;
 }

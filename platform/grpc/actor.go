@@ -33,6 +33,7 @@ func (a *Platform) OnInit(ctx tree.Context) {
 	a.router.Register(&protoPlatform.RegisterReq{}, a.onRegister)
 	a.router.Register(&protoPlatform.AuthLoginReq{}, a.onLogin)
 	a.router.Register(&protoPlatform.VerifyTokenReq{}, a.onVerify)
+	a.router.Register(&protoPlatform.GetServerListReq{}, a.onGetServerList)
 	a.router.Register(&protoPlatform.CreateOrderReq{}, a.onCreateOrder)
 	a.router.Register(&protoPlatform.QueryOrderReq{}, a.onQueryOrder)
 	a.router.Register(&deliverReq{}, a.onDeliver)
@@ -96,6 +97,14 @@ func (s *svcHandler) VerifyToken(_ context.Context, req *protoPlatform.VerifyTok
 		return nil, err
 	}
 	return v.(*protoPlatform.VerifyAck), nil
+}
+
+func (s *svcHandler) GetServerList(_ context.Context, req *protoPlatform.GetServerListReq) (*protoPlatform.ServerListAck, error) {
+	v, err := s.call(req)
+	if err != nil {
+		return nil, err
+	}
+	return v.(*protoPlatform.ServerListAck), nil
 }
 
 func (s *svcHandler) CreateOrder(_ context.Context, req *protoPlatform.CreateOrderReq) (*protoPlatform.OrderAck, error) {

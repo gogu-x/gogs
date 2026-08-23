@@ -8,24 +8,24 @@ import (
 
 func (a *Platform) onRegister(ctx tree.Context, msg interface{}) {
 	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*protoPlatform.RegisterReq)
-	go func() {
-		resp, err := service.Register(db, req)
-		f.Respond(resp, err)
-	}()
+	resp, err := service.Register(db, req)
+	f.Respond(resp, err)
 }
 
 func (a *Platform) onLogin(ctx tree.Context, msg interface{}) {
 	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*protoPlatform.AuthLoginReq)
-	go func() {
-		resp, err := service.Login(db, req)
-		f.Respond(resp, err)
-	}()
+	resp, err := service.Login(db, req)
+	f.Respond(resp, err)
 }
 
 func (a *Platform) onVerify(ctx tree.Context, msg interface{}) {
 	f, req := ctx.RequestEnvelope(), msg.(*protoPlatform.VerifyTokenReq)
-	go func() {
-		resp, err := service.VerifyToken(req)
-		f.Respond(resp, err)
-	}()
+	resp, err := service.VerifyToken(req)
+	f.Respond(resp, err)
+}
+
+func (a *Platform) onGetServerList(ctx tree.Context, msg interface{}) {
+	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*protoPlatform.GetServerListReq)
+	resp, err := service.GetServerList(db, req)
+	f.Respond(resp, err)
 }

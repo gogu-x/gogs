@@ -1,4 +1,4 @@
-﻿package platform
+package platform
 
 import "github.com/gogu-x/gogs/pb/protoPlatform"
 
@@ -14,6 +14,10 @@ func registerRoutes(a *Actor) {
 	a.register(&protoPlatform.VerifyTokenReq{},
 		protoPlatform.AuthService_VerifyToken_FullMethodName,
 		func() any { return &protoPlatform.VerifyAck{} })
+
+	a.register(&protoPlatform.GetServerListReq{},
+		protoPlatform.AuthService_GetServerList_FullMethodName,
+		func() any { return &protoPlatform.ServerListAck{} })
 
 	a.register(&protoPlatform.CreateOrderReq{},
 		protoPlatform.OrderService_CreateOrder_FullMethodName,

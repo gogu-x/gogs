@@ -6,7 +6,6 @@ import (
 	"reflect"
 
 	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	actor "github.com/gogu-x/tree"
 	"github.com/gorilla/websocket"
@@ -36,19 +35,23 @@ func (c *Conn) forward(ctx actor.Context, inner interface{}) {
 		return
 	}
 	body, _ := c.codec.Marshal(protoMsg)
-	if c.serverID == 0 {
-		return
-	}
-	stream, _ := ctx.Lookup(constant.StreamName(c.serverID))
-	if ok := ctx.Send(stream, &protoGateway.Frame{
+
+	msg := &protoGateway.Frame{
 		ConnId:   c.connID,
 		Uid:      c.uid,
 		ServerId: c.serverID,
 		GateId:   fmt.Sprintf("%d", config.GateID),
 		Payload:  body,
 		MsgType:  reflect.TypeOf(inner).Elem().Name(),
-	}); !ok {
-		log.Printf("ConnActor[%d]: forward cast error: %v", c.connID, ok)
+	}
+	if c.stream == nil {
+		log.Printf("ConnActor[%d]: game stream is unavailable", c.connID)
+		return
+	}
+	if err := c.stream.Send(msg); err != nil {
+		log.Printf("ConnActor[%d]: send stream error: %v", c.connID, err)
+		ctx.Stop()
+		return
 	}
 }
 

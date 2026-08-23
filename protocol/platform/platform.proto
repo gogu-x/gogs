@@ -32,7 +32,7 @@ message AuthAck {
   string  msg   = 2;
   uint64  uid   = 3;
   string  token = 4;
-  uint64 server_id = 5;
+  int32   server_id = 5;
 }
 
 message VerifyTokenReq {
@@ -44,10 +44,27 @@ message VerifyAck {
   uint64 uid   = 2;
 }
 
+// GetServerListReq is used before login to look up all registrations for an account.
+message GetServerListReq {
+  string account = 1;
+}
+
+message ServerAccount {
+  int32  server_id = 1;
+  uint64 uid       = 2;
+}
+
+message ServerListAck {
+  ErrCode                 code     = 1;
+  string                  msg      = 2;
+  repeated ServerAccount accounts = 3;
+}
+
 service AuthService {
-  rpc Register    (RegisterReq)    returns (AuthAck);
-  rpc Login       (AuthLoginReq)   returns (AuthAck);
-  rpc VerifyToken (VerifyTokenReq) returns (VerifyAck);
+  rpc Register      (RegisterReq)      returns (AuthAck);
+  rpc Login         (AuthLoginReq)     returns (AuthAck);
+  rpc VerifyToken   (VerifyTokenReq)   returns (VerifyAck);
+  rpc GetServerList (GetServerListReq) returns (ServerListAck);
 }
 
 // ─── Order ───────────────────────────────────────────────────────────────────

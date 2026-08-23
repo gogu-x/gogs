@@ -24,13 +24,13 @@ func (p *Play) Name() string { return constant.PLAY }
 
 func (p *Play) OnInit(ctx tree.Context) {
 	internal.InitRoutes(p.app)
+
 	p.app.Init(ctx)
 }
 
 // HandleMessage 按入口分流：
-//   - *protoGateway.Frame：来自 gate（NATS/gRPC）的玩家请求，走 HandleFrame（含登录校验）；
-//   - 其他类型：其他模块投递或内部异步消息，走 HandleSystem（无 uid，不判断登录）。
 func (p *Play) HandleMessage(ctx tree.Context, msg interface{}) {
+	//这里需要先执行钩子handle
 	if f, ok := msg.(*protoGateway.Frame); ok {
 		p.app.HandleFrame(ctx, f)
 		return

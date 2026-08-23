@@ -2,9 +2,9 @@ package internal
 
 import (
 	"github.com/gogu-x/gogs/game/play/internal/base"
-	"github.com/gogu-x/gogs/game/play/internal/ctl_activity"
-	"github.com/gogu-x/gogs/game/play/internal/ctl_auth"
-	"github.com/gogu-x/gogs/game/play/internal/ctl_chat"
+	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_activity"
+	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_auth"
+	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_chat"
 	"github.com/gogu-x/gogs/pb/protoActivity"
 	"github.com/gogu-x/gogs/pb/protoChat"
 	"github.com/gogu-x/gogs/pb/protoGateway"
@@ -20,7 +20,7 @@ func InitRoutes(app *base.App) {
 	d := app.Dispatcher()
 
 	// 免登录白名单
-	base.RegisterAnon(d, &protoGateway.LoginReq{}, ctl_auth.AutoLogin)
+	base.RegisterAnon(d, &protoGateway.LoginGameReq{}, ctl_auth.AutoLogin)
 	base.RegisterAnon(d, &protoGateway.RegisterReq{}, ctl_auth.AutoRegister)
 
 	// 需要玩家在线

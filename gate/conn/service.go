@@ -42,8 +42,14 @@ func (c *Conn) LoginCb(ctx tree.Context, ret interface{}, err error) {
 		Uid:      AuthAck.Uid,
 		ServerId: AuthAck.ServerId,
 	}
+	if err := c.OpenSteam(ctx.Self()); err != nil {
+		c.state = stateAnon
+		log.Printf("ConnActor[%d]: open game stream: %v", c.connID, err)
+		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: "game server unavailable"})
+		return
+	}
 	c.forward(ctx, req)
-	log.Printf("ConnActor[%d]: uid=%d logged in -> server=%s node=%s", c.connID, c.uid, c.serverID, c.nodeID)
+	log.Printf("ConnActor[%d]: uid=%d logged in -> server=%d node=%s", c.connID, c.uid, c.serverID, c.nodeID)
 	c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
 }
 
@@ -73,6 +79,26 @@ func (c *Conn) regCb(ctx tree.Context, ret interface{}, err error) {
 	c.serverID = AuthAck.ServerId
 	c.nodeID = ""
 	c.state = stateAuthed
-	log.Printf("ConnActor[%d]: uid=%d registered -> server=%s node=%s", c.connID, c.uid, c.serverID, c.nodeID)
+	log.Printf("ConnActor[%d]: uid=%d registered -> server=%d node=%s", c.connID, c.uid, c.serverID, c.nodeID)
 	c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
+}
+
+func (c *Conn) onGetServerList(ctx tree.Context, msg interface{}) {
+	req := msg.(*protoGateway.GetServerListReq)
+	platformPID := tree.MustLookup(constant.PF)
+	ctx.RequestCallback(platformPID, &protoPlatform.GetServerListReq{Account: req.Account}, c.getServerListCb)
+}
+
+func (c *Conn) getServerListCb(_ tree.Context, ret interface{}, err error) {
+	if err != nil {
+		c.Reply(&protoGateway.ServerListAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
+		return
+	}
+
+	resp := ret.(*protoPlatform.ServerListAck)
+	accounts := make([]*protoGateway.ServerAccount, 0, len(resp.Accounts))
+	for _, account := range resp.Accounts {
+		accounts = append(accounts, &protoGateway.ServerAccount{ServerId: account.ServerId, Uid: account.Uid})
+	}
+	c.Reply(&protoGateway.ServerListAck{Code: resp.Code, Msg: resp.Msg, Accounts: accounts})
 }

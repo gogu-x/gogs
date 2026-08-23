@@ -5,7 +5,8 @@ import (
 	"reflect"
 
 	"github.com/gogu-x/gogs/codec"
-	"github.com/gogu-x/gogs/game/play/module/player"
+	"github.com/gogu-x/gogs/comm"
+	player2 "github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree"
@@ -15,7 +16,7 @@ import (
 // 它定义在 base 而不是 play 包，这样 PlayContext / SysContext 可以直接引用它
 // 而不产生 play → internal → base → play 的 import 环。
 type App struct {
-	Players *player.PlayerMgr
+	Players *player2.PlayerMgr
 
 	// Sender Frame 出口，默认走 NATS，单测可替换。
 	Sender Sender
@@ -23,12 +24,15 @@ type App struct {
 	disp Dispatcher
 	// ctx 是 Play Actor 的上下文（OnInit 时保存），用于定时器等与单条消息无关的场景。
 	ctx tree.Context
+
+	event *comm.Event
 }
 
 func NewApp() *App {
 	return &App{
-		Players: player.NewPlayerMgr(),
+		Players: player2.NewPlayerMgr(),
 		Sender:  natsSender{},
+		event:   comm.NewEvent(),
 	}
 }
 
@@ -38,11 +42,13 @@ func (a *App) Dispatcher() *Dispatcher { return &a.disp }
 // Context 返回 Actor 级上下文（Init 之后有效）。
 func (a *App) Context() tree.Context { return a.ctx }
 
+func (a *App) Event() *comm.Event { return a.event }
+
 // Init 在 Play Actor 的 OnInit 中调用：保存上下文、加载数据、启动定时任务。
 func (a *App) Init(ctx tree.Context) {
 	a.ctx = ctx
-	a.Players.Loader()
 	InitTimers(a)
+	InitEven(a)
 	log.Printf("play: app ready, players=%d, playerRoutes=%d, sysRoutes=%d",
 		a.Players.Count(), a.disp.PlayerRouteCount(), a.disp.SysRouteCount())
 }
@@ -72,7 +78,7 @@ func (a *App) HandleFrame(ctx tree.Context, f *protoGateway.Frame) bool {
 		return false
 	}
 
-	var p *player.Player
+	var p *player2.Player
 	if !r.anonymous {
 		if p = a.Players.Get(f.GetUid()); p == nil {
 			// 未登录（或已被踢下线）请求受保护消息：丢弃，不回包，避免被伪造 uid 放大。
@@ -84,7 +90,7 @@ func (a *App) HandleFrame(ctx tree.Context, f *protoGateway.Frame) bool {
 	s := &PlayContext{
 		SysContext: SysContext{App: a, ctx: ctx},
 		Player:     p,
-		UID:        f.GetUid(),
+		PlayerId:   f.GetUid(),
 		ConnID:     f.GetConnId(),
 		GateId:     f.GetGateId(),
 		RequestId:  f.GetRequestId(),

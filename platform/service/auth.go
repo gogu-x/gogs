@@ -1,4 +1,4 @@
-﻿package service
+package service
 
 import (
 	"context"
@@ -22,6 +22,7 @@ func bg() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), dbTimeout)
 }
 
+// Register 注册账号
 func Register(db *mongo.Database, req *protoPlatform.RegisterReq) (*protoPlatform.AuthAck, error) {
 	if req.ServerId == 0 {
 		return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_ERR_PARAM, Msg: "server_id required"}, nil
@@ -58,6 +59,7 @@ func Register(db *mongo.Database, req *protoPlatform.RegisterReq) (*protoPlatfor
 	return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_OK, Uid: uid, Token: token}, nil
 }
 
+// Login 登录账号
 func Login(db *mongo.Database, req *protoPlatform.AuthLoginReq) (*protoPlatform.AuthAck, error) {
 	ctx, cancel := bg()
 	defer cancel()
@@ -72,7 +74,39 @@ func Login(db *mongo.Database, req *protoPlatform.AuthLoginReq) (*protoPlatform.
 	if err != nil {
 		return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_ERR_INTERNAL, Msg: "sign error"}, nil
 	}
-	return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_OK, Uid: acc.UID, Token: token}, nil
+	return &protoPlatform.AuthAck{Code: protoCommon.ErrCode_OK, Uid: acc.UID, Token: token, ServerId: acc.ServerId}, nil
+}
+
+// GetServerList returns every server registration for an account before login.
+func GetServerList(db *mongo.Database, req *protoPlatform.GetServerListReq) (*protoPlatform.ServerListAck, error) {
+	if req == nil || req.Account == "" {
+		return &protoPlatform.ServerListAck{Code: protoCommon.ErrCode_ERR_PARAM, Msg: "account required"}, nil
+	}
+
+	ctx, cancel := bg()
+	defer cancel()
+	cursor, err := db.Collection(store.ColAccounts).Find(
+		ctx,
+		bson.M{"account": req.Account},
+		options.Find().SetProjection(bson.M{"server_id": 1, "uid": 1}).SetSort(bson.D{{Key: "server_id", Value: 1}}),
+	)
+	if err != nil {
+		return &protoPlatform.ServerListAck{Code: protoCommon.ErrCode_ERR_INTERNAL, Msg: err.Error()}, nil
+	}
+	defer cursor.Close(ctx)
+
+	accounts := make([]*protoPlatform.ServerAccount, 0)
+	for cursor.Next(ctx) {
+		var account store.Account
+		if err := cursor.Decode(&account); err != nil {
+			return &protoPlatform.ServerListAck{Code: protoCommon.ErrCode_ERR_INTERNAL, Msg: err.Error()}, nil
+		}
+		accounts = append(accounts, &protoPlatform.ServerAccount{ServerId: account.ServerId, Uid: account.UID})
+	}
+	if err := cursor.Err(); err != nil {
+		return &protoPlatform.ServerListAck{Code: protoCommon.ErrCode_ERR_INTERNAL, Msg: err.Error()}, nil
+	}
+	return &protoPlatform.ServerListAck{Code: protoCommon.ErrCode_OK, Accounts: accounts}, nil
 }
 
 func VerifyToken(req *protoPlatform.VerifyTokenReq) (*protoPlatform.VerifyAck, error) {

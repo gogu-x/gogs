@@ -11,13 +11,14 @@ import (
 func initRouter(c *Conn) {
 	c.router.Register(&WsMsg{}, c.onWsMsg)
 	c.router.Register(&stopMsg{}, c.onStop)
+	c.router.Register(&streamClosed{}, c.onStreamClosed)
 
 	c.router.Register(&protoGateway.Frame{}, c.onFrame)
 	c.router.Register(&protoGateway.BroadcastMsg{}, c.onBroadcast)
 
 	c.router.Register(&protoGateway.LoginReq{}, c.onLogin)
 	c.router.Register(&protoGateway.RegisterReq{}, c.onRegister)
-	c.router.Register(&NodeFailoverMsg{}, c.onNodeFailover)
+	c.router.Register(&protoGateway.GetServerListReq{}, c.onGetServerList)
 }
 
 func (c *Conn) onWsMsg(ctx actor.Context, msg interface{}) {
@@ -40,5 +41,12 @@ func (c *Conn) onBroadcast(_ actor.Context, msg interface{}) {
 }
 
 func (c *Conn) onStop(ctx actor.Context, _ interface{}) {
+	ctx.Stop()
+}
+
+func (c *Conn) onStreamClosed(ctx actor.Context, msg interface{}) {
+	if err := msg.(*streamClosed).err; err != nil {
+		log.Printf("ConnActor[%d]: game stream closed: %v", c.connID, err)
+	}
 	ctx.Stop()
 }

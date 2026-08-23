@@ -20,12 +20,11 @@ import (
 
 var (
 	addr     = flag.String("addr", "ws://127.0.0.1:8081/ws", "gate websocket address")
-	users    = flag.Int("users", 100, "concurrent users")
+	users    = flag.Int("users", 1, "concurrent users")
 	duration = flag.Duration("duration", 100*time.Second, "test duration")
 	interval = flag.Duration("interval", 1*time.Second, "message send interval per user")
 	dialRate = flag.Int("dial-rate", 1, "max concurrent dials per second")
 )
-
 
 var (
 	connOK    int64

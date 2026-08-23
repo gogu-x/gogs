@@ -26,30 +26,10 @@ func main() {
 	cmd := &cli.Command{
 		Name:  "game",
 		Usage: "game server",
-		Flags: []cli.Flag{
-			&cli.IntFlag{
-				Name:     "server-id",
-				Aliases:  []string{"id"},
-				Usage:    "server ID (unique per game server group, e.g. 1, 2, 3)",
-				Required: true,
-			},
-			&cli.IntFlag{
-				Name:     "node-id",
-				Aliases:  []string{"node-id"},
-				Usage:    "node ID (unique per game server group, e.g. 1, 2, 3)",
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:  "port",
-				Usage: "gRPC listen port override (default: 9000+serverID)",
-			},
-		},
+		Flags: config.ConnectionFlags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			config.ServerID = c.Int("server-id")
-			config.NodeId = c.Int("node-id")
-
-			if p := c.String("port"); p != "" {
-				config.GrpcPortOverride = p
+			if err := config.LoadAndApply(c); err != nil {
+				return err
 			}
 
 			if err := cluster.Init(config.EtcdEndpoints); err != nil {
@@ -71,7 +51,12 @@ func main() {
 			}
 			fmt.Printf("game server [%s] inst=%s registered at %s\n", serverID, NodeID, addr)
 
-			db := rpcmongo.Connect(config.MongoURL, fmt.Sprintf("game_%v", serverID))
+			db := rpcmongo.Connect(
+				config.MongoURL,
+				config.MongoUsername,
+				config.MongoPassword,
+				fmt.Sprintf("game_%v", serverID),
+			)
 
 			tree.Spawn(
 				play.NewPlayActor(),
