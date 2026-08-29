@@ -3,14 +3,13 @@ package base
 import (
 	"log"
 	"reflect"
-	"time"
 
-	"github.com/gogu-x/gogs/codec"
 	gamegate "github.com/gogu-x/gogs/game/gate"
 	"github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/codec"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -39,11 +38,6 @@ func (s *SysContext) Send(pid tree.PID, msg interface{}) bool { return s.ctx.Sen
 
 // Response 对通过 tree.Request 发来的消息进行应答（非请求时为 no-op）。
 func (s *SysContext) Response(value interface{}, err error) { s.ctx.Response(value, err) }
-
-// AfterFunc 在本 Actor goroutine 内延迟执行 cb。
-func (s *SysContext) AfterFunc(d time.Duration, cb func()) {
-	s.ctx.AfterFunc(d, func(_ tree.Context) { cb() })
-}
 
 // PlayContext 是 gate 玩家请求的上下文：在 SysContext 之上附带连接信息与玩家数据。
 // 每个 Frame 新建一个实例（不做池化，因为 Request 回调会在之后异步持有它）。

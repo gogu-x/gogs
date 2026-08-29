@@ -4,12 +4,13 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/gogu-x/gogs/codec"
-	"github.com/gogu-x/gogs/comm"
 	player2 "github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/codec"
+	"github.com/gogu-x/tree/comm"
+	"github.com/gogu-x/tree/timer"
 )
 
 // App 是整个 play 模块的状态载体：管理器集合 + 路由表 + Actor 级上下文。
@@ -22,8 +23,8 @@ type App struct {
 	Sender Sender
 
 	disp Dispatcher
-	// ctx 是 Play Actor 的上下文（OnInit 时保存），用于定时器等与单条消息无关的场景。
-	ctx tree.Context
+
+	timeWheel *timer.TimeWheel
 
 	event *comm.Event
 }
@@ -39,14 +40,12 @@ func NewApp() *App {
 // Dispatcher 返回路由表，供 InitRoutes 注册。
 func (a *App) Dispatcher() *Dispatcher { return &a.disp }
 
-// Context 返回 Actor 级上下文（Init 之后有效）。
-func (a *App) Context() tree.Context { return a.ctx }
-
+// Event 返回模块事件分发器。
 func (a *App) Event() *comm.Event { return a.event }
 
-// Init 在 Play Actor 的 OnInit 中调用：保存上下文、加载数据、启动定时任务。
+// Init 在 Play Actor 的 OnInit 中调用：初始化 Actor 资源、加载数据并启动定时任务。
 func (a *App) Init(ctx tree.Context) {
-	a.ctx = ctx
+	a.timeWheel = timer.NewTimeWheel(16, ctx.Self(), ctx.System())
 	InitTimers(a)
 	InitEven(a)
 	log.Printf("play: app ready, players=%d, playerRoutes=%d, sysRoutes=%d",
@@ -55,6 +54,9 @@ func (a *App) Init(ctx tree.Context) {
 
 // Stop 在 Play Actor 的 OnStop 中调用。
 func (a *App) Stop() {
+	if a.timeWheel != nil {
+		a.timeWheel.Stop()
+	}
 	a.Players.Save()
 }
 

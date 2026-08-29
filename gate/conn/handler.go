@@ -7,12 +7,12 @@ import (
 
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/pb/protoGateway"
-	actor "github.com/gogu-x/tree"
+	"github.com/gogu-x/tree"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 )
 
-func (c *Conn) handleWsMsg(ctx actor.Context, data []byte) {
+func (c *Conn) handleWsMsg(ctx tree.Context, data []byte) {
 	inner, err := c.codec.Unmarshal(data)
 	if err != nil {
 		log.Printf("ConnActor[%d]: unmarshal error: %v", c.connID, err)
@@ -23,13 +23,13 @@ func (c *Conn) handleWsMsg(ctx actor.Context, data []byte) {
 			return
 		}
 	}
-	c.router.SetFallback(func(ctx actor.Context, _ interface{}) {
+	c.router.SetFallback(func(ctx tree.Context, _ interface{}) {
 		c.forward(ctx, inner)
 	})
 	c.router.Route(ctx, inner)
 }
 
-func (c *Conn) forward(ctx actor.Context, inner interface{}) {
+func (c *Conn) forward(ctx tree.Context, inner interface{}) {
 	protoMsg, ok := inner.(proto.Message)
 	if !ok {
 		return
@@ -63,6 +63,6 @@ func (c *Conn) Reply(msg proto.Message) {
 	_ = c.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
-func (c *Conn) onNodeFailover(_ actor.Context, msg interface{}) {
+func (c *Conn) onNodeFailover(_ tree.Context, msg interface{}) {
 
 }

@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gogu-x/gogs/codec"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
 	"github.com/gogu-x/gogs/pb/protoChat"
 	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/tree/codec"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 )

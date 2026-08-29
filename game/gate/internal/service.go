@@ -6,12 +6,12 @@ import (
 	"net"
 	"os"
 
-	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/cluster"
 	"google.golang.org/grpc"
 )
 

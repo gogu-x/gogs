@@ -2,7 +2,7 @@
 package pbregister
 
 import (
-	"github.com/gogu-x/gogs/codec"
+	"github.com/gogu-x/tree/codec"
 
 	protoActivity "github.com/gogu-x/gogs/pb/protoActivity"
 	protoChat "github.com/gogu-x/gogs/pb/protoChat"

@@ -10,21 +10,22 @@ import (
 	"github.com/gogu-x/tree"
 )
 
+// onLogin 请求平台验证登录
 func (c *Conn) onLogin(ctx tree.Context, msg interface{}) {
 	req := msg.(*protoGateway.LoginReq)
-	c.state = stateLogging
 	platformPID := tree.MustLookup(constant.PF)
 	plReq := &protoPlatform.AuthLoginReq{
 		Account:  req.Account,
 		Password: req.Password,
 		ServerId: req.ServerId,
 	}
-	ctx.RequestCallback(platformPID, plReq, c.LoginCb)
+	ctx.RequestCallback(platformPID, plReq, c.authLoginCb)
 }
 
-func (c *Conn) LoginCb(ctx tree.Context, ret interface{}, err error) {
+// LoginCb 平台回调
+func (c *Conn) authLoginCb(ctx tree.Context, ret interface{}, err error) {
 	if err != nil {
-		c.state = stateAnon
+		c.state = StateAnon
 		log.Printf("ConnActor[%d]: uid=%d AuthLoginReq err: %s", c.connID, c.uid, err.Error())
 		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 		return
@@ -37,13 +38,14 @@ func (c *Conn) LoginCb(ctx tree.Context, ret interface{}, err error) {
 	c.token = AuthAck.Token
 	c.serverID = AuthAck.ServerId
 	c.nodeID = ""
-	c.state = stateAuthed
+	c.state = StateLoggIng
+	//进入game gate 验证
 	req := &protoGateway.LoginGameReq{
 		Uid:      AuthAck.Uid,
 		ServerId: AuthAck.ServerId,
 	}
 	if err := c.OpenSteam(ctx.Self()); err != nil {
-		c.state = stateAnon
+		c.state = StateAnon
 		log.Printf("ConnActor[%d]: open game stream: %v", c.connID, err)
 		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: "game server unavailable"})
 		return
@@ -55,7 +57,7 @@ func (c *Conn) LoginCb(ctx tree.Context, ret interface{}, err error) {
 
 func (c *Conn) onRegister(ctx tree.Context, msg interface{}) {
 	req := msg.(*protoGateway.RegisterReq)
-	c.state = stateLogging
+	c.state = StateRegIng
 	platformPID := tree.MustLookup(constant.PF)
 	plReq := &protoPlatform.RegisterReq{
 		Account:  req.Account,
@@ -68,7 +70,7 @@ func (c *Conn) onRegister(ctx tree.Context, msg interface{}) {
 func (c *Conn) regCb(ctx tree.Context, ret interface{}, err error) {
 
 	if err != nil {
-		c.state = stateAnon
+		c.state = StateAnon
 		c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 		return
 	}
@@ -78,7 +80,6 @@ func (c *Conn) regCb(ctx tree.Context, ret interface{}, err error) {
 	c.token = AuthAck.Token
 	c.serverID = AuthAck.ServerId
 	c.nodeID = ""
-	c.state = stateAuthed
 	log.Printf("ConnActor[%d]: uid=%d registered -> server=%d node=%s", c.connID, c.uid, c.serverID, c.nodeID)
 	c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
 }
@@ -91,7 +92,7 @@ func (c *Conn) onGetServerList(ctx tree.Context, msg interface{}) {
 
 func (c *Conn) getServerListCb(_ tree.Context, ret interface{}, err error) {
 	if err != nil {
-		c.Reply(&protoGateway.ServerListAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
+		c.Reply(&protoGateway.ServerListAck{Code: protoCommon.ErrCode_ERR_UNKNOWN})
 		return
 	}
 
@@ -100,5 +101,5 @@ func (c *Conn) getServerListCb(_ tree.Context, ret interface{}, err error) {
 	for _, account := range resp.Accounts {
 		accounts = append(accounts, &protoGateway.ServerAccount{ServerId: account.ServerId, Uid: account.Uid})
 	}
-	c.Reply(&protoGateway.ServerListAck{Code: resp.Code, Msg: resp.Msg, Accounts: accounts})
+	c.Reply(&protoGateway.ServerListAck{Code: resp.Code, Accounts: accounts})
 }

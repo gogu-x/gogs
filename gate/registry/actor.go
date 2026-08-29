@@ -5,9 +5,9 @@ import (
 	"log"
 	"sync/atomic"
 
-	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/tree"
+	cluster2 "github.com/gogu-x/tree/cluster"
 )
 
 type Actor struct {
@@ -29,12 +29,12 @@ func (r *Actor) Name() string { return constant.ActorRegistry }
 
 func (r *Actor) OnInit(ctx tree.Context) {
 	// 启动时从 etcd 加载所有节点，初始化 hash 路由缓存
-	if all, err := cluster.GetAll(); err != nil {
+	if all, err := cluster2.GetAll(); err != nil {
 		log.Fatal("cluster.GetAll: " + err.Error())
 	} else {
 		for serverID := range all {
-			instances, _ := cluster.GetInstances(serverID)
-			cluster.UpdateNodes(serverID, instances)
+			instances, _ := cluster2.GetInstances(serverID)
+			cluster2.UpdateNodes(serverID, instances)
 		}
 	}
 
@@ -44,9 +44,9 @@ func (r *Actor) OnInit(ctx tree.Context) {
 	watchCtx, watchCancel := context.WithCancel(context.Background())
 	r.cancel = watchCancel
 	go func() {
-		for ev := range cluster.WatchInstances(watchCtx) {
-			instances, _ := cluster.GetInstances(ev.ServerID)
-			cluster.UpdateNodes(ev.ServerID, instances)
+		for ev := range cluster2.WatchInstances(watchCtx) {
+			instances, _ := cluster2.GetInstances(ev.ServerID)
+			cluster2.UpdateNodes(ev.ServerID, instances)
 			// 节点下线：通知 GateServer 广播 failover，让受影响连接无感切换
 			if ev.Type == "delete" {
 				//这里关闭，

@@ -6,24 +6,24 @@ import (
 	"github.com/gogu-x/tree"
 )
 
-type GuildActor struct {
+type Guild struct {
 	store  *internal.Store
 	router tree.Router
 }
 
-// NewGuildActor 创建 GuildActor
-func NewGuildActor() *GuildActor {
-	return &GuildActor{store: internal.NewStore()}
+// NewGuild 创建 Guild
+func NewGuild() *Guild {
+	return &Guild{store: internal.NewStore()}
 }
 
-func (g *GuildActor) Name() string { return constant.Guild }
+func (g *Guild) Name() string { return constant.Guild }
 
-func (g *GuildActor) OnInit(_ tree.Context) {
+func (g *Guild) OnInit(_ tree.Context) {
 	internal.InitRoutes(&g.router, g.store)
 }
 
-func (g *GuildActor) HandleMessage(ctx tree.Context, msg interface{}) {
+func (g *Guild) HandleMessage(ctx tree.Context, msg interface{}) {
 	g.router.Route(ctx, msg)
 }
 
-func (g *GuildActor) OnStop(_ tree.Context) {}
+func (g *Guild) OnStop(_ tree.Context) {}

@@ -18,11 +18,11 @@ func (c *Conn) checkAuth(_ actor.Context, msg interface{}) bool {
 	if noAuthRequired[reflect.TypeOf(msg)] {
 		return true
 	}
-	if c.state == stateLogging {
+	if c.state == StateLoggIng {
 		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_LOGIN_IN_PROGRESS, Msg: "login in progress"})
 		return false
 	}
-	if c.state != stateAuthed {
+	if c.state != StateAuthed {
 		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNAUTHORIZED, Msg: "unauthorized"})
 		return false
 	}

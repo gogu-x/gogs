@@ -20,7 +20,11 @@ message ServerAccount {
 }
 
 message ServerListAck {
-  ErrCode                 code     = 1;
-  string                  msg      = 2;
-  repeated ServerAccount accounts = 3;
+  ErrCode  code   = 1;
+  repeated ServerAccount accounts = 2;
+}
+
+message LoginGameAck {
+  ErrCode  code  = 1;
+  uint64   uid   = 2;
 }

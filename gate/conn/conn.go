@@ -1,10 +1,10 @@
 package conn
 
 import (
-	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/codec"
 	"github.com/gorilla/websocket"
 	"google.golang.org/grpc"
 )
@@ -23,9 +23,10 @@ type NodeFailoverMsg struct {
 type connState int
 
 const (
-	stateAnon    connState = iota // 未登录
-	stateLogging                  // 登录/注册 中
-	stateAuthed                   // 已登录
+	StateAnon    connState = iota // 未登录
+	StateLoggIng                  // 登录 中
+	StateRegIng                   // 注册中
+	StateAuthed                   // 已登录
 )
 
 type middlewareFunc func(tree.Context, interface{}) bool

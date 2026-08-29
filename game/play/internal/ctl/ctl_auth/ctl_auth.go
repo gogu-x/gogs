@@ -3,11 +3,11 @@ package ctl_auth
 import (
 	"log"
 
-	"github.com/gogu-x/gogs/comm"
 	"github.com/gogu-x/gogs/game/play/internal/base"
 	"github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/gogs/pb/protoCommon"
 	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/tree/comm"
 )
 
 // AutoLogin 免登录路由：建立本节点的玩家会话。

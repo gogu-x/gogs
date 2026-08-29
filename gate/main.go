@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
 	gatenats "github.com/gogu-x/gogs/gate/nats"
-	"github.com/gogu-x/gogs/gate/registry"
 	"github.com/gogu-x/gogs/gate/ws"
 	natsclient "github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
 	rpcplatform "github.com/gogu-x/gogs/rpc/platform"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/cluster"
 	"github.com/gogu-x/tree/log"
 	"github.com/urfave/cli/v3"
 )
@@ -37,9 +36,7 @@ func main() {
 			}
 			defer natsclient.Close()
 
-			//	registry.Actor 暂未启用
 			tree.Spawn(
-				registry.NewActor(),
 				gatenats.NewActor(),
 				ws.New(config.GateAddr(), int64(config.GateID)),
 				rpcplatform.NewActor(),

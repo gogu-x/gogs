@@ -1,9 +1,9 @@
 package registry
 
 import (
-	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	actor "github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/cluster"
 )
 
 func initRouter(r *Actor) {

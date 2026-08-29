@@ -7,8 +7,8 @@ import (
 	"github.com/gogu-x/tree"
 )
 
-// NewGateActor 创建 GateActor，负责 gRPC 服务和集群注册。
-func NewGateActor() tree.Actor {
+// NewGate 创建 GateActor，负责 gRPC 服务和集群注册。
+func NewGate() tree.Actor {
 	return internal.NewGateActor()
 }
 

@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gogu-x/gogs/codec"
-	"github.com/gogu-x/gogs/comm"
 	"github.com/gogu-x/gogs/gate/conn"
 	"github.com/gogu-x/gogs/gate/constant"
 	actor "github.com/gogu-x/tree"
+	codec2 "github.com/gogu-x/tree/codec"
+	"github.com/gogu-x/tree/comm"
 
 	"github.com/gorilla/websocket"
 )
@@ -69,9 +69,9 @@ func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	var cd codec.Codec = codec.ProtoCodec
+	var cd codec2.Codec = codec2.ProtoCodec
 	if c.Subprotocol() == "json" {
-		cd = codec.JsonCodec
+		cd = codec2.JsonCodec
 	}
 	actor.SpawnOne(conn.New(s.idGen.NextUint64(), c, cd))
 }

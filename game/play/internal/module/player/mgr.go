@@ -62,3 +62,8 @@ func (mgr *PlayerMgr) Loader() {
 // Save fire-and-forget，upsert 玩家全量数据，不等待结果。
 func (mgr *PlayerMgr) Save() {
 }
+
+// OnSaveTimer 适配 TimeWheel Handler；回调在 Play Actor goroutine 内执行。
+func (mgr *PlayerMgr) OnSaveTimer(_ interface{}) {
+	mgr.Save()
+}

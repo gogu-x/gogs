@@ -6,9 +6,9 @@ import (
 	"io"
 	"log"
 
-	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/cluster"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"

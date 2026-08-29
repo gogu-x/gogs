@@ -15,7 +15,7 @@ type Play struct {
 	app *base.App
 }
 
-func NewPlayActor() *Play {
+func NewPlay() *Play {
 	return &Play{app: base.NewApp()}
 }
 

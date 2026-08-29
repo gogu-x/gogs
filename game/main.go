@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gogu-x/gogs/cluster"
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/gogs/game/activity"
@@ -16,6 +15,7 @@ import (
 	natsclient "github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
 	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
+	cluster2 "github.com/gogu-x/tree/cluster"
 	"github.com/gogu-x/tree/log"
 
 	"github.com/gogu-x/tree"
@@ -32,10 +32,10 @@ func main() {
 				return err
 			}
 
-			if err := cluster.Init(config.EtcdEndpoints); err != nil {
+			if err := cluster2.Init(config.EtcdEndpoints); err != nil {
 				log.Fatal("cluster init error: " + err.Error())
 			}
-			defer cluster.Close()
+			defer cluster2.Close()
 
 			if err := natsclient.Init(config.NatsURL); err != nil {
 				log.Fatal("NATS init error: " + err.Error())
@@ -46,7 +46,7 @@ func main() {
 			NodeID := fmt.Sprintf("%d", config.NodeId)
 			addr := config.GameAddr()
 
-			if err := cluster.Register(serverID, NodeID, addr); err != nil {
+			if err := cluster2.Register(serverID, NodeID, addr); err != nil {
 				log.Fatal("cluster register error: " + err.Error())
 			}
 			fmt.Printf("game server [%s] inst=%s registered at %s\n", serverID, NodeID, addr)
@@ -59,12 +59,12 @@ func main() {
 			)
 
 			tree.Spawn(
-				play.NewPlayActor(),
-				gate.NewGateActor(),
-				guild.NewGuildActor(),
+				play.NewPlay(),
+				gate.NewGate(),
+				guild.NewGuild(),
 				activity.NewActivityActor(),
 				rpcmongo.NewActor(constant.Mongo, db),
-				gamenats.NewActor(serverID, NodeID),
+				gamenats.NewNats(serverID, NodeID),
 			)
 			tree.Default().Start()
 

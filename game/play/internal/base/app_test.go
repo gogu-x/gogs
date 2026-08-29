@@ -2,9 +2,7 @@ package base
 
 import (
 	"testing"
-	"time"
 
-	"github.com/gogu-x/gogs/codec"
 	"github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
@@ -12,7 +10,7 @@ import (
 	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/gogs/pb/protoGuild"
 	"github.com/gogu-x/tree"
-	"github.com/gogu-x/tree/timer"
+	"github.com/gogu-x/tree/codec"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -36,9 +34,6 @@ func (stubCtx) Register(string)                 {}
 func (stubCtx) System() *tree.Tree              { return nil }
 func (stubCtx) SetValue(string, interface{})    {}
 func (stubCtx) GetValue(string) interface{}     { return nil }
-
-func (stubCtx) AfterFunc(time.Duration, func(tree.Context)) *timer.WheelTimer { return nil }
-func (stubCtx) CronFunc(*timer.CronExpr, func(tree.Context)) *timer.WheelCron { return nil }
 
 // fakeSender 记录回包去向。
 type fakeSender struct {

@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/gogu-x/gogs/pb/protoGateway"
-	actor "github.com/gogu-x/tree"
+	"github.com/gogu-x/tree"
 	"github.com/gorilla/websocket"
 )
 
@@ -21,11 +21,11 @@ func initRouter(c *Conn) {
 	c.router.Register(&protoGateway.GetServerListReq{}, c.onGetServerList)
 }
 
-func (c *Conn) onWsMsg(ctx actor.Context, msg interface{}) {
+func (c *Conn) onWsMsg(ctx tree.Context, msg interface{}) {
 	c.handleWsMsg(ctx, msg.(*WsMsg).Data)
 }
 
-func (c *Conn) onFrame(ctx actor.Context, msg interface{}) {
+func (c *Conn) onFrame(ctx tree.Context, msg interface{}) {
 	m := msg.(*protoGateway.Frame)
 	if len(m.Payload) == 0 {
 		return
@@ -36,15 +36,15 @@ func (c *Conn) onFrame(ctx actor.Context, msg interface{}) {
 	}
 }
 
-func (c *Conn) onBroadcast(_ actor.Context, msg interface{}) {
+func (c *Conn) onBroadcast(_ tree.Context, msg interface{}) {
 	_ = c.conn.WriteMessage(websocket.BinaryMessage, msg.(*protoGateway.BroadcastMsg).Data)
 }
 
-func (c *Conn) onStop(ctx actor.Context, _ interface{}) {
+func (c *Conn) onStop(ctx tree.Context, _ interface{}) {
 	ctx.Stop()
 }
 
-func (c *Conn) onStreamClosed(ctx actor.Context, msg interface{}) {
+func (c *Conn) onStreamClosed(ctx tree.Context, msg interface{}) {
 	if err := msg.(*streamClosed).err; err != nil {
 		log.Printf("ConnActor[%d]: game stream closed: %v", c.connID, err)
 	}

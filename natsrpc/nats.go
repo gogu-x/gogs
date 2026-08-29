@@ -10,10 +10,13 @@ import (
 
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/timer"
 )
 
 // RouteFunc 根据 Frame 返回目标 Actor PID。
 type RouteFunc func(frame *Frame) (tree.PID, bool)
+
+const timerRequestTimeout = timer.TimerType(1)
 
 // ActorConfig 配置订阅列表。
 type ActorConfig struct {
@@ -36,9 +39,6 @@ type replyFrame struct {
 	frame   *Frame
 }
 
-// timeoutMsg 超时信号，投给 NatsActor 处理。
-type timeoutMsg struct{ requestId string }
-
 // Actor NATS 订阅 Actor，负责收消息、反序列化、投递，并承载 Cast/Call 的发送与超时管理。
 type Actor struct {
 	cfg        ActorConfig
@@ -47,6 +47,7 @@ type Actor struct {
 	inboxBase  string              // 本 NatsActor 私有回包 inbox 前缀，如 _INBOX.xxxxx
 	inboxSub   *natsgo.Subscription
 	inboxCh    chan *natsgo.Msg
+	timeWheel  *timer.TimeWheel
 }
 
 func NewActor(cfg ActorConfig) *Actor {
@@ -62,6 +63,15 @@ func (a *Actor) Name() string {
 }
 
 func (a *Actor) OnInit(ctx tree.Context) {
+	a.timeWheel = timer.NewTimeWheel(1024, ctx.Self(), ctx.System())
+	a.timeWheel.Register(timerRequestTimeout, func(data interface{}) {
+		requestID, ok := data.(string)
+		if !ok {
+			log.Printf("natsrpc: invalid timeout timer data %T", data)
+			return
+		}
+		a.handleTimeout(requestID)
+	})
 	self := ctx.Self()
 	for _, sub := range a.cfg.Subs {
 		switch sub.kind {
@@ -82,17 +92,18 @@ func (a *Actor) HandleMessage(ctx tree.Context, msg interface{}) {
 			log.Printf("natsrpc: cast [%s/%s/%s]: %v", m.Module, m.ID, m.NodeId, err)
 		}
 	case *callMsg:
-		a.handleCall(ctx, m)
+		a.handleCall(m)
 	case *replyFrame:
 		a.handleReply(m.subject, m.frame)
-	case *timeoutMsg:
-		a.handleTimeout(m.requestId)
 	case *shutdownMsg:
 		a.OnStop(ctx)
 	}
 }
 
 func (a *Actor) OnStop(_ tree.Context) {
+	if a.timeWheel != nil {
+		a.timeWheel.Stop()
+	}
 	for _, sub := range a.subs {
 		_ = sub.Unsubscribe()
 	}
@@ -162,7 +173,7 @@ func (a *Actor) subscribeInbox(self tree.PID) {
 }
 
 // handleCall 在 NatsActor goroutine 内执行：生成 reply inbox subject，存 pending，发消息。
-func (a *Actor) handleCall(ctx tree.Context, m *callMsg) {
+func (a *Actor) handleCall(m *callMsg) {
 	requestId := a.inboxBase + "." + newRequestId()
 	m.Frame.RequestId = requestId
 
@@ -173,11 +184,8 @@ func (a *Actor) handleCall(ctx tree.Context, m *callMsg) {
 
 	a.pendingMap[requestId] = &pending{callerPID: m.CallerPID, cb: m.Callback}
 
-	// 超时时投 timeoutMsg 给自己，串行处理。
-	self := ctx.Self()
-	ctx.AfterFunc(timeout, func(_ tree.Context) {
-		tree.Send(self, &timeoutMsg{requestId: requestId})
-	})
+	// 回调已按 timerRequestTimeout 类型注册；每个任务只携带时间和 requestID。
+	a.timeWheel.After(timerRequestTimeout, timeout, requestId)
 
 	if err := publishTo(m.Module, m.ID, m.NodeId, m.Frame); err != nil {
 		delete(a.pendingMap, requestId)

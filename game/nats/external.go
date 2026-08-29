@@ -6,10 +6,10 @@ import (
 	"github.com/gogu-x/tree"
 )
 
-// NewActor 创建 game 进程的 NATS 订阅 Actor：
+// NewNats 创建 game 进程的 NATS 订阅 Actor：
 // 订阅 game:{serverID}:{nodeID}，所有 Frame 投给 Play Actor，
 // 同时订阅本节点的关闭信号。
-func NewActor(serverID, nodeID string) *natsrpc.Actor {
+func NewNats(serverID, nodeID string) *natsrpc.Actor {
 	return natsrpc.NewActor(natsrpc.ActorConfig{
 		Subs: []natsrpc.SubConfig{
 			natsrpc.Sub(natsrpc.GameInSubject(serverID, nodeID), RouteToPlay, 8),
