@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/pb_common";
+
+message comm {
+  uint64   uID   = 1;
+  uint32   serverID = 2;
+  string   sessionID = 3;
+}

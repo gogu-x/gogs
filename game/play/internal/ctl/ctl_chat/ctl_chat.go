@@ -1,13 +1,9 @@
 package ctl_chat
 
 import (
-	"log"
-
-	"github.com/gogu-x/gogs/game/play/internal/base"
-	"github.com/gogu-x/gogs/pb/protoChat"
+	"github.com/gogu-x/gogs/game/play/internal/common"
+	"github.com/gogu-x/gogs/pb/pb_chat"
 )
 
-func ChatService(s *base.PlayContext, req *protoChat.ChatReq) {
-	log.Printf("play: chat from uid=%d: %s", s.Player.UID, req.GetContent())
-	s.Reply(&protoChat.ChatAck{State: 2})
+func ChatService(s *common.PlayerContext, req *pb_chat.ChatReq) {
 }

@@ -4,50 +4,52 @@ package pbregister
 import (
 	"github.com/gogu-x/tree/codec"
 
-	protoActivity "github.com/gogu-x/gogs/pb/protoActivity"
-	protoChat "github.com/gogu-x/gogs/pb/protoChat"
-	protoGateway "github.com/gogu-x/gogs/pb/protoGateway"
-	protoGuild "github.com/gogu-x/gogs/pb/protoGuild"
-	protoPlatform "github.com/gogu-x/gogs/pb/protoPlatform"
+	pb_activity "github.com/gogu-x/gogs/pb/pb_activity"
+	pb_auth "github.com/gogu-x/gogs/pb/pb_auth"
+	pb_chat "github.com/gogu-x/gogs/pb/pb_chat"
+	pb_gateway "github.com/gogu-x/gogs/pb/pb_gateway"
+	pb_guild "github.com/gogu-x/gogs/pb/pb_guild"
+	pb_pf "github.com/gogu-x/gogs/pb/pb_pf"
 )
 
 func init() {
 	codec.RegisterMsg(
-		&protoActivity.GetActivityListAck{},
-		&protoActivity.JoinActivityAck{},
-		&protoActivity.GetProgressAck{},
-		&protoActivity.ClaimRewardAck{},
-		&protoActivity.GetActivityListReq{},
-		&protoActivity.JoinActivityReq{},
-		&protoActivity.GetProgressReq{},
-		&protoActivity.ClaimRewardReq{},
-		&protoChat.ChatAck{},
-		&protoChat.ChatReq{},
-		&protoGateway.LoginAck{},
-		&protoGateway.RegisterAck{},
-		&protoGateway.ServerListAck{},
-		&protoGateway.LoginReq{},
-		&protoGateway.RegisterReq{},
-		&protoGateway.LogoutReq{},
-		&protoGateway.GetServerListReq{},
-		&protoGateway.LoginGameReq{},
-		&protoGuild.CreateGuildAck{},
-		&protoGuild.JoinGuildAck{},
-		&protoGuild.LeaveGuildAck{},
-		&protoGuild.GetGuildAck{},
-		&protoGuild.CreateGuildReq{},
-		&protoGuild.JoinGuildReq{},
-		&protoGuild.LeaveGuildReq{},
-		&protoGuild.GetGuildReq{},
-		&protoPlatform.RegisterReq{},
-		&protoPlatform.AuthLoginReq{},
-		&protoPlatform.AuthAck{},
-		&protoPlatform.VerifyTokenReq{},
-		&protoPlatform.VerifyAck{},
-		&protoPlatform.GetServerListReq{},
-		&protoPlatform.ServerListAck{},
-		&protoPlatform.CreateOrderReq{},
-		&protoPlatform.OrderAck{},
-		&protoPlatform.QueryOrderReq{},
+		&pb_activity.GetActivityListAck{},
+		&pb_activity.JoinActivityAck{},
+		&pb_activity.GetProgressAck{},
+		&pb_activity.ClaimRewardAck{},
+		&pb_activity.GetActivityListReq{},
+		&pb_activity.JoinActivityReq{},
+		&pb_activity.GetProgressReq{},
+		&pb_activity.ClaimRewardReq{},
+		&pb_auth.LoginGameAck{},
+		&pb_auth.LoginGameReq{},
+		&pb_chat.ChatAck{},
+		&pb_chat.ChatReq{},
+		&pb_gateway.LoginAck{},
+		&pb_gateway.RegisterAck{},
+		&pb_gateway.ServerListAck{},
+		&pb_gateway.LoginReq{},
+		&pb_gateway.RegisterReq{},
+		&pb_gateway.LogoutReq{},
+		&pb_gateway.GetServerListReq{},
+		&pb_guild.CreateGuildAck{},
+		&pb_guild.JoinGuildAck{},
+		&pb_guild.LeaveGuildAck{},
+		&pb_guild.GetGuildAck{},
+		&pb_guild.CreateGuildReq{},
+		&pb_guild.JoinGuildReq{},
+		&pb_guild.LeaveGuildReq{},
+		&pb_guild.GetGuildReq{},
+		&pb_pf.RegisterReq{},
+		&pb_pf.AuthLoginReq{},
+		&pb_pf.AuthAck{},
+		&pb_pf.VerifyTokenReq{},
+		&pb_pf.VerifyAck{},
+		&pb_pf.GetServerListReq{},
+		&pb_pf.ServerListAck{},
+		&pb_pf.CreateOrderReq{},
+		&pb_pf.OrderAck{},
+		&pb_pf.QueryOrderReq{},
 	)
 }

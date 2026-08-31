@@ -1,14 +1,14 @@
 package registry
 
 import (
-	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/gogs/pb/pb_gateway"
 	actor "github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/cluster"
 )
 
 func initRouter(r *Actor) {
 	r.router.Register(&cluster.InstanceEvent{}, r.onInstanceEvent)
-	r.router.Register(&protoGateway.CheckDeleteMsg{}, r.onCheckDelete)
+	r.router.Register(&pb_gateway.CheckDeleteMsg{}, r.onCheckDelete)
 }
 
 func (r *Actor) onInstanceEvent(ctx actor.Context, msg interface{}) {
@@ -16,7 +16,7 @@ func (r *Actor) onInstanceEvent(ctx actor.Context, msg interface{}) {
 }
 
 func (r *Actor) onCheckDelete(_ actor.Context, msg interface{}) {
-	//m := msg.(*protoGateway.CheckDeleteMsg)
+	//m := msg.(*pb_gateway.CheckDeleteMsg)
 	//if !r.pending[m.ServerId] || r.active[m.ServerId] != m.NodeId {
 	//	return
 	//}
@@ -38,7 +38,7 @@ func (r *Actor) handleEvent(_ actor.Context, ev *cluster.InstanceEvent) {
 	//	r.active[ev.ServerID] = ev.NodeID
 	//	r.pending[ev.ServerID] = false
 	//	if pid, ok := actor.Lookup(constant.ActorNats); ok {
-	//		actor.Send(pid, &protoGateway.SwitchMsg{ServerId: ev.ServerID, NewAddr: ev.Addr})
+	//		actor.Send(pid, &pb_gateway.SwitchMsg{ServerId: ev.ServerID, NewAddr: ev.Addr})
 	//	}
 	//	log.Printf("RegistryActor: server=%s switch to %s addr=%s", ev.ServerID, ev.NodeID, ev.Addr)
 	//
@@ -51,7 +51,7 @@ func (r *Actor) handleEvent(_ actor.Context, ev *cluster.InstanceEvent) {
 	//	self := actor.MustLookup(constant.ActorRegistry)
 	//	go func() {
 	//		time.Sleep(3 * time.Second)
-	//		actor.Send(self, &protoGateway.CheckDeleteMsg{ServerId: serverID, NodeId: NodeID})
+	//		actor.Send(self, &pb_gateway.CheckDeleteMsg{ServerId: serverID, NodeId: NodeID})
 	//	}()
 	//}
 }

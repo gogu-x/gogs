@@ -4,17 +4,18 @@ import (
 	"log"
 
 	"github.com/gogu-x/gogs/constant"
-	"github.com/gogu-x/gogs/pb/protoCommon"
-	"github.com/gogu-x/gogs/pb/protoGateway"
-	"github.com/gogu-x/gogs/pb/protoPlatform"
+	"github.com/gogu-x/gogs/pb/pb_auth"
+	"github.com/gogu-x/gogs/pb/pb_common"
+	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/pb/pb_pf"
 	"github.com/gogu-x/tree"
 )
 
 // onLogin 请求平台验证登录
 func (c *Conn) onLogin(ctx tree.Context, msg interface{}) {
-	req := msg.(*protoGateway.LoginReq)
+	req := msg.(*pb_gateway.LoginReq)
 	platformPID := tree.MustLookup(constant.PF)
-	plReq := &protoPlatform.AuthLoginReq{
+	plReq := &pb_pf.AuthLoginReq{
 		Account:  req.Account,
 		Password: req.Password,
 		ServerId: req.ServerId,
@@ -27,11 +28,11 @@ func (c *Conn) authLoginCb(ctx tree.Context, ret interface{}, err error) {
 	if err != nil {
 		c.state = StateAnon
 		log.Printf("ConnActor[%d]: uid=%d AuthLoginReq err: %s", c.connID, c.uid, err.Error())
-		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
+		c.Reply(&pb_gateway.LoginAck{Code: pb_common.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 		return
 	}
-	AuthAck := ret.(*protoPlatform.AuthAck)
-	if AuthAck.Code != protoCommon.ErrCode_OK {
+	AuthAck := ret.(*pb_pf.AuthAck)
+	if AuthAck.Code != pb_common.ErrCode_OK {
 		return
 	}
 	c.uid = AuthAck.Uid
@@ -40,26 +41,26 @@ func (c *Conn) authLoginCb(ctx tree.Context, ret interface{}, err error) {
 	c.nodeID = ""
 	c.state = StateLoggIng
 	//进入game gate 验证
-	req := &protoGateway.LoginGameReq{
-		Uid:      AuthAck.Uid,
-		ServerId: AuthAck.ServerId,
+	req := &pb_auth.LoginGameReq{
+		UID:      AuthAck.Uid,
+		ServerID: AuthAck.ServerId,
 	}
+	// 起来game gate流
 	if err := c.OpenSteam(ctx.Self()); err != nil {
 		c.state = StateAnon
 		log.Printf("ConnActor[%d]: open game stream: %v", c.connID, err)
-		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: "game server unavailable"})
+		c.Reply(&pb_gateway.LoginAck{Code: pb_common.ErrCode_ERR_UNKNOWN, Msg: "game server unavailable"})
 		return
 	}
-	c.forward(ctx, req)
-	log.Printf("ConnActor[%d]: uid=%d logged in -> server=%d node=%s", c.connID, c.uid, c.serverID, c.nodeID)
-	c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
+	c.sendGameSteam(ctx, req)
+	log.Printf("ConnActor[%d]: uid=%d login forwarded -> server=%d node=%s", c.connID, c.uid, c.serverID, c.nodeID)
 }
 
 func (c *Conn) onRegister(ctx tree.Context, msg interface{}) {
-	req := msg.(*protoGateway.RegisterReq)
+	req := msg.(*pb_gateway.RegisterReq)
 	c.state = StateRegIng
 	platformPID := tree.MustLookup(constant.PF)
-	plReq := &protoPlatform.RegisterReq{
+	plReq := &pb_pf.RegisterReq{
 		Account:  req.Account,
 		Password: req.Password,
 		ServerId: req.ServerId,
@@ -71,35 +72,35 @@ func (c *Conn) regCb(ctx tree.Context, ret interface{}, err error) {
 
 	if err != nil {
 		c.state = StateAnon
-		c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
+		c.Reply(&pb_gateway.RegisterAck{Code: pb_common.ErrCode_ERR_UNKNOWN, Msg: err.Error()})
 		return
 	}
 
-	AuthAck := ret.(*protoPlatform.AuthAck)
+	AuthAck := ret.(*pb_pf.AuthAck)
 	c.uid = AuthAck.Uid
 	c.token = AuthAck.Token
 	c.serverID = AuthAck.ServerId
 	c.nodeID = ""
 	log.Printf("ConnActor[%d]: uid=%d registered -> server=%d node=%s", c.connID, c.uid, c.serverID, c.nodeID)
-	c.Reply(&protoGateway.RegisterAck{Code: protoCommon.ErrCode_OK, Msg: "ok"})
+	c.Reply(&pb_gateway.RegisterAck{Code: pb_common.ErrCode_OK, Msg: "ok"})
 }
 
 func (c *Conn) onGetServerList(ctx tree.Context, msg interface{}) {
-	req := msg.(*protoGateway.GetServerListReq)
+	req := msg.(*pb_gateway.GetServerListReq)
 	platformPID := tree.MustLookup(constant.PF)
-	ctx.RequestCallback(platformPID, &protoPlatform.GetServerListReq{Account: req.Account}, c.getServerListCb)
+	ctx.RequestCallback(platformPID, &pb_pf.GetServerListReq{Account: req.Account}, c.getServerListCb)
 }
 
 func (c *Conn) getServerListCb(_ tree.Context, ret interface{}, err error) {
 	if err != nil {
-		c.Reply(&protoGateway.ServerListAck{Code: protoCommon.ErrCode_ERR_UNKNOWN})
+		c.Reply(&pb_gateway.ServerListAck{Code: pb_common.ErrCode_ERR_UNKNOWN})
 		return
 	}
 
-	resp := ret.(*protoPlatform.ServerListAck)
-	accounts := make([]*protoGateway.ServerAccount, 0, len(resp.Accounts))
+	resp := ret.(*pb_pf.ServerListAck)
+	accounts := make([]*pb_gateway.ServerAccount, 0, len(resp.Accounts))
 	for _, account := range resp.Accounts {
-		accounts = append(accounts, &protoGateway.ServerAccount{ServerId: account.ServerId, Uid: account.Uid})
+		accounts = append(accounts, &pb_gateway.ServerAccount{ServerId: account.ServerId, Uid: account.Uid})
 	}
-	c.Reply(&protoGateway.ServerListAck{Code: resp.Code, Accounts: accounts})
+	c.Reply(&pb_gateway.ServerListAck{Code: resp.Code, Accounts: accounts})
 }

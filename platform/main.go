@@ -10,7 +10,7 @@ import (
 
 	"github.com/gogu-x/gogs/config"
 	natsclient "github.com/gogu-x/gogs/natsrpc"
-	"github.com/gogu-x/gogs/pb/protoPlatform"
+	_ "github.com/gogu-x/gogs/pb/pbregister"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
 	"github.com/gogu-x/gogs/platform/webhook"
 	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
@@ -25,8 +25,6 @@ func main() {
 			if err := config.LoadAndApply(c); err != nil {
 				return err
 			}
-
-			protoPlatform.RegisterJSONCodec()
 
 			if err := natsclient.Init(config.NatsURL); err != nil {
 				log.Fatalf("NATS init: %v", err)

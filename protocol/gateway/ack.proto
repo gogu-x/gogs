@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option go_package = "github.com/gogu-x/gogs/pb/pb_gateway";
+
+import "common/error.proto";
+import "gateway/struct.proto";
+
+message LoginAck {
+  ErrCode code = 1;
+  string  msg  = 2;
+}
+
+message RegisterAck {
+  ErrCode code = 1;
+  string  msg  = 2;
+}
+
+
+message ServerListAck {
+  ErrCode  code   = 1;
+  repeated ServerAccount accounts = 2;
+}

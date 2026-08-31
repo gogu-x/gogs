@@ -1,21 +1,14 @@
 package nats
 
 import (
-	"fmt"
-
 	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/natsrpc"
-	actor "github.com/gogu-x/tree"
 )
 
 func NewActor() *natsrpc.Actor {
-	gateID := fmt.Sprintf("%d", config.GateID)
 	return natsrpc.NewActor(natsrpc.ActorConfig{
 		Subs: []natsrpc.SubConfig{
-			natsrpc.Sub(natsrpc.GateOutSubject(gateID), func(frame *natsrpc.Frame) (actor.PID, bool) {
-				return actor.Default().Lookup(constant.ConnName(frame.ConnId))
-			}, 20),
+			natsrpc.Sub(natsrpc.GateSubject(uint32(config.GateID), 1), "", 20),
 		},
 	})
 }

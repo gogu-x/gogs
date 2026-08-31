@@ -8,7 +8,7 @@ import (
 
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
-	"github.com/gogu-x/gogs/pb/protoPlatform"
+	"github.com/gogu-x/gogs/pb/pb_pf"
 	"github.com/gogu-x/gogs/platform/service"
 	"github.com/gogu-x/tree"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -30,13 +30,12 @@ func (a *Platform) OnInit(ctx tree.Context) {
 		log.Printf("GrpcActor: EnsureIndexes: %v", err)
 	}
 
-	a.router.Register(&protoPlatform.RegisterReq{}, a.onRegister)
-	a.router.Register(&protoPlatform.AuthLoginReq{}, a.onLogin)
-	a.router.Register(&protoPlatform.VerifyTokenReq{}, a.onVerify)
-	a.router.Register(&protoPlatform.GetServerListReq{}, a.onGetServerList)
-	a.router.Register(&protoPlatform.CreateOrderReq{}, a.onCreateOrder)
-	a.router.Register(&protoPlatform.QueryOrderReq{}, a.onQueryOrder)
-	a.router.Register(&deliverReq{}, a.onDeliver)
+	a.router.Register(&pb_pf.RegisterReq{}, a.onRegister)
+	a.router.Register(&pb_pf.AuthLoginReq{}, a.onLogin)
+	a.router.Register(&pb_pf.VerifyTokenReq{}, a.onVerify)
+	a.router.Register(&pb_pf.GetServerListReq{}, a.onGetServerList)
+	a.router.Register(&pb_pf.CreateOrderReq{}, a.onCreateOrder)
+	a.router.Register(&pb_pf.QueryOrderReq{}, a.onQueryOrder)
 
 	lis, err := net.Listen("tcp", config.PlatformAddr)
 	if err != nil {
@@ -44,8 +43,8 @@ func (a *Platform) OnInit(ctx tree.Context) {
 	}
 	a.grpcServer = grpc.NewServer()
 	svc := &svcHandler{pid: ctx.Self()}
-	protoPlatform.RegisterAuthServiceServer(a.grpcServer, svc)
-	protoPlatform.RegisterOrderServiceServer(a.grpcServer, svc)
+	pb_pf.RegisterAuthServiceServer(a.grpcServer, svc)
+	pb_pf.RegisterOrderServiceServer(a.grpcServer, svc)
 
 	go func() {
 		log.Printf("platform gRPC listening on %s", config.PlatformAddr)
@@ -66,8 +65,8 @@ func (a *Platform) OnStop(_ tree.Context) {
 }
 
 type svcHandler struct {
-	protoPlatform.UnimplementedAuthServiceServer
-	protoPlatform.UnimplementedOrderServiceServer
+	pb_pf.UnimplementedAuthServiceServer
+	pb_pf.UnimplementedOrderServiceServer
 	pid tree.PID
 }
 
@@ -75,50 +74,50 @@ func (s *svcHandler) call(msg interface{}) (interface{}, error) {
 	return tree.Default().Request(s.pid, msg).AwaitTimeout(5 * time.Second)
 }
 
-func (s *svcHandler) Register(_ context.Context, req *protoPlatform.RegisterReq) (*protoPlatform.AuthAck, error) {
+func (s *svcHandler) Register(_ context.Context, req *pb_pf.RegisterReq) (*pb_pf.AuthAck, error) {
 	v, err := s.call(req)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*protoPlatform.AuthAck), nil
+	return v.(*pb_pf.AuthAck), nil
 }
 
-func (s *svcHandler) Login(_ context.Context, req *protoPlatform.AuthLoginReq) (*protoPlatform.AuthAck, error) {
+func (s *svcHandler) Login(_ context.Context, req *pb_pf.AuthLoginReq) (*pb_pf.AuthAck, error) {
 	v, err := s.call(req)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*protoPlatform.AuthAck), nil
+	return v.(*pb_pf.AuthAck), nil
 }
 
-func (s *svcHandler) VerifyToken(_ context.Context, req *protoPlatform.VerifyTokenReq) (*protoPlatform.VerifyAck, error) {
+func (s *svcHandler) VerifyToken(_ context.Context, req *pb_pf.VerifyTokenReq) (*pb_pf.VerifyAck, error) {
 	v, err := s.call(req)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*protoPlatform.VerifyAck), nil
+	return v.(*pb_pf.VerifyAck), nil
 }
 
-func (s *svcHandler) GetServerList(_ context.Context, req *protoPlatform.GetServerListReq) (*protoPlatform.ServerListAck, error) {
+func (s *svcHandler) GetServerList(_ context.Context, req *pb_pf.GetServerListReq) (*pb_pf.ServerListAck, error) {
 	v, err := s.call(req)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*protoPlatform.ServerListAck), nil
+	return v.(*pb_pf.ServerListAck), nil
 }
 
-func (s *svcHandler) CreateOrder(_ context.Context, req *protoPlatform.CreateOrderReq) (*protoPlatform.OrderAck, error) {
+func (s *svcHandler) CreateOrder(_ context.Context, req *pb_pf.CreateOrderReq) (*pb_pf.OrderAck, error) {
 	v, err := s.call(req)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*protoPlatform.OrderAck), nil
+	return v.(*pb_pf.OrderAck), nil
 }
 
-func (s *svcHandler) QueryOrder(_ context.Context, req *protoPlatform.QueryOrderReq) (*protoPlatform.OrderDetail, error) {
+func (s *svcHandler) QueryOrder(_ context.Context, req *pb_pf.QueryOrderReq) (*pb_pf.OrderDetail, error) {
 	v, err := s.call(req)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*protoPlatform.OrderDetail), nil
+	return v.(*pb_pf.OrderDetail), nil
 }

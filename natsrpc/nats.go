@@ -1,22 +1,17 @@
 package natsrpc
 
 import (
-	"fmt"
 	"log"
-	"time"
-
-	natsgo "github.com/nats-io/nats.go"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/gogu-x/gogs/constant"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/codec"
 	"github.com/gogu-x/tree/timer"
+	natsgo "github.com/nats-io/nats.go"
+	"google.golang.org/protobuf/proto"
 )
 
-// RouteFunc 根据 Frame 返回目标 Actor PID。
-type RouteFunc func(frame *Frame) (tree.PID, bool)
-
-const timerRequestTimeout = timer.TimerType(1)
+const natsRequestTimeout = timer.TimerType(1)
 
 // ActorConfig 配置订阅列表。
 type ActorConfig struct {
@@ -28,15 +23,7 @@ type ActorConfig struct {
 // pending 记录一条等待回包的跨节点请求（Call 模式）。
 type pending struct {
 	callerPID tree.PID
-	cb        func(*Frame, error)
-}
-
-// replyFrame subscribe worker 收到私有 inbox 的回包，投给 NatsActor 处理。
-// subject 是回包实际投递到的 NATS subject（用于匹配 pendingMap），
-// 不依赖回包 Frame 自身是否携带 RequestId 字段。
-type replyFrame struct {
-	subject string
-	frame   *Frame
+	cb        func(proto.Message, error)
 }
 
 // Actor NATS 订阅 Actor，负责收消息、反序列化、投递，并承载 Cast/Call 的发送与超时管理。
@@ -48,10 +35,11 @@ type Actor struct {
 	inboxSub   *natsgo.Subscription
 	inboxCh    chan *natsgo.Msg
 	timeWheel  *timer.TimeWheel
+	codec      codec.Codec
 }
 
 func NewActor(cfg ActorConfig) *Actor {
-	return &Actor{cfg: cfg, pendingMap: make(map[string]*pending)}
+	return &Actor{cfg: cfg, pendingMap: make(map[string]*pending), codec: codec.ProtoCodec}
 }
 
 // Name 实现 tree.Actor，注册名默认为 constant.ActorNats。
@@ -64,37 +52,37 @@ func (a *Actor) Name() string {
 
 func (a *Actor) OnInit(ctx tree.Context) {
 	a.timeWheel = timer.NewTimeWheel(1024, ctx.Self(), ctx.System())
-	a.timeWheel.Register(timerRequestTimeout, func(data interface{}) {
-		requestID, ok := data.(string)
-		if !ok {
-			log.Printf("natsrpc: invalid timeout timer data %T", data)
-			return
-		}
-		a.handleTimeout(requestID)
+	a.timeWheel.Register(natsRequestTimeout, func(data interface{}) {
+		//requestID, ok := data.(string)
+		//if !ok {
+		//	log.Printf("natsrpc: invalid timeout timer data %T", data)
+		//	return
+		//}
+		//a.handleTimeout(requestID)
 	})
 	self := ctx.Self()
+	//根据订阅创建nats消息监听
 	for _, sub := range a.cfg.Subs {
 		switch sub.kind {
 		case kindSub:
 			a.subscribe(self, sub)
-		case kindShutdown:
-			a.subscribeShutdown(self, sub)
+			//case kindShutdown:
+			//	a.subscribeShutdown(self, sub)
 		}
 	}
-	// 本模块的 Call 回包统一走一个私有 inbox：{inbox}.>，每次 Call 生成唯一子 subject。
 	a.subscribeInbox(self)
 }
 
 func (a *Actor) HandleMessage(ctx tree.Context, msg interface{}) {
 	switch m := msg.(type) {
+	//消息投递到nats
 	case *castMsg:
-		if err := publishTo(m.Module, m.ID, m.NodeId, m.Frame); err != nil {
+		if err := publishTo(m.Module, m.ID, m.NodeId, m.Msg); err != nil {
 			log.Printf("natsrpc: cast [%s/%s/%s]: %v", m.Module, m.ID, m.NodeId, err)
 		}
+	//带回调的消息
 	case *callMsg:
 		a.handleCall(m)
-	case *replyFrame:
-		a.handleReply(m.subject, m.frame)
 	case *shutdownMsg:
 		a.OnStop(ctx)
 	}
@@ -124,108 +112,94 @@ func (a *Actor) subscribe(self tree.PID, sub SubConfig) {
 	if workers <= 0 {
 		workers = 1
 	}
-	route := sub.route
-	for i := 0; i < workers; i++ {
-		go func() {
-			for m := range ch {
-				var frame Frame
-				if err := proto.Unmarshal(m.Data, &frame); err != nil {
-					log.Printf("natsrpc: unmarshal frame: %v", err)
-					continue
-				}
-				// CallSync 走 NATS 原生 request-reply，回复目标在 m.Reply；
-				// Call 模式则已经把私有 inbox subject 编码进 frame.RequestId，不可覆盖。
-				if frame.RequestId == "" && m.Reply != "" {
-					frame.RequestId = m.Reply
-				}
-				pid, ok := route(&frame)
-				if !ok {
-					continue
-				}
-				tree.Default().Send(pid, &frame)
+	go func() {
+		for m := range ch {
+			msg, err := a.codec.Unmarshal(m.Data)
+			if err != nil {
+				log.Printf("natsrpc: unmarshal frame: %v", err)
+				continue
 			}
-		}()
-	}
+			tree.Default().Send(self, msg)
+		}
+	}()
 	log.Printf("natsrpc: subscribed %s (%d workers)", sub.subject, workers)
 }
 
 // subscribeInbox 订阅本 NatsActor 私有回包 inbox（Call 模式的回复统一进这里）。
 func (a *Actor) subscribeInbox(self tree.PID) {
-	inbox := natsgo.NewInbox() // _INBOX.<uid>
-	ch := make(chan *natsgo.Msg, 128)
-	s, err := nc.ChanSubscribe(inbox+".*", ch)
-	if err != nil {
-		log.Fatalf("natsrpc: subscribe inbox %s: %v", inbox, err)
-	}
-	a.inboxBase = inbox
-	a.inboxSub = s
-	a.inboxCh = ch
-	go func() {
-		for m := range ch {
-			var frame Frame
-			if err := proto.Unmarshal(m.Data, &frame); err != nil {
-				log.Printf("natsrpc: unmarshal reply frame: %v", err)
-				continue
-			}
-			tree.Send(self, &replyFrame{subject: m.Subject, frame: &frame})
-		}
-	}()
+	//inbox := natsgo.NewInbox() // _INBOX.<uid>
+	//ch := make(chan *natsgo.Msg, 128)
+	//s, err := nc.ChanSubscribe(inbox+".*", ch)
+	//if err != nil {
+	//	log.Fatalf("natsrpc: subscribe inbox %s: %v", inbox, err)
+	//}
+	//a.inboxBase = inbox
+	//a.inboxSub = s
+	//a.inboxCh = ch
+	//go func() {
+	//	for m := range ch {
+	//		var frame Frame
+	//		if err := proto.Unmarshal(m.Data, &frame); err != nil {
+	//			log.Printf("natsrpc: unmarshal reply frame: %v", err)
+	//			continue
+	//		}
+	//		tree.Send(self, &replyFrame{subject: m.Subject, frame: &frame})
+	//	}
+	//}()
 }
 
 // handleCall 在 NatsActor goroutine 内执行：生成 reply inbox subject，存 pending，发消息。
 func (a *Actor) handleCall(m *callMsg) {
-	requestId := a.inboxBase + "." + newRequestId()
-	m.Frame.RequestId = requestId
 
-	timeout := m.Timeout
-	if timeout <= 0 {
-		timeout = 5 * time.Second
-	}
-
-	a.pendingMap[requestId] = &pending{callerPID: m.CallerPID, cb: m.Callback}
-
-	// 回调已按 timerRequestTimeout 类型注册；每个任务只携带时间和 requestID。
-	a.timeWheel.After(timerRequestTimeout, timeout, requestId)
-
-	if err := publishTo(m.Module, m.ID, m.NodeId, m.Frame); err != nil {
-		delete(a.pendingMap, requestId)
-		sendFrameCallback(m.CallerPID, m.Callback, nil, err)
-	}
+	//timeout := m.Timeout
+	//if timeout <= 0 {
+	//	timeout = 5 * time.Second
+	//}
+	//
+	//a.pendingMap[requestId] = &pending{callerPID: m.CallerPID, cb: m.Callback}
+	//
+	//// 回调已按 timerRequestTimeout 类型注册；每个任务只携带时间和 requestID。
+	//a.timeWheel.After(timerRequestTimeout, timeout, requestId)
+	//
+	//if err := publishTo(m.Module, m.ID, m.NodeId, m.Frame); err != nil {
+	//	delete(a.pendingMap, requestId)
+	//	sendFrameCallback(m.CallerPID, m.Callback, nil, err)
+	//}
 }
 
-// handleReply 在 NatsActor goroutine 内执行：按接收 subject 查 pending，触发回调。
-func (a *Actor) handleReply(subject string, frame *Frame) {
-	p, ok := a.pendingMap[subject]
-	if !ok {
-		return
-	}
-	delete(a.pendingMap, subject)
-	sendFrameCallback(p.callerPID, p.cb, frame, nil)
-}
-
-// handleTimeout 在 NatsActor goroutine 内执行：超时回调。
-func (a *Actor) handleTimeout(requestId string) {
-	p, ok := a.pendingMap[requestId]
-	if !ok {
-		return // 已被 handleReply 处理，忽略
-	}
-	delete(a.pendingMap, requestId)
-	sendFrameCallback(p.callerPID, p.cb, nil, fmt.Errorf("natsrpc: request timeout [%s]", requestId))
-}
-
-func (a *Actor) subscribeShutdown(self tree.PID, sub SubConfig) {
-	s, err := nc.Subscribe(sub.subject, func(_ *natsgo.Msg) {
-		tree.Send(self, &shutdownMsg{})
-	})
-	if err != nil {
-		log.Printf("natsrpc: subscribe %s: %v", sub.subject, err)
-		return
-	}
-	a.subs = append(a.subs, s)
-	log.Printf("natsrpc: subscribed %s", sub.subject)
-}
-
-// sendFrameCallback 包装 actor.SendCallback，适配 func(*Frame, error) 签名。
-func sendFrameCallback(pid tree.PID, cb func(*Frame, error), frame *Frame, err error) bool {
-	return false
-}
+//// handleReply 在 NatsActor goroutine 内执行：按接收 subject 查 pending，触发回调。
+//func (a *Actor) handleReply(subject string, frame *Frame) {
+//	p, ok := a.pendingMap[subject]
+//	if !ok {
+//		return
+//	}
+//	delete(a.pendingMap, subject)
+//	sendFrameCallback(p.callerPID, p.cb, frame, nil)
+//}
+//
+//// handleTimeout 在 NatsActor goroutine 内执行：超时回调。
+//func (a *Actor) handleTimeout(requestId string) {
+//	p, ok := a.pendingMap[requestId]
+//	if !ok {
+//		return // 已被 handleReply 处理，忽略
+//	}
+//	delete(a.pendingMap, requestId)
+//	sendFrameCallback(p.callerPID, p.cb, nil, fmt.Errorf("natsrpc: request timeout [%s]", requestId))
+//}
+//
+//func (a *Actor) subscribeShutdown(self tree.PID, sub SubConfig) {
+//	s, err := nc.Subscribe(sub.subject, func(_ *natsgo.Msg) {
+//		tree.Send(self, &shutdownMsg{})
+//	})
+//	if err != nil {
+//		log.Printf("natsrpc: subscribe %s: %v", sub.subject, err)
+//		return
+//	}
+//	a.subs = append(a.subs, s)
+//	log.Printf("natsrpc: subscribed %s", sub.subject)
+//}
+//
+//// sendFrameCallback 包装 actor.SendCallback，适配 func(*Frame, error) 签名。
+//func sendFrameCallback(pid tree.PID, cb func(*Frame, error), frame *Frame, err error) bool {
+//	return false
+//}

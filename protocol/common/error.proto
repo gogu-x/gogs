@@ -1,6 +1,6 @@
 ﻿syntax = "proto3";
 
-option go_package = "github.com/gogu-x/gogs/pb/protoCommon";
+option go_package = "github.com/gogu-x/gogs/pb/pb_common";
 
 enum ErrCode {
   OK = 0;

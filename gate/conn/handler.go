@@ -1,57 +1,40 @@
 package conn
 
 import (
-	"fmt"
 	"log"
-	"reflect"
 
-	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/gogs/pb/pb_gateway"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/codec"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 )
 
-func (c *Conn) handleWsMsg(ctx tree.Context, data []byte) {
-	inner, err := c.codec.Unmarshal(data)
-	if err != nil {
-		log.Printf("ConnActor[%d]: unmarshal error: %v", c.connID, err)
-		return
-	}
-	for _, mw := range c.middlewares {
-		if !mw(ctx, inner) {
-			return
-		}
-	}
-	c.router.SetFallback(func(ctx tree.Context, _ interface{}) {
-		c.forward(ctx, inner)
-	})
-	c.router.Route(ctx, inner)
-}
-
-func (c *Conn) forward(ctx tree.Context, inner interface{}) {
+// sendGameSteam forwards a client protobuf message through a payload-only Frame.
+func (c *Conn) sendGameSteam(ctx tree.Context, inner interface{}) {
 	protoMsg, ok := inner.(proto.Message)
 	if !ok {
+		log.Printf("ConnActor[%d]: unsupported game message %T", c.connID, inner)
 		return
 	}
-	body, _ := c.codec.Marshal(protoMsg)
-
-	msg := &protoGateway.Frame{
-		ConnId:   c.connID,
-		Uid:      c.uid,
-		ServerId: c.serverID,
-		GateId:   fmt.Sprintf("%d", config.GateID),
-		Payload:  body,
-		MsgType:  reflect.TypeOf(inner).Elem().Name(),
+	codec.WriteHeader(protoMsg, codec.ReqHeader{
+		UID:       c.uid,
+		ServerID:  c.serverID,
+		SessionID: comm.NewUUID(),
+	})
+	body, err := codec.ProtoCodec.Marshal(protoMsg)
+	if err != nil {
+		log.Printf("ConnActor[%d]: marshal game message: %v", c.connID, err)
+		return
 	}
 	if c.stream == nil {
 		log.Printf("ConnActor[%d]: game stream is unavailable", c.connID)
 		return
 	}
-	if err := c.stream.Send(msg); err != nil {
+	if err := c.stream.Send(&pb_gateway.Frame{Payload: body}); err != nil {
 		log.Printf("ConnActor[%d]: send stream error: %v", c.connID, err)
 		ctx.Stop()
-		return
 	}
 }
 
@@ -63,6 +46,4 @@ func (c *Conn) Reply(msg proto.Message) {
 	_ = c.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
-func (c *Conn) onNodeFailover(_ tree.Context, msg interface{}) {
-
-}
+func (c *Conn) onNodeFailover(_ tree.Context, _ interface{}) {}

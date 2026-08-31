@@ -6,26 +6,26 @@ import (
 	"github.com/gogu-x/tree"
 )
 
-type ActivityActor struct {
+type Activity struct {
 	mgr     *internal.Mgr
 	router  tree.Router
 	context tree.Context
 }
 
-// NewActivityActor 创建 ActivityActor
-func NewActivityActor() *ActivityActor {
-	return &ActivityActor{mgr: internal.NewMgr()}
+// NewActivity 创建 Activity
+func NewActivity() *Activity {
+	return &Activity{mgr: internal.NewMgr()}
 }
 
-func (a *ActivityActor) Name() string { return constant.ActorActivity }
+func (a *Activity) Name() string { return constant.ActorActivity }
 
-func (a *ActivityActor) OnInit(c tree.Context) {
+func (a *Activity) OnInit(c tree.Context) {
 	a.context = c
 	internal.InitRoutes(&a.router, a.mgr)
 }
 
-func (a *ActivityActor) HandleMessage(ctx tree.Context, msg interface{}) {
+func (a *Activity) HandleMessage(ctx tree.Context, msg interface{}) {
 	a.router.Route(ctx, msg)
 }
 
-func (a *ActivityActor) OnStop(_ tree.Context) {}
+func (a *Activity) OnStop(_ tree.Context) {}

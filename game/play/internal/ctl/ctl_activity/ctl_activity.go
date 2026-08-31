@@ -4,48 +4,46 @@ import (
 	"log"
 
 	"github.com/gogu-x/gogs/constant"
-	"github.com/gogu-x/gogs/game/play/internal/base"
-	"github.com/gogu-x/gogs/pb/protoActivity"
+	"github.com/gogu-x/gogs/game/play/internal/common"
+	"github.com/gogu-x/gogs/pb/pb_activity"
 	"github.com/gogu-x/tree"
 	"google.golang.org/protobuf/proto"
 )
 
-func GetActivityList(s *base.PlayContext, req *protoActivity.GetActivityListReq) {
+func GetActivityList(s *common.PlayerContext, req *pb_activity.GetActivityListReq) {
+	requestActivity(s, req,
+		func(ret interface{}, err error) {
+			if ack, ok := ret.(*pb_activity.GetActivityListAck); ok {
+				s.Reply(ack)
+			}
+		})
+}
+
+func JoinActivity(s *common.PlayerContext, req *pb_activity.JoinActivityReq) {
 	requestActivity(s, req, func(ret interface{}, err error) {
-		if ack, ok := ret.(*protoActivity.GetActivityListAck); ok {
+		if ack, ok := ret.(*pb_activity.JoinActivityAck); ok {
 			s.Reply(ack)
 		}
 	})
 }
 
-func JoinActivity(s *base.PlayContext, req *protoActivity.JoinActivityReq) {
-	req.Uid = s.Player.UID
+func GetProgress(s *common.PlayerContext, req *pb_activity.GetProgressReq) {
 	requestActivity(s, req, func(ret interface{}, err error) {
-		if ack, ok := ret.(*protoActivity.JoinActivityAck); ok {
+		if ack, ok := ret.(*pb_activity.GetProgressAck); ok {
 			s.Reply(ack)
 		}
 	})
 }
 
-func GetProgress(s *base.PlayContext, req *protoActivity.GetProgressReq) {
-	req.Uid = s.Player.UID
+func ClaimReward(s *common.PlayerContext, req *pb_activity.ClaimRewardReq) {
 	requestActivity(s, req, func(ret interface{}, err error) {
-		if ack, ok := ret.(*protoActivity.GetProgressAck); ok {
+		if ack, ok := ret.(*pb_activity.ClaimRewardAck); ok {
 			s.Reply(ack)
 		}
 	})
 }
 
-func ClaimReward(s *base.PlayContext, req *protoActivity.ClaimRewardReq) {
-	req.Uid = s.Player.UID
-	requestActivity(s, req, func(ret interface{}, err error) {
-		if ack, ok := ret.(*protoActivity.ClaimRewardAck); ok {
-			s.Reply(ack)
-		}
-	})
-}
-
-func requestActivity(s *base.PlayContext, msg proto.Message, cb func(interface{}, error)) {
+func requestActivity(s *common.PlayerContext, msg proto.Message, cb func(interface{}, error)) {
 	pid, ok := s.Tree().Lookup(constant.ActorActivity)
 	if !ok {
 		log.Printf("play: activity actor not found")

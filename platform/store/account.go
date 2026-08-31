@@ -16,7 +16,7 @@ type Account struct {
 	PasswordHash string        `bson:"password_hash"      json:"password_hash"`
 	UID          uint64        `bson:"uid"                json:"uid"`
 	CreatedAt    time.Time     `bson:"created_at"         json:"created_at"`
-	ServerId     int32         `bson:"server_id"          json:"server_id"`
+	ServerId     uint32        `bson:"server_id"          json:"server_id"`
 }
 
 var uidCounter uint64

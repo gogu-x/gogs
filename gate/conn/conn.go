@@ -2,7 +2,7 @@ package conn
 
 import (
 	"github.com/gogu-x/gogs/gate/constant"
-	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/gogs/pb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gorilla/websocket"
@@ -35,12 +35,12 @@ type Conn struct {
 	conn        *websocket.Conn
 	uid         uint64
 	connID      uint64
-	serverID    int32
+	serverID    uint32
 	nodeID      string
 	token       string
 	state       connState
 	middlewares []middlewareFunc
-	stream      protoGateway.Gateway_StreamClient
+	stream      pb_gateway.Gateway_StreamClient
 	grpcConn    *grpc.ClientConn
 	router      tree.Router
 	codec       codec.Codec
@@ -61,7 +61,7 @@ func (c *Conn) OnInit(ctx tree.Context) {
 	c.middlewares = []middlewareFunc{c.checkAuth}
 
 	if pid, ok := ctx.Lookup(constant.ActorGateServer); ok {
-		ctx.Send(pid, &protoGateway.ConnRegMsg{ConnId: c.connID})
+		ctx.Send(pid, &pb_gateway.ConnRegMsg{ConnId: c.connID})
 	}
 
 	self := ctx.Self()
@@ -83,7 +83,7 @@ func (c *Conn) HandleMessage(ctx tree.Context, msg interface{}) {
 
 func (c *Conn) OnStop(ctx tree.Context) {
 	if pid, ok := ctx.Lookup(constant.ActorGateServer); ok {
-		ctx.Send(pid, &protoGateway.ConnUnregMsg{ConnId: c.connID})
+		ctx.Send(pid, &pb_gateway.ConnUnregMsg{ConnId: c.connID})
 	}
 	if c.uid != 0 && c.serverID != 0 {
 

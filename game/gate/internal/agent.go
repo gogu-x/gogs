@@ -5,23 +5,14 @@ import (
 	"log"
 	"time"
 
-	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
-	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/gogs/pb/pb_gateway"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/codec"
 	"google.golang.org/protobuf/proto"
 )
 
 const maxFramesPerSecond = 200
-
-type sessionKey struct {
-	gateID string
-	connID uint64
-}
-
-func (k sessionKey) String() string {
-	return fmt.Sprintf("%s/%d", k.gateID, k.connID)
-}
 
 type session struct {
 	pid        tree.PID
@@ -30,70 +21,58 @@ type session struct {
 }
 
 type openSession struct {
-	stream protoGateway.Gateway_StreamServer
-	first  *protoGateway.Frame
+	stream pb_gateway.Gateway_StreamServer
+	frame  *pb_gateway.Frame
 }
 
 type openedSession struct {
-	key        sessionKey
 	pid        tree.PID
+	uid        uint64
 	generation uint64
 }
 
 type closeSession struct {
-	key        sessionKey
 	pid        tree.PID
+	uid        uint64
 	generation uint64
 	reason     string
 }
 
-type sessionUID struct {
-	key        sessionKey
-	pid        tree.PID
-	generation uint64
-	uid        uint64
-}
-
 type inboundFrame struct {
-	frame *protoGateway.Frame
-}
-
-type outboundFrame struct {
-	frame *protoGateway.Frame
+	frame *pb_gateway.Frame
 }
 
 type stopAgent struct{}
 
-// PushToConn is the Game-side message used to send a frame to a live gateway
-// connection. GateActor resolves the session key and routes it to its agent.
-type PushToConn struct {
-	GateID string
-	ConnID uint64
-	Frame  *protoGateway.Frame
+// PushToMsg routes a Game-side frame to the live stream identified by UID.
+type PushToMsg struct {
+	UID   uint64
+	Frame *pb_gateway.Frame
 }
 
 // BanUID and UnbanUID are control messages for the in-memory session ban list.
-// Persistent ban decisions should send one of these messages to GateActor.
 type BanUID struct{ UID uint64 }
 type UnbanUID struct{ UID uint64 }
 
-// GsAgent owns one gRPC stream. Its mailbox serializes inbound client frames
-// and outbound Game pushes so stream.Send is never called concurrently.
+// GsAgent owns the gRPC stream for one authenticated UID.
 type GsAgent struct {
-	key        sessionKey
-	generation uint64
-	stream     protoGateway.Gateway_StreamServer
-	manager    tree.PID
-	router     tree.Router
-
+	generation  uint64
+	stream      pb_gateway.Gateway_StreamServer
+	manager     tree.PID
+	router      tree.Router
 	uid         uint64
 	windowStart time.Time
 	frameCount  int
 }
 
-func newGsAgent(key sessionKey, generation uint64, stream protoGateway.Gateway_StreamServer, manager tree.PID) *GsAgent {
+func newGsAgent(
+	uid uint64,
+	generation uint64,
+	stream pb_gateway.Gateway_StreamServer,
+	manager tree.PID,
+) *GsAgent {
 	return &GsAgent{
-		key:         key,
+		uid:         uid,
 		generation:  generation,
 		stream:      stream,
 		manager:     manager,
@@ -102,14 +81,14 @@ func newGsAgent(key sessionKey, generation uint64, stream protoGateway.Gateway_S
 }
 
 func (g *GsAgent) Name() string {
-	return fmt.Sprintf("gateway-conn-%s-%d-%d", g.key.gateID, g.key.connID, g.generation)
+	return fmt.Sprintf("gateway-uid-%d-%d", g.uid, g.generation)
 }
 
 func (g *GsAgent) MailboxSize() int { return 256 }
 
 func (g *GsAgent) OnInit(_ tree.Context) {
 	g.router.Register(&inboundFrame{}, g.handleInboundFrame)
-	g.router.Register(&outboundFrame{}, g.handleOutboundFrame)
+	g.router.Register(&pb_gateway.Frame{}, g.handleOutboundFrame)
 	g.router.Register(&stopAgent{}, g.handleStop)
 }
 
@@ -126,36 +105,27 @@ func (g *GsAgent) handleInboundFrame(ctx tree.Context, msg interface{}) {
 }
 
 func (g *GsAgent) handleOutboundFrame(ctx tree.Context, msg interface{}) {
-	g.onOutbound(ctx, msg.(*outboundFrame).frame)
+	g.onOutbound(ctx, msg.(*pb_gateway.Frame))
 }
 
 func (g *GsAgent) handleStop(ctx tree.Context, _ interface{}) {
 	ctx.Stop()
 }
 
-func (g *GsAgent) onInbound(ctx tree.Context, frame *protoGateway.Frame) {
-	if frame == nil || frame.GetConnId() != g.key.connID || frame.GetGateId() != g.key.gateID || frame.GetServerId() != int32(config.ServerID) {
-		g.close(ctx, "invalid connection ownership")
-		return
-	}
+func (g *GsAgent) onInbound(ctx tree.Context, frame *pb_gateway.Frame) {
 	if !g.allowFrame() {
 		g.close(ctx, "inbound rate limit exceeded")
 		return
 	}
-	if frame.GetUid() != 0 && frame.GetUid() != g.uid {
-		binding := ctx.Request(g.manager, &sessionUID{
-			key:        g.key,
-			pid:        ctx.Self(),
-			generation: g.generation,
-			uid:        frame.GetUid(),
-		})
-		result, err := binding.AwaitTimeout(2 * time.Second)
-		allowed, ok := result.(bool)
-		if err != nil || !ok || !allowed {
-			g.close(ctx, "session UID rejected")
-			return
-		}
-		g.uid = frame.GetUid()
+
+	msg, uid, err := decodeInboundFrame(frame)
+	if err != nil {
+		g.close(ctx, fmt.Sprintf("invalid inbound frame: %v", err))
+		return
+	}
+	if uid != g.uid {
+		g.close(ctx, fmt.Sprintf("message UID mismatch: got %d want %d", uid, g.uid))
+		return
 	}
 
 	playPID, ok := ctx.Lookup(constant.PLAY)
@@ -163,26 +133,20 @@ func (g *GsAgent) onInbound(ctx tree.Context, frame *protoGateway.Frame) {
 		g.close(ctx, "Play actor is unavailable")
 		return
 	}
-	if !ctx.Send(playPID, frame) {
+	if !ctx.Send(playPID, msg) {
 		g.close(ctx, "Play actor stopped")
 	}
 }
 
-func (g *GsAgent) onOutbound(ctx tree.Context, frame *protoGateway.Frame) {
+func (g *GsAgent) onOutbound(ctx tree.Context, frame *pb_gateway.Frame) {
 	if frame == nil || g.stream == nil {
 		return
 	}
 
-	out, ok := proto.Clone(frame).(*protoGateway.Frame)
+	out, ok := proto.Clone(frame).(*pb_gateway.Frame)
 	if !ok {
-		log.Printf("GatewayAgent[%s]: clone outbound frame failed", g.key)
+		log.Printf("GatewayAgent[%d]: clone outbound frame failed", g.uid)
 		return
-	}
-	out.GateId = g.key.gateID
-	out.ConnId = g.key.connID
-	out.ServerId = int32(config.ServerID)
-	if g.uid != 0 {
-		out.Uid = g.uid
 	}
 	if err := g.stream.Send(out); err != nil {
 		g.close(ctx, fmt.Sprintf("stream send: %v", err))
@@ -201,10 +165,29 @@ func (g *GsAgent) allowFrame() bool {
 
 func (g *GsAgent) close(ctx tree.Context, reason string) {
 	ctx.Send(g.manager, &closeSession{
-		key:        g.key,
+		uid:        g.uid,
 		pid:        ctx.Self(),
 		generation: g.generation,
 		reason:     reason,
 	})
 	ctx.Stop()
+}
+
+func decodeInboundFrame(frame *pb_gateway.Frame) (interface{}, uint64, error) {
+	if err := validateFrame(frame); err != nil {
+		return nil, 0, err
+	}
+	msg, err := codec.ProtoCodec.Unmarshal(frame.GetPayload())
+	if err != nil {
+		return nil, 0, fmt.Errorf("decode payload: %w", err)
+	}
+	request, ok := msg.(interface{ GetUID() uint64 })
+	if !ok {
+		return nil, 0, fmt.Errorf("message %T has no UID", msg)
+	}
+	uid := request.GetUID()
+	if uid == 0 {
+		return nil, 0, fmt.Errorf("message %T has an empty UID", msg)
+	}
+	return msg, uid, nil
 }

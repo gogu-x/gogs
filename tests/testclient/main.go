@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gogu-x/gogs/pb/pb_chat"
+	"github.com/gogu-x/gogs/pb/pb_gateway"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
-	"github.com/gogu-x/gogs/pb/protoChat"
-	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
@@ -84,7 +84,7 @@ func runUser(uid uint64, wg *sync.WaitGroup, stop <-chan struct{}) {
 	}
 
 	// 登录
-	if !send(&protoGateway.RegisterReq{Account: "test", Password: "123456", ServerId: 1}) {
+	if !send(&pb_gateway.RegisterReq{Account: "test", Password: "123456", ServerId: 1}) {
 		atomic.AddInt64(&sendFail, 1)
 		return
 	}
@@ -98,7 +98,7 @@ func runUser(uid uint64, wg *sync.WaitGroup, stop <-chan struct{}) {
 		case <-stop:
 			return
 		case <-ticker.C:
-			if send(&protoChat.ChatReq{Type: 1, Content: fmt.Sprintf("hi from %d", uid)}) {
+			if send(&pb_chat.ChatReq{Type: 1, Content: fmt.Sprintf("hi from %d", uid)}) {
 				atomic.AddInt64(&sendOK, 1)
 			} else {
 				atomic.AddInt64(&sendFail, 1)

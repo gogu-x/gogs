@@ -3,15 +3,15 @@ package conn
 import (
 	"reflect"
 
-	"github.com/gogu-x/gogs/pb/protoCommon"
-	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/gogs/pb/pb_common"
+	"github.com/gogu-x/gogs/pb/pb_gateway"
 	actor "github.com/gogu-x/tree"
 )
 
 var noAuthRequired = map[reflect.Type]bool{
-	reflect.TypeOf(&protoGateway.LoginReq{}):         true,
-	reflect.TypeOf(&protoGateway.RegisterReq{}):      true,
-	reflect.TypeOf(&protoGateway.GetServerListReq{}): true,
+	reflect.TypeOf(&pb_gateway.LoginReq{}):         true,
+	reflect.TypeOf(&pb_gateway.RegisterReq{}):      true,
+	reflect.TypeOf(&pb_gateway.GetServerListReq{}): true,
 }
 
 func (c *Conn) checkAuth(_ actor.Context, msg interface{}) bool {
@@ -19,11 +19,11 @@ func (c *Conn) checkAuth(_ actor.Context, msg interface{}) bool {
 		return true
 	}
 	if c.state == StateLoggIng {
-		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_LOGIN_IN_PROGRESS, Msg: "login in progress"})
+		c.Reply(&pb_gateway.LoginAck{Code: pb_common.ErrCode_ERR_LOGIN_IN_PROGRESS, Msg: "login in progress"})
 		return false
 	}
 	if c.state != StateAuthed {
-		c.Reply(&protoGateway.LoginAck{Code: protoCommon.ErrCode_ERR_UNAUTHORIZED, Msg: "unauthorized"})
+		c.Reply(&pb_gateway.LoginAck{Code: pb_common.ErrCode_ERR_UNAUTHORIZED, Msg: "unauthorized"})
 		return false
 	}
 	return true

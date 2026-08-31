@@ -5,7 +5,7 @@ import (
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/constant"
-	"github.com/gogu-x/gogs/pb/protoPlatform"
+	"github.com/gogu-x/gogs/pb/pb_pf"
 	"github.com/gogu-x/gogs/platform/service"
 	"github.com/gogu-x/tree"
 )
@@ -13,7 +13,7 @@ import (
 type deliverReq struct{ orderID string }
 
 func (a *Platform) onCreateOrder(ctx tree.Context, msg interface{}) {
-	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*protoPlatform.CreateOrderReq)
+	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*pb_pf.CreateOrderReq)
 	go func() {
 		resp, err := service.CreateOrder(db, req)
 		f.Respond(resp, err)
@@ -21,7 +21,7 @@ func (a *Platform) onCreateOrder(ctx tree.Context, msg interface{}) {
 }
 
 func (a *Platform) onQueryOrder(ctx tree.Context, msg interface{}) {
-	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*protoPlatform.QueryOrderReq)
+	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*pb_pf.QueryOrderReq)
 	go func() {
 		resp, err := service.QueryOrder(db, req)
 		f.Respond(resp, err)
@@ -29,11 +29,6 @@ func (a *Platform) onQueryOrder(ctx tree.Context, msg interface{}) {
 }
 
 func (a *Platform) onDeliver(ctx tree.Context, msg interface{}) {
-	f, db, req := ctx.RequestEnvelope(), a.db, msg.(*deliverReq)
-	go func() {
-		err := service.DeliverOrder(db, req.orderID)
-		f.Respond(nil, err)
-	}()
 }
 
 // DeliverByOrderID 由 webhook 调用，向 GrpcActor mailbox 发送 deliverReq

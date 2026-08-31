@@ -6,7 +6,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/gogu-x/gogs/pb/protoGateway"
+	"github.com/gogu-x/gogs/pb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/cluster"
 	"google.golang.org/grpc"
@@ -29,7 +29,7 @@ func (c *Conn) OpenSteam(self tree.PID) error {
 	if err != nil {
 		return fmt.Errorf("dial game %s: %w", addr, err)
 	}
-	stream, err := protoGateway.NewGatewayClient(grpcConn).Stream(context.Background())
+	stream, err := pb_gateway.NewGatewayClient(grpcConn).Stream(context.Background())
 	if err != nil {
 		_ = grpcConn.Close()
 		return fmt.Errorf("open game stream: %w", err)
@@ -41,7 +41,7 @@ func (c *Conn) OpenSteam(self tree.PID) error {
 	return nil
 }
 
-func (c *Conn) receiveStream(self tree.PID, stream protoGateway.Gateway_StreamClient) {
+func (c *Conn) receiveStream(self tree.PID, stream pb_gateway.Gateway_StreamClient) {
 	for {
 		frame, err := stream.Recv()
 		if err != nil {

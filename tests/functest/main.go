@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gogu-x/gogs/pb/pb_chat"
+	"github.com/gogu-x/gogs/pb/pb_common"
+	"github.com/gogu-x/gogs/pb/pb_gateway"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
-	"github.com/gogu-x/gogs/pb/protoChat"
-	"github.com/gogu-x/gogs/pb/protoCommon"
-	"github.com/gogu-x/gogs/pb/protoGateway"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
@@ -92,37 +92,36 @@ func runUser(idx int) error {
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
-	defer c.close()
 
 	account := fmt.Sprintf("bench_%d_%d", time.Now().UnixNano(), idx)
-	sid := int32(*serverID)
+	sid := uint32(*serverID)
 
 	// 注册
-	if err := c.send(&protoGateway.RegisterReq{Account: account, Password: "Test@1234", ServerId: sid}); err != nil {
+	if err := c.send(&pb_gateway.RegisterReq{Account: account, Password: "Test@1234", ServerId: sid}); err != nil {
 		return fmt.Errorf("register send: %w", err)
 	}
 	msg, err := c.recv()
 	if err != nil {
 		return fmt.Errorf("register recv: %w", err)
 	}
-	if ack, ok := msg.(*protoGateway.RegisterAck); !ok || ack.Code != protoCommon.ErrCode_OK {
+	if ack, ok := msg.(*pb_gateway.RegisterAck); !ok || ack.Code != pb_common.ErrCode_OK {
 		return fmt.Errorf("register ack: %v", msg)
 	}
 
 	// 登录
-	if err := c.send(&protoGateway.LoginReq{Account: account, Password: "Test@1234", ServerId: sid}); err != nil {
+	if err := c.send(&pb_gateway.LoginReq{Account: account, Password: "Test@1234", ServerId: sid}); err != nil {
 		return fmt.Errorf("login send: %w", err)
 	}
 	msg, err = c.recv()
 	if err != nil {
 		return fmt.Errorf("login recv: %w", err)
 	}
-	if ack, ok := msg.(*protoGateway.LoginAck); !ok || ack.Code != protoCommon.ErrCode_OK {
+	if ack, ok := msg.(*pb_gateway.LoginAck); !ok || ack.Code != pb_common.ErrCode_OK {
 		return fmt.Errorf("login ack: %v", msg)
 	}
 
 	// Chat
-	if err := c.send(&protoChat.ChatReq{Type: 1, Content: "bench"}); err != nil {
+	if err := c.send(&pb_chat.ChatReq{Type: 1, Content: "bench"}); err != nil {
 		return fmt.Errorf("chat send: %w", err)
 	}
 
@@ -137,6 +136,10 @@ func main() {
 	log.Printf("压测开始: addrs=%v users=%d", gateAddrs, *users)
 
 	runUser(1)
+
+	for true {
+
+	}
 	//var (
 	//	wg      sync.WaitGroup
 	//	success int64

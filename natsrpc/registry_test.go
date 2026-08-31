@@ -9,7 +9,7 @@ func TestSubjectForBuiltinModules(t *testing.T) {
 		nodeID string
 		want   string
 	}{
-		{GameNats, "1", "2", "game:1:2"},
+		{ModuleGate, "1", "2", "game:1:2"},
 		{ModuleGate, "3", "", "gate.out.3"},
 		{ModuleCross, "4", "", "cross.4"},
 		{ModuleDeliver, "5", "", "platform.deliver.5"},

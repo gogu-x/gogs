@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package platform;
 
-option go_package = "github.com/gogu-x/gogs/pb/protoPlatform";
+option go_package = "github.com/gogu-x/gogs/pb/pb_pf";
 
 import "common/error.proto";
 
@@ -18,13 +18,13 @@ enum OrderStatus {
 message RegisterReq {
   string account   = 1;
   string password  = 2;
-  int32  server_id = 3;
+  uint32  server_id = 3;
 }
 
 message AuthLoginReq {
   string account   = 1;
   string password  = 2;
-  int32  server_id = 3;
+  uint32  server_id = 3;
 }
 
 message AuthAck {
@@ -32,7 +32,7 @@ message AuthAck {
   string  msg   = 2;
   uint64  uid   = 3;
   string  token = 4;
-  int32   server_id = 5;
+  uint32   server_id = 5;
 }
 
 message VerifyTokenReq {
@@ -50,7 +50,7 @@ message GetServerListReq {
 }
 
 message ServerAccount {
-  int32  server_id = 1;
+  uint32  server_id = 1;
   uint64 uid       = 2;
 }
 

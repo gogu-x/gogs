@@ -9,7 +9,6 @@ import (
 
 	"github.com/gogu-x/gogs/config"
 	"github.com/gogu-x/gogs/constant"
-	"github.com/gogu-x/gogs/pb/protoPlatform"
 	actor "github.com/gogu-x/tree"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -36,7 +35,6 @@ func (a *Actor) register(req any, method string, newResp func() any) {
 func (a *Actor) OnInit(_ actor.Context) {
 	conn, err := grpc.NewClient(config.PlatformGrpcAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		protoPlatform.ForceJSONCodec(),
 	)
 	if err != nil {
 		log.Fatalf("rpc/platform: dial %s: %v", config.PlatformGrpcAddr, err)

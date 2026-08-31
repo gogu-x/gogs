@@ -62,9 +62,9 @@ func main() {
 				play.NewPlay(),
 				gate.NewGate(),
 				guild.NewGuild(),
-				activity.NewActivityActor(),
+				activity.NewActivity(),
 				rpcmongo.NewActor(constant.Mongo, db),
-				gamenats.NewNats(serverID, NodeID),
+				gamenats.NewNats(uint32(config.ServerID), uint32(config.NodeId)),
 			)
 			tree.Default().Start()
 
