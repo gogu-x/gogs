@@ -20,6 +20,7 @@ type Player struct {
 }
 
 func NewPlayerData(uid uint64) *Player {
+
 	return &Player{
 		UID:          uid,
 		AssetMgr:     &asset.Mgr{},

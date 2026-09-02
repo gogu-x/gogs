@@ -13,7 +13,7 @@ type uidRequest interface {
 func RegisterPlayer[Req any](
 	py *Play,
 	prototype Req,
-	h func(*common.PlayerContext, Req),
+	h func(*common.Context, Req),
 ) {
 	py.router.Register(prototype, func(ctx tree.Context, msg interface{}) {
 		request, ok := msg.(uidRequest)
@@ -24,7 +24,7 @@ func RegisterPlayer[Req any](
 		if p == nil {
 			return
 		}
-		h(&common.PlayerContext{
+		h(&common.Context{
 			Play:    py,
 			TreeCtx: ctx,
 			Player:  p,
@@ -36,10 +36,10 @@ func RegisterPlayer[Req any](
 func RegisterSys[Msg any](
 	py *Play,
 	prototype Msg,
-	h func(*common.PlayerContext, Msg),
+	h func(*common.Context, Msg),
 ) {
 	py.router.Register(prototype, func(ctx tree.Context, msg interface{}) {
-		h(&common.PlayerContext{
+		h(&common.Context{
 			Play:    py,
 			TreeCtx: ctx,
 		}, msg.(Msg))

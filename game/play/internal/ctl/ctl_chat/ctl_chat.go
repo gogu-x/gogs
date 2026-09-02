@@ -5,5 +5,5 @@ import (
 	"github.com/gogu-x/gogs/pb/pb_chat"
 )
 
-func ChatService(s *common.PlayerContext, req *pb_chat.ChatReq) {
+func ChatService(s *common.Context, req *pb_chat.ChatReq) {
 }

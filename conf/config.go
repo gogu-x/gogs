@@ -1,4 +1,4 @@
-package config
+package conf
 
 import (
 	"fmt"
@@ -58,6 +58,8 @@ var (
 
 	// JWTSecret JWT 签名密钥
 	JWTSecret = "changeme-secret"
+
+	LogPath = ""
 )
 
 // ConnectionFlags returns flags shared by all service entrypoints. Values passed
@@ -79,6 +81,7 @@ func ConnectionFlags() []cli.Flag {
 		&cli.StringFlag{Name: "platform-addr", Usage: "platform gRPC listen address"},
 		&cli.StringFlag{Name: "platform-grpc-addr", Usage: "platform gRPC connection address"},
 		&cli.StringFlag{Name: "platform-webhook-addr", Usage: "platform webhook listen address"},
+		&cli.StringFlag{Name: "log_path", Usage: "log path"},
 	}
 }
 
@@ -127,6 +130,9 @@ func LoadAndApply(c *cli.Command) error {
 	}
 	if c.IsSet("node-id") {
 		NodeId = c.Int("node-id")
+	}
+	if c.IsSet("log_path") {
+		LogPath = c.String("log_path")
 	}
 
 	return nil

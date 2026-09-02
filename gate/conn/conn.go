@@ -1,6 +1,8 @@
 package conn
 
 import (
+	"reflect"
+
 	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/pb/pb_gateway"
 	"github.com/gogu-x/tree"
@@ -29,25 +31,25 @@ const (
 	StateAuthed                   // 已登录
 )
 
-type middlewareFunc func(tree.Context, interface{}) bool
+type hookHandler func(tree.Context, interface{})
 
 type Conn struct {
-	conn        *websocket.Conn
-	uid         uint64
-	connID      uint64
-	serverID    uint32
-	nodeID      string
-	token       string
-	state       connState
-	middlewares []middlewareFunc
-	stream      pb_gateway.Gateway_StreamClient
-	grpcConn    *grpc.ClientConn
-	router      tree.Router
-	codec       codec.Codec
+	conn     *websocket.Conn
+	uid      uint64
+	connID   uint64
+	serverID uint32
+	nodeID   string
+	token    string
+	state    connState
+	hook     map[reflect.Type]hookHandler
+	stream   pb_gateway.Gateway_StreamClient
+	grpcConn *grpc.ClientConn
+	router   tree.Router
+	codec    codec.Codec
 }
 
 func New(connID uint64, c *websocket.Conn, cd codec.Codec) *Conn {
-	return &Conn{connID: connID, conn: c, codec: cd}
+	return &Conn{connID: connID, conn: c, codec: cd, hook: make(map[reflect.Type]hookHandler)}
 }
 
 func (c *Conn) Name() string { return constant.ConnName(c.connID) }
@@ -57,12 +59,8 @@ func (c *Conn) Name() string { return constant.ConnName(c.connID) }
 func (c *Conn) MailboxSize() int { return 64 }
 
 func (c *Conn) OnInit(ctx tree.Context) {
-	initRouter(c)
-	c.middlewares = []middlewareFunc{c.checkAuth}
-
-	if pid, ok := ctx.Lookup(constant.ActorGateServer); ok {
-		ctx.Send(pid, &pb_gateway.ConnRegMsg{ConnId: c.connID})
-	}
+	initHandler(c)
+	initHook(c)
 
 	self := ctx.Self()
 	go func() {

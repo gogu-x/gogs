@@ -1,13 +1,14 @@
-// Package mongo provides a common MongoDB Actor that serializes all database
+// Package mongorpc Package mongo provides a common MongoDB Actor that serializes all database
 // operations to prevent concurrency issues. Any process needing MongoDB should
 // Spawn one Actor and interact via messages.
-package mongo
+package mongorpc
 
 import (
 	"context"
 	"log"
 	"time"
 
+	"github.com/gogu-x/gogs/def"
 	actor "github.com/gogu-x/tree"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -135,7 +136,7 @@ func Connect(uri, username, password, dbName string) *mongo.Database {
 
 	client, err := mongo.Connect(clientOptions)
 	if err != nil {
-		log.Fatalf("rpc/mongo.Connect: %v", err)
+		def.DLog.Info("rpc/mongo.Connect: %v", err)
 	}
 	return client.Database(dbName)
 }

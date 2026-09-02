@@ -6,8 +6,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/constant"
+	"github.com/gogu-x/gogs/conf"
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/pb/pb_pf"
 	"github.com/gogu-x/gogs/platform/service"
 	"github.com/gogu-x/tree"
@@ -23,7 +23,7 @@ type Platform struct {
 
 func NewActor(db *mongo.Database) *Platform { return &Platform{db: db} }
 
-func (a *Platform) Name() string { return constant.PF }
+func (a *Platform) Name() string { return def.PF }
 
 func (a *Platform) OnInit(ctx tree.Context) {
 	if err := service.EnsureIndexes(a.db); err != nil {
@@ -37,9 +37,9 @@ func (a *Platform) OnInit(ctx tree.Context) {
 	a.router.Register(&pb_pf.CreateOrderReq{}, a.onCreateOrder)
 	a.router.Register(&pb_pf.QueryOrderReq{}, a.onQueryOrder)
 
-	lis, err := net.Listen("tcp", config.PlatformAddr)
+	lis, err := net.Listen("tcp", conf.PlatformAddr)
 	if err != nil {
-		log.Fatalf("GrpcActor: listen %s: %v", config.PlatformAddr, err)
+		log.Fatalf("GrpcActor: listen %s: %v", conf.PlatformAddr, err)
 	}
 	a.grpcServer = grpc.NewServer()
 	svc := &svcHandler{pid: ctx.Self()}
@@ -47,7 +47,7 @@ func (a *Platform) OnInit(ctx tree.Context) {
 	pb_pf.RegisterOrderServiceServer(a.grpcServer, svc)
 
 	go func() {
-		log.Printf("platform gRPC listening on %s", config.PlatformAddr)
+		log.Printf("platform gRPC listening on %s", conf.PlatformAddr)
 		if err := a.grpcServer.Serve(lis); err != nil {
 			log.Printf("GrpcActor: serve error: %v", err)
 		}

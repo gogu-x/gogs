@@ -4,15 +4,15 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/constant"
+	"github.com/gogu-x/gogs/conf"
+	"github.com/gogu-x/gogs/def"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
 	"github.com/gogu-x/tree"
 )
 
 type Actor struct{}
 
-func (a *Actor) Name() string { return constant.Web }
+func (a *Actor) Name() string { return def.Web }
 
 func (a *Actor) OnInit(_ tree.Context) {
 	mux := http.NewServeMux()
@@ -30,8 +30,8 @@ func (a *Actor) OnInit(_ tree.Context) {
 		w.WriteHeader(http.StatusOK)
 	})
 	go func() {
-		log.Printf("platform HTTP webhook on %s", config.PlatformWebhookAddr)
-		if err := http.ListenAndServe(config.PlatformWebhookAddr, mux); err != nil {
+		log.Printf("platform HTTP webhook on %s", conf.PlatformWebhookAddr)
+		if err := http.ListenAndServe(conf.PlatformWebhookAddr, mux); err != nil {
 			log.Printf("webhook: %v", err)
 		}
 	}()

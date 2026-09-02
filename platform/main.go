@@ -5,36 +5,36 @@ import (
 	"log"
 	"os"
 
+	"github.com/gogu-x/gogs/conf"
 	actor "github.com/gogu-x/tree"
 	"github.com/urfave/cli/v3"
 
-	"github.com/gogu-x/gogs/config"
 	natsclient "github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb/pbregister"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
 	"github.com/gogu-x/gogs/platform/webhook"
-	rpcmongo "github.com/gogu-x/gogs/rpc/mongo"
+	"github.com/gogu-x/gogs/rpc/mongorpc"
 )
 
 func main() {
 	cmd := &cli.Command{
 		Name:  "platform",
 		Usage: "platform server",
-		Flags: config.ConnectionFlags(),
+		Flags: conf.ConnectionFlags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			if err := config.LoadAndApply(c); err != nil {
+			if err := conf.LoadAndApply(c); err != nil {
 				return err
 			}
 
-			if err := natsclient.Init(config.NatsURL); err != nil {
+			if err := natsclient.Init(conf.NatsURL); err != nil {
 				log.Fatalf("NATS init: %v", err)
 			}
 			defer natsclient.Close()
 
-			db := rpcmongo.Connect(
-				config.MongoURL,
-				config.MongoUsername,
-				config.MongoPassword,
+			db := mongorpc.Connect(
+				conf.MongoURL,
+				conf.MongoUsername,
+				conf.MongoPassword,
 				"platform",
 			)
 

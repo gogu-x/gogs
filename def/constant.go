@@ -1,6 +1,4 @@
-package constant
-
-import "fmt"
+package def
 
 // Actor 名称常量，用于 ActorSystem Spawn/Lookup，避免魔法字符串
 const (
@@ -28,5 +26,3 @@ const (
 
 	Web = "Web"
 )
-
-func PlayerName(uid uint64) string { return fmt.Sprintf("player-%d", uid) }

@@ -1,7 +1,7 @@
 package nats
 
 import (
-	"github.com/gogu-x/gogs/constant"
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/natsrpc"
 )
 
@@ -11,8 +11,8 @@ import (
 func NewNats(serverID, nodeID uint32) *natsrpc.Actor {
 	return natsrpc.NewActor(natsrpc.ActorConfig{
 		Subs: []natsrpc.SubConfig{
-			natsrpc.Sub(natsrpc.GameSubject(serverID, nodeID), constant.PLAY, 1),
-			natsrpc.Sub(natsrpc.ActivitySubject(serverID, nodeID), constant.ActorActivity, 1),
+			natsrpc.Sub(natsrpc.GameSubject(serverID, nodeID), def.PLAY, 1),
+			natsrpc.Sub(natsrpc.ActivitySubject(serverID, nodeID), def.ActorActivity, 1),
 		},
 	})
 }

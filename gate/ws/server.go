@@ -7,8 +7,8 @@ import (
 
 	"github.com/gogu-x/gogs/gate/conn"
 	"github.com/gogu-x/gogs/gate/constant"
-	actor "github.com/gogu-x/tree"
-	codec2 "github.com/gogu-x/tree/codec"
+	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/codec"
 	"github.com/gogu-x/tree/comm"
 
 	"github.com/gorilla/websocket"
@@ -24,7 +24,7 @@ var upgrader = websocket.Upgrader{
 type Server struct {
 	addr    string
 	clients map[uint64]struct{}
-	router  actor.Router
+	router  tree.Router
 	idGen   *comm.IDGenerator
 }
 
@@ -40,7 +40,7 @@ func New(addr string, gateID int64) *Server {
 
 func (s *Server) Name() string { return constant.ActorGateServer }
 
-func (s *Server) OnInit(_ actor.Context) {
+func (s *Server) OnInit(_ tree.Context) {
 	initRouter(s)
 
 	mux := http.NewServeMux()
@@ -58,20 +58,20 @@ func (s *Server) OnInit(_ actor.Context) {
 	}()
 }
 
-func (s *Server) HandleMessage(ctx actor.Context, msg interface{}) {
+func (s *Server) HandleMessage(ctx tree.Context, msg interface{}) {
 	s.router.Route(ctx, msg)
 }
 
-func (s *Server) OnStop(_ actor.Context) {}
+func (s *Server) OnStop(_ tree.Context) {}
 
 func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
-	var cd codec2.Codec = codec2.ProtoCodec
+	var cd codec.Codec = codec.ProtoCodec
 	if c.Subprotocol() == "json" {
-		cd = codec2.JsonCodec
+		cd = codec.JsonCodec
 	}
-	actor.SpawnOne(conn.New(s.idGen.NextUint64(), c, cd))
+	tree.SpawnOne(conn.New(s.idGen.NextUint64(), c, cd))
 }

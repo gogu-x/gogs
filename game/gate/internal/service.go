@@ -2,17 +2,17 @@ package internal
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 
-	"github.com/gogu-x/gogs/config"
-	"github.com/gogu-x/gogs/constant"
-	gamemsg "github.com/gogu-x/gogs/game/message"
+	"github.com/gogu-x/gogs/conf"
+	"github.com/gogu-x/gogs/def"
+	"github.com/gogu-x/gogs/pb/ipb"
 	"github.com/gogu-x/gogs/pb/pb_auth"
 	"github.com/gogu-x/gogs/pb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/cluster"
+	"github.com/gogu-x/tree/codec"
 	"google.golang.org/grpc"
 )
 
@@ -32,41 +32,44 @@ func NewGateActor() *GateActor {
 	}
 }
 
-func (g *GateActor) Name() string { return constant.Gate }
+func (g *GateActor) Name() string { return def.Gate }
 
 func (g *GateActor) OnInit(ctx tree.Context) {
 	g.router.Register(&openSession{}, g.onOpenSession)
 	g.router.Register(&closeSession{}, g.onCloseSession)
-	g.router.Register(&PushToMsg{}, g.onPushToMsg)
-	g.router.Register(&BanUID{}, g.onBanUID)
-	g.router.Register(&UnbanUID{}, g.onUnbanUID)
 
-	lis, err := net.Listen("tcp", config.GameAddr())
+	//外部的消息
+	g.router.Register(&ipb.PushToMsg{}, g.onPushToMsg)
+	g.router.Register(&ipb.BanUID{}, g.onBanUID)
+	g.router.Register(&ipb.UnbanUID{}, g.onUnbanUID)
+
+	lis, err := net.Listen("tcp", conf.GameAddr())
 	if err != nil {
-		log.Fatalf("GateActor: listen error: %v", err)
+		def.DLog.Info("GateActor: listen error: %v", err)
 	}
 
 	g.grpcServer = grpc.NewServer()
 	pb_gateway.RegisterGatewayServer(g.grpcServer, &gatewayService{
 		actorPID: ctx.Self(),
 		system:   ctx.System(),
+		codec:    codec.ProtoCodec,
 	})
 
 	go func() {
-		log.Printf("GateActor: gRPC server listening on %s", config.GameAddr())
+		def.DLog.Info("GateActor: gRPC server listening on %v", conf.GameAddr())
 		if err := g.grpcServer.Serve(lis); err != nil {
-			log.Printf("GateActor: grpc serve error: %v", err)
+			def.DLog.Info("GateActor: grpc serve error: %v", err)
 		}
 	}()
 
 	if err := cluster.Register(
-		fmt.Sprintf("%d", config.ServerID),
+		fmt.Sprintf("%d", conf.ServerID),
 		fmt.Sprintf("%d", os.Getpid()),
-		config.GameAddr(),
+		conf.GameAddr(),
 	); err != nil {
-		log.Printf("GateActor: cluster register error: %v", err)
+		def.DLog.Info("GateActor: cluster register error: %v", err)
 	} else {
-		log.Printf("GateActor: registered [%d] -> %s", config.ServerID, config.GameAddr())
+		def.DLog.Info("GateActor: registered [%d] -> %s", conf.ServerID, conf.GameAddr())
 	}
 }
 
@@ -86,15 +89,12 @@ func (g *GateActor) OnStop(ctx tree.Context) {
 
 func (g *GateActor) onOpenSession(ctx tree.Context, msg interface{}) {
 	open := msg.(*openSession)
-	first, uid, err := decodeInboundFrame(open.frame)
-	if err != nil {
-		ctx.Response(nil, err)
+	firstMsg, ok := open.msg.(*pb_auth.LoginGameReq)
+	if !ok {
+		ctx.Response(nil, fmt.Errorf("first stream message must be LoginGameReq, got %T", firstMsg))
 		return
 	}
-	if _, ok := first.(*pb_auth.LoginGameReq); !ok {
-		ctx.Response(nil, fmt.Errorf("first stream message must be LoginGameReq, got %T", first))
-		return
-	}
+	uid := firstMsg.UID
 	if _, banned := g.bannedUIDs[uid]; banned {
 		ctx.Response(nil, fmt.Errorf("uid %d is banned", uid))
 		return
@@ -110,7 +110,7 @@ func (g *GateActor) onOpenSession(ctx tree.Context, msg interface{}) {
 	pid := ctx.System().SpawnOne(agent)
 	g.sessions[uid] = session{pid: pid, generation: generation, uid: uid}
 
-	ctx.Send(pid, &inboundFrame{frame: open.frame})
+	ctx.Send(pid, &inboundFrame{msg: open.msg})
 	ctx.Response(&openedSession{pid: pid, uid: uid, generation: generation}, nil)
 }
 
@@ -124,25 +124,25 @@ func (g *GateActor) onCloseSession(ctx tree.Context, msg interface{}) {
 	delete(g.sessions, closed.uid)
 	ctx.Send(current.pid, &stopAgent{})
 	g.notifySessionClosed(ctx, closed.uid)
-	log.Printf("GateActor: closed UID %d: %s", closed.uid, closed.reason)
+	def.DLog.Info("GateActor: closed UID %d: %s", closed.uid, closed.reason)
 }
 
 func (g *GateActor) onPushToMsg(ctx tree.Context, msg interface{}) {
-	push := msg.(*PushToMsg)
-	if push.Frame == nil {
+	push := msg.(*ipb.PushToMsg)
+	if push.Msg == nil {
 		return
 	}
 	current, ok := g.sessions[push.UID]
 	if !ok {
 		return
 	}
-	if !ctx.TrySend(current.pid, push.Frame) {
+	if !ctx.TrySend(current.pid, push) {
 		g.closeCurrent(ctx, push.UID, current, "outbound mailbox is full")
 	}
 }
 
 func (g *GateActor) onBanUID(ctx tree.Context, msg interface{}) {
-	uid := msg.(*BanUID).UID
+	uid := msg.(*ipb.BanUID).UID
 	if uid == 0 {
 		return
 	}
@@ -153,7 +153,7 @@ func (g *GateActor) onBanUID(ctx tree.Context, msg interface{}) {
 }
 
 func (g *GateActor) onUnbanUID(_ tree.Context, msg interface{}) {
-	delete(g.bannedUIDs, msg.(*UnbanUID).UID)
+	delete(g.bannedUIDs, msg.(*ipb.UnbanUID).UID)
 }
 
 func (g *GateActor) closeCurrent(
@@ -165,12 +165,12 @@ func (g *GateActor) closeCurrent(
 	delete(g.sessions, uid)
 	ctx.Send(current.pid, &stopAgent{})
 	g.notifySessionClosed(ctx, uid)
-	log.Printf("GateActor: closed UID %d: %s", uid, reason)
+	def.DLog.Info("GateActor: closed UID %d: %s", uid, reason)
 }
 
 func (g *GateActor) notifySessionClosed(ctx tree.Context, uid uint64) {
-	if playPID, ok := ctx.Lookup(constant.PLAY); ok {
-		ctx.Send(playPID, &gamemsg.SessionClosed{UID: uid})
+	if playPID, ok := ctx.Lookup(def.PLAY); ok {
+		ctx.Send(playPID, &ipb.SessionClosed{UID: uid})
 	}
 }
 

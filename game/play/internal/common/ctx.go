@@ -2,22 +2,20 @@
 package common
 
 import (
-	"log"
-
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/play/internal/module/player"
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/pb/ipb"
 	"github.com/gogu-x/tree"
-	"github.com/gogu-x/tree/codec"
 	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/timer"
 	"google.golang.org/protobuf/proto"
 )
 
 // PlayerHandler 处理来自 gate 的玩家请求，上下文携带玩家数据。
-type PlayerHandler func(*PlayerContext, interface{})
+type PlayerHandler func(*Context, interface{})
 
 // SysHandler 处理系统或登录消息。
-type SysHandler func(*PlayerContext, interface{})
+type SysHandler func(*Context, interface{})
 
 // Services 是 Play 持有的公共能力集合。
 type Services struct {
@@ -31,43 +29,56 @@ type PlayIface interface {
 	Services() *Services
 }
 
-// PlayerContext 是一次请求的上下文。
-type PlayerContext struct {
+// Context 是一次请求的上下文。
+type Context struct {
 	Play    PlayIface
 	TreeCtx tree.Context
 	Player  *player.Player
 }
 
-func (c *PlayerContext) Services() *Services         { return c.Play.Services() }
-func (c *PlayerContext) Players() *player.PlayerMgr  { return c.Services().Players }
-func (c *PlayerContext) Event() *comm.Event          { return c.Services().Event }
-func (c *PlayerContext) TimeWheel() *timer.TimeWheel { return c.Services().TimeWheel }
-func (c *PlayerContext) Tree() tree.Context          { return c.TreeCtx }
+func (c *Context) Services() *Services         { return c.Play.Services() }
+func (c *Context) Players() *player.PlayerMgr  { return c.Services().Players }
+func (c *Context) Event() *comm.Event          { return c.Services().Event }
+func (c *Context) TimeWheel() *timer.TimeWheel { return c.Services().TimeWheel }
+func (c *Context) Tree() tree.Context          { return c.TreeCtx }
 
-func (c *PlayerContext) Request(
-	pid tree.PID,
+// CastCall 投递一个带有回调的消息
+func (c *Context) CastCall(
+	a string,
 	msg interface{},
 	cb func(tree.Context, interface{}, error),
-) {
+) bool {
+	pid, ok := c.Tree().Lookup(a)
+	if !ok {
+		return false
+	}
 	c.TreeCtx.RequestCallback(pid, msg, cb)
+	return true
 }
 
-func (c *PlayerContext) Send(pid tree.PID, msg interface{}) bool {
+// CastPID 投递一个普通消息
+func (c *Context) CastPID(pid tree.PID, msg interface{}) bool {
 	return c.TreeCtx.Send(pid, msg)
 }
 
-func (c *PlayerContext) Response(value interface{}, err error) {
+// Cast 投递一个普通消息
+func (c *Context) Cast(a string, msg interface{}) bool {
+	pid, ok := c.Tree().Lookup(a)
+	if !ok {
+		return false
+	}
+	return c.TreeCtx.Send(pid, msg)
+}
+
+func (c *Context) Response(value interface{}, err error) {
 	c.TreeCtx.Response(value, err)
 }
 
-// Reply serializes a response and sends it back to the GsAgent that sent the request.
-func (c *PlayerContext) Reply(msg proto.Message) {
-	payload, err := codec.ProtoCodec.Marshal(msg)
-	if err != nil {
-		log.Printf("play: marshal reply %T: %v", msg, err)
+// CastPlayerIdMsg 给玩家投递消息 网关
+func (c *Context) CastPlayerIdMsg(uid uint64, msg proto.Message) {
+	p := c.Players().Get(uid)
+	if p == nil {
 		return
 	}
-	if !c.TreeCtx.Send(c.TreeCtx.Sender(), &pb_gateway.Frame{Payload: payload}) {
-		log.Printf("play: reply sender unavailable, message=%T", msg)
-	}
+	c.Cast(def.Gate, &ipb.PushToMsg{UID: p.UID, Msg: msg})
 }

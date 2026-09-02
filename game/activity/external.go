@@ -1,7 +1,7 @@
 package activity
 
 import (
-	"github.com/gogu-x/gogs/constant"
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/activity/internal"
 	"github.com/gogu-x/tree"
 )
@@ -17,7 +17,7 @@ func NewActivity() *Activity {
 	return &Activity{mgr: internal.NewMgr()}
 }
 
-func (a *Activity) Name() string { return constant.ActorActivity }
+func (a *Activity) Name() string { return def.ActorActivity }
 
 func (a *Activity) OnInit(c tree.Context) {
 	a.context = c

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gogu-x/gogs/constant"
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/tree"
 	"google.golang.org/protobuf/proto"
 )
@@ -13,9 +13,9 @@ import (
 // natsActorPID 返回本进程内 NatsActor 的 PID，Cast/Call 都通过它中转发送。
 // 各进程（gate/game/platform）启动时须以 constant.ActorNats 名字 Spawn 一个 natsrpc.Actor。
 func natsActorPID() (tree.PID, error) {
-	pid, ok := tree.Lookup(constant.Nats)
+	pid, ok := tree.Lookup(def.Nats)
 	if !ok {
-		return tree.PID{}, fmt.Errorf("natsrpc: NatsActor(%q) not spawned in this process", constant.Nats)
+		return tree.PID{}, fmt.Errorf("natsrpc: NatsActor(%q) not spawned in this process", def.Nats)
 	}
 	return pid, nil
 }
@@ -72,12 +72,6 @@ func CallSync(module, id, nodeID string, msg proto.Message, timeout time.Duratio
 		return nil, fmt.Errorf("natsrpc.CallSync: unmarshal reply: %w", err)
 	}
 	return respFrame, nil
-}
-
-// ReplyTo 响应端一行回复：将 respFrame 发回 reqFrame 携带的 reply inbox。
-func ReplyTo() error {
-
-	return nil
 }
 
 func sendOrErr(pid tree.PID, msg interface{}) error {

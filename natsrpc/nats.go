@@ -3,7 +3,7 @@ package natsrpc
 import (
 	"log"
 
-	"github.com/gogu-x/gogs/constant"
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gogu-x/tree/timer"
@@ -47,7 +47,7 @@ func (a *Actor) Name() string {
 	if a.cfg.Name != "" {
 		return a.cfg.Name
 	}
-	return constant.Nats
+	return def.Nats
 }
 
 func (a *Actor) OnInit(ctx tree.Context) {
@@ -55,7 +55,7 @@ func (a *Actor) OnInit(ctx tree.Context) {
 	a.timeWheel.Register(natsRequestTimeout, func(data interface{}) {
 		//requestID, ok := data.(string)
 		//if !ok {
-		//	log.Printf("natsrpc: invalid timeout timer data %T", data)
+		//	def.DLog.Info("natsrpc: invalid timeout timer data %T", data)
 		//	return
 		//}
 		//a.handleTimeout(requestID)
@@ -78,7 +78,7 @@ func (a *Actor) HandleMessage(ctx tree.Context, msg interface{}) {
 	//消息投递到nats
 	case *castMsg:
 		if err := publishTo(m.Module, m.ID, m.NodeId, m.Msg); err != nil {
-			log.Printf("natsrpc: cast [%s/%s/%s]: %v", m.Module, m.ID, m.NodeId, err)
+			def.DLog.Info("natsrpc: cast [%s/%s/%s]: %v", m.Module, m.ID, m.NodeId, err)
 		}
 	//带回调的消息
 	case *callMsg:
@@ -116,90 +116,20 @@ func (a *Actor) subscribe(self tree.PID, sub SubConfig) {
 		for m := range ch {
 			msg, err := a.codec.Unmarshal(m.Data)
 			if err != nil {
-				log.Printf("natsrpc: unmarshal frame: %v", err)
+				def.DLog.Info("natsrpc: unmarshal frame: %v", err)
 				continue
 			}
 			tree.Default().Send(self, msg)
 		}
 	}()
-	log.Printf("natsrpc: subscribed %s (%d workers)", sub.subject, workers)
+	def.DLog.Info("natsrpc: subscribed %s (%d workers)", sub.subject, workers)
 }
 
 // subscribeInbox 订阅本 NatsActor 私有回包 inbox（Call 模式的回复统一进这里）。
 func (a *Actor) subscribeInbox(self tree.PID) {
-	//inbox := natsgo.NewInbox() // _INBOX.<uid>
-	//ch := make(chan *natsgo.Msg, 128)
-	//s, err := nc.ChanSubscribe(inbox+".*", ch)
-	//if err != nil {
-	//	log.Fatalf("natsrpc: subscribe inbox %s: %v", inbox, err)
-	//}
-	//a.inboxBase = inbox
-	//a.inboxSub = s
-	//a.inboxCh = ch
-	//go func() {
-	//	for m := range ch {
-	//		var frame Frame
-	//		if err := proto.Unmarshal(m.Data, &frame); err != nil {
-	//			log.Printf("natsrpc: unmarshal reply frame: %v", err)
-	//			continue
-	//		}
-	//		tree.Send(self, &replyFrame{subject: m.Subject, frame: &frame})
-	//	}
-	//}()
+
 }
 
 // handleCall 在 NatsActor goroutine 内执行：生成 reply inbox subject，存 pending，发消息。
 func (a *Actor) handleCall(m *callMsg) {
-
-	//timeout := m.Timeout
-	//if timeout <= 0 {
-	//	timeout = 5 * time.Second
-	//}
-	//
-	//a.pendingMap[requestId] = &pending{callerPID: m.CallerPID, cb: m.Callback}
-	//
-	//// 回调已按 timerRequestTimeout 类型注册；每个任务只携带时间和 requestID。
-	//a.timeWheel.After(timerRequestTimeout, timeout, requestId)
-	//
-	//if err := publishTo(m.Module, m.ID, m.NodeId, m.Frame); err != nil {
-	//	delete(a.pendingMap, requestId)
-	//	sendFrameCallback(m.CallerPID, m.Callback, nil, err)
-	//}
 }
-
-//// handleReply 在 NatsActor goroutine 内执行：按接收 subject 查 pending，触发回调。
-//func (a *Actor) handleReply(subject string, frame *Frame) {
-//	p, ok := a.pendingMap[subject]
-//	if !ok {
-//		return
-//	}
-//	delete(a.pendingMap, subject)
-//	sendFrameCallback(p.callerPID, p.cb, frame, nil)
-//}
-//
-//// handleTimeout 在 NatsActor goroutine 内执行：超时回调。
-//func (a *Actor) handleTimeout(requestId string) {
-//	p, ok := a.pendingMap[requestId]
-//	if !ok {
-//		return // 已被 handleReply 处理，忽略
-//	}
-//	delete(a.pendingMap, requestId)
-//	sendFrameCallback(p.callerPID, p.cb, nil, fmt.Errorf("natsrpc: request timeout [%s]", requestId))
-//}
-//
-//func (a *Actor) subscribeShutdown(self tree.PID, sub SubConfig) {
-//	s, err := nc.Subscribe(sub.subject, func(_ *natsgo.Msg) {
-//		tree.Send(self, &shutdownMsg{})
-//	})
-//	if err != nil {
-//		log.Printf("natsrpc: subscribe %s: %v", sub.subject, err)
-//		return
-//	}
-//	a.subs = append(a.subs, s)
-//	log.Printf("natsrpc: subscribed %s", sub.subject)
-//}
-//
-//// sendFrameCallback 包装 actor.SendCallback，适配 func(*Frame, error) 签名。
-//func sendFrameCallback(pid tree.PID, cb func(*Frame, error), frame *Frame, err error) bool {
-//	return false
-//}

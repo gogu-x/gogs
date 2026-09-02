@@ -5,5 +5,5 @@ import (
 )
 
 func NewPlay() *internal.Play {
-	return internal.NewPlay()
+	return &internal.Play{}
 }

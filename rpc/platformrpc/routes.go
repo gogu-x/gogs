@@ -1,4 +1,4 @@
-package platform
+package platformrpc
 
 import "github.com/gogu-x/gogs/pb/pb_pf"
 

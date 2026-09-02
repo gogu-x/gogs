@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gogu-x/gogs/config"
+	"github.com/gogu-x/gogs/conf"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -20,12 +20,12 @@ func Sign(uid uint64) (string, error) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},
 	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString([]byte(config.JWTSecret))
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString([]byte(conf.JWTSecret))
 }
 
 func Verify(token string) (uint64, error) {
 	t, err := jwt.ParseWithClaims(token, &claims{}, func(*jwt.Token) (interface{}, error) {
-		return []byte(config.JWTSecret), nil
+		return []byte(conf.JWTSecret), nil
 	})
 	if err != nil {
 		return 0, err

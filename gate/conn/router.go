@@ -1,8 +1,9 @@
 package conn
 
 import (
-	"log"
+	"reflect"
 
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/pb/pb_common"
 	"github.com/gogu-x/gogs/pb/pb_gateway"
 	"github.com/gogu-x/tree"
@@ -10,10 +11,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func initRouter(c *Conn) {
+func initHandler(c *Conn) {
 	c.router.Register(&WsMsg{}, c.onWsMsg)
 	c.router.Register(&stopMsg{}, c.onStop)
 	c.router.Register(&streamClosed{}, c.onStreamClosed)
+
 	c.router.Register(&pb_gateway.Frame{}, c.onFrame)
 	c.router.Register(&pb_gateway.BroadcastMsg{}, c.onBroadcast)
 	c.router.Register(&pb_gateway.LoginReq{}, c.onLogin)
@@ -24,13 +26,22 @@ func initRouter(c *Conn) {
 func (c *Conn) onWsMsg(ctx tree.Context, msg interface{}) {
 	inner, err := c.codec.Unmarshal(msg.(*WsMsg).Data)
 	if err != nil {
-		log.Printf("ConnActor[%d]: unmarshal error: %v", c.connID, err)
+		def.DLog.Info("ConnActor[%d]: unmarshal error: %v", c.connID, err)
 		return
 	}
-	for _, mw := range c.middlewares {
-		if !mw(ctx, inner) {
-			return
-		}
+	msgType := reflect.TypeOf(inner)
+	if hookHandler, ok := c.hook[msgType]; ok {
+		hookHandler(ctx, inner)
+		return
+	}
+
+	if c.state == StateLoggIng {
+		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_ERR_LOGIN_IN_PROGRESS, Msg: "login in progress"})
+		return
+	}
+	if c.state != StateAuthed {
+		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_ERR_UNAUTHORIZED, Msg: "unauthorized"})
+		return
 	}
 	c.router.SetFallback(func(ctx tree.Context, _ interface{}) {
 		c.sendGameSteam(ctx, inner)
@@ -45,23 +56,18 @@ func (c *Conn) onFrame(ctx tree.Context, msg interface{}) {
 	}
 	inner, err := codec.ProtoCodec.Unmarshal(frame.GetPayload())
 	if err != nil {
-		log.Printf("ConnActor[%d]: decode game payload: %v", c.connID, err)
+		def.DLog.Info("ConnActor[%d]: decode game payload: %v", c.connID, err)
 		return
 	}
-	if ack, ok := inner.(*pb_gateway.LoginAck); ok {
-		if ack.GetCode() == pb_common.ErrCode_OK {
-			c.state = StateAuthed
-		} else {
-			c.state = StateAnon
-		}
-	}
-	data, err := c.codec.Marshal(inner)
-	if err != nil {
-		log.Printf("ConnActor[%d]: encode websocket reply: %v", c.connID, err)
+	msgType := reflect.TypeOf(inner)
+	if hookHandler, ok := c.hook[msgType]; ok {
+		hookHandler(ctx, inner)
 		return
 	}
-	if err := c.conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
-		log.Printf("ConnActor[%d]: ws write error: %v", c.connID, err)
+
+	//写入ws消息流
+	if err := c.conn.WriteMessage(websocket.BinaryMessage, frame.GetPayload()); err != nil {
+		def.DLog.Info("ConnActor[%d]: ws write error: %v", c.connID, err)
 		ctx.Stop()
 	}
 }
@@ -76,7 +82,7 @@ func (c *Conn) onStop(ctx tree.Context, _ interface{}) {
 
 func (c *Conn) onStreamClosed(ctx tree.Context, msg interface{}) {
 	if err := msg.(*streamClosed).err; err != nil {
-		log.Printf("ConnActor[%d]: game stream closed: %v", c.connID, err)
+		def.DLog.Info("ConnActor[%d]: game stream closed: %v", c.connID, err)
 	}
 	ctx.Stop()
 }
