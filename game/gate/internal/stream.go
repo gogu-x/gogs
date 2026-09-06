@@ -2,13 +2,13 @@ package internal
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"time"
 
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
+	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -35,7 +35,7 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(fmt.Sprintf("msg= %v", msg))
+	tlog.Log.Info("gateStream GateActor: receive msg: %s", msg)
 
 	result, err := s.system.Request(
 		s.actorPID,
@@ -72,7 +72,7 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(fmt.Sprintf("msg= %v", msg))
+		tlog.Log.Info("gateStream GateActor: receive msg: %v", msg)
 		if !s.system.TrySend(opened.pid, &inboundFrame{msg: msg}) {
 			return status.Error(codes.ResourceExhausted, "gateway connection is overloaded")
 		}

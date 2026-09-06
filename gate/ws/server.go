@@ -40,7 +40,7 @@ func New(addr string, gateID int64) *Server {
 
 func (s *Server) Name() string { return constant.ActorGateServer }
 
-func (s *Server) OnInit(_ tree.Context) {
+func (s *Server) OnInit(ctx tree.Context) {
 	initRouter(s)
 
 	mux := http.NewServeMux()

@@ -8,8 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
-	"github.com/gogu-x/gogs/pb/pb_common"
-	"github.com/gogu-x/gogs/pb/pb_pf"
+	"github.com/gogu-x/gogs/pb/pfpb/pb_pf"
 	"github.com/gogu-x/gogs/platform/store"
 )
 
@@ -23,9 +22,9 @@ func CreateOrder(db *mongo.Database, req *pb_pf.CreateOrderReq) (*pb_pf.OrderAck
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 	if _, err := db.Collection(store.ColOrders).InsertOne(ctx, o); err != nil {
-		return &pb_pf.OrderAck{Code: pb_common.ErrCode_ERR_INTERNAL, Msg: err.Error()}, nil
+		return &pb_pf.OrderAck{Code: pb_pf.ErrCode_INTERNAL, Msg: err.Error()}, nil
 	}
-	return &pb_pf.OrderAck{Code: pb_common.ErrCode_OK, OrderId: orderID}, nil
+	return &pb_pf.OrderAck{Code: pb_pf.ErrCode_OK, OrderId: orderID}, nil
 }
 
 func QueryOrder(db *mongo.Database, req *pb_pf.QueryOrderReq) (*pb_pf.OrderDetail, error) {

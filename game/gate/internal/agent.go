@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/pb/ipb"
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/ipb"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
 )

@@ -2,7 +2,7 @@ package ws
 
 import (
 	"github.com/gogu-x/gogs/gate/constant"
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
 )
 

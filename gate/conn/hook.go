@@ -3,8 +3,8 @@ package conn
 import (
 	"reflect"
 
-	"github.com/gogu-x/gogs/pb/pb_auth"
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/pb/cspb/pb_auth"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"google.golang.org/protobuf/proto"
 )
 

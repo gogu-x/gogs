@@ -1,22 +1,22 @@
 package ctl_activity
 
 import (
-	"github.com/gogu-x/gogs/game/play/internal/common"
-	"github.com/gogu-x/gogs/pb/pb_activity"
+	"github.com/gogu-x/gogs/game/play/internal/context"
+	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 )
 
-func GetActivityList(s *common.Context, req *pb_activity.GetActivityListReq) {
+func GetActivityList(s *context.Context, req *pb_activity.GetActivityListReq) {
 
 }
 
-func JoinActivity(s *common.Context, req *pb_activity.JoinActivityReq) {
+func JoinActivity(s *context.Context, req *pb_activity.JoinActivityReq) {
 
 }
 
-func GetProgress(s *common.Context, req *pb_activity.GetProgressReq) {
+func GetProgress(s *context.Context, req *pb_activity.GetProgressReq) {
 
 }
 
-func ClaimReward(s *common.Context, req *pb_activity.ClaimRewardReq) {
+func ClaimReward(s *context.Context, req *pb_activity.ClaimRewardReq) {
 
 }

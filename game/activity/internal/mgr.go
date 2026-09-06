@@ -1,8 +1,8 @@
 package internal
 
 import (
-	"github.com/gogu-x/gogs/pb/pb_activity"
-	"github.com/gogu-x/gogs/pb/pb_common"
+	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/tree"
 )
 
@@ -63,12 +63,12 @@ func (s *Mgr) Join(ctx tree.Context, req *pb_activity.JoinActivityReq) {
 	defer ctx.Response(ack, nil)
 	act, ok := s.activities[req.ActivityId]
 	if !ok || act.Status != pb_activity.ActivityStatus_ONGOING {
-		ack.Code = pb_common.ErrCode_ERR_UNKNOWN
+		ack.Code = pb_common.ErrCode_UNKNOWN
 		ack.Msg = "activity not available"
 		return
 	}
 	if _, exists := s.getProgress(req.GetUID(), req.ActivityId); exists {
-		ack.Code = pb_common.ErrCode_ERR_ALREADY_IN_GUILD
+		ack.Code = pb_common.ErrCode_ALREADY_IN_GUILD
 		ack.Msg = "already joined"
 		return
 	}
@@ -76,7 +76,7 @@ func (s *Mgr) Join(ctx tree.Context, req *pb_activity.JoinActivityReq) {
 }
 
 func (s *Mgr) GetProgress(ctx tree.Context, req *pb_activity.GetProgressReq) {
-	ack := &pb_activity.GetProgressAck{Code: pb_common.ErrCode_ERR_UNKNOWN}
+	ack := &pb_activity.GetProgressAck{Code: pb_common.ErrCode_UNKNOWN}
 	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.GetUID(), req.ActivityId)
 	if !ok {
@@ -91,17 +91,17 @@ func (s *Mgr) ClaimReward(ctx tree.Context, req *pb_activity.ClaimRewardReq) {
 	defer ctx.Response(ack, nil)
 	p, ok := s.getProgress(req.GetUID(), req.ActivityId)
 	if !ok {
-		ack.Code = pb_common.ErrCode_ERR_UNKNOWN
+		ack.Code = pb_common.ErrCode_UNKNOWN
 		ack.Msg = "not joined"
 		return
 	}
 	if p.Rewarded {
-		ack.Code = pb_common.ErrCode_ERR_UNKNOWN
+		ack.Code = pb_common.ErrCode_UNKNOWN
 		ack.Msg = "already claimed"
 		return
 	}
 	if p.Progress < p.Target {
-		ack.Code = pb_common.ErrCode_ERR_UNKNOWN
+		ack.Code = pb_common.ErrCode_UNKNOWN
 		ack.Msg = "not completed"
 		return
 	}

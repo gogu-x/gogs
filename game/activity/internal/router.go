@@ -2,7 +2,7 @@ package internal
 
 import (
 	"github.com/gogu-x/gogs/game/util"
-	"github.com/gogu-x/gogs/pb/pb_activity"
+	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	"github.com/gogu-x/tree"
 )
 

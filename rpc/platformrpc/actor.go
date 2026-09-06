@@ -9,6 +9,7 @@ import (
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -18,32 +19,32 @@ type route struct {
 	newResp func() any
 }
 
-type Actor struct {
+type PfRpc struct {
 	conn   *grpc.ClientConn
 	routes map[reflect.Type]route
 }
 
-func NewActor() *Actor { return &Actor{routes: make(map[reflect.Type]route)} }
+func NewActor() *PfRpc { return &PfRpc{routes: make(map[reflect.Type]route)} }
 
-func (a *Actor) Name() string { return def.PF }
+func (a *PfRpc) Name() string { return def.PF }
 
-func (a *Actor) register(req any, method string, newResp func() any) {
+func (a *PfRpc) register(req any, method string, newResp func() any) {
 	a.routes[reflect.TypeOf(req)] = route{method, newResp}
 }
 
-func (a *Actor) OnInit(_ tree.Context) {
+func (a *PfRpc) OnInit(_ tree.Context) {
 	conn, err := grpc.NewClient(conf.PlatformGrpcAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		def.DLog.Info("rpc/platform: dial %s: %v", conf.PlatformGrpcAddr, err)
+		tlog.Log.Info("rpc/platform: dial %s: %v", conf.PlatformGrpcAddr, err)
 	}
 	a.conn = conn
 	registerRoutes(a)
-	def.DLog.Info("rpc/platform: connected to %s", conf.PlatformGrpcAddr)
+	tlog.Log.Info("rpc/platform: connected to %s", conf.PlatformGrpcAddr)
 }
 
-func (a *Actor) HandleMessage(ctx tree.Context, msg any) {
+func (a *PfRpc) HandleMessage(ctx tree.Context, msg any) {
 	r, ok := a.routes[reflect.TypeOf(msg)]
 	if !ok {
 		ctx.Response(nil, fmt.Errorf("rpc/platform: no route for %T", msg))
@@ -63,7 +64,7 @@ func (a *Actor) HandleMessage(ctx tree.Context, msg any) {
 	}()
 }
 
-func (a *Actor) OnStop(_ tree.Context) {
+func (a *PfRpc) OnStop(_ tree.Context) {
 	if a.conn != nil {
 		a.conn.Close()
 	}

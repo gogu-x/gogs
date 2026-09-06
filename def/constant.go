@@ -19,10 +19,10 @@ const (
 	Guild = "Guild"
 
 	// ActorActivity 活动 Actor，全局唯一，管理所有活动及玩家进度
-	ActorActivity = "Activity"
+	ActorActivity = "ACTIVITY"
 
-	// Gate 旧 gRPC 网关 Actor，新架构已由 NATS 替代，保留供旧代码引用
-	Gate = "Gate"
+	// GameGate 旧 gRPC 网关 Actor，新架构已由 NATS 替代，保留供旧代码引用
+	GameGate = "GAMEGATE"
 
 	Web = "Web"
 )

@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"github.com/gogu-x/gogs/game/play/internal/common"
+	"github.com/gogu-x/gogs/game/play/internal/context"
 	"github.com/gogu-x/tree"
 )
 
@@ -13,7 +13,7 @@ type uidRequest interface {
 func RegisterPlayer[Req any](
 	py *Play,
 	prototype Req,
-	h func(*common.Context, Req),
+	h func(*context.Context, Req),
 ) {
 	py.router.Register(prototype, func(ctx tree.Context, msg interface{}) {
 		request, ok := msg.(uidRequest)
@@ -24,10 +24,9 @@ func RegisterPlayer[Req any](
 		if p == nil {
 			return
 		}
-		h(&common.Context{
-			Play:    py,
-			TreeCtx: ctx,
-			Player:  p,
+		h(&context.Context{
+			Play: py,
+			Req:  msg,
 		}, msg.(Req))
 	})
 }
@@ -36,12 +35,12 @@ func RegisterPlayer[Req any](
 func RegisterSys[Msg any](
 	py *Play,
 	prototype Msg,
-	h func(*common.Context, Msg),
+	h func(*context.Context, Msg),
 ) {
 	py.router.Register(prototype, func(ctx tree.Context, msg interface{}) {
-		h(&common.Context{
-			Play:    py,
-			TreeCtx: ctx,
+		h(&context.Context{
+			Play: py,
+			Req:  msg,
 		}, msg.(Msg))
 	})
 }

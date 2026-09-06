@@ -63,7 +63,10 @@ func (mgr *PlayerMgr) Loader() {
 func (mgr *PlayerMgr) Save() {
 }
 
-// OnSaveTimer 适配 TimeWheel Handler；回调在 Play Actor goroutine 内执行。
-func (mgr *PlayerMgr) OnSaveTimer(_ interface{}) {
-	mgr.Save()
+func (mgr *PlayerMgr) TableName() string {
+	return "player"
+}
+
+func (mgr *PlayerMgr) OnTimer() int64 {
+	return 1000
 }

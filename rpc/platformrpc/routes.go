@@ -1,11 +1,9 @@
 package platformrpc
 
-import "github.com/gogu-x/gogs/pb/pb_pf"
+import "github.com/gogu-x/gogs/pb/pfpb/pb_pf"
 
-func registerRoutes(a *Actor) {
-	a.register(&pb_pf.RegisterReq{},
-		pb_pf.AuthService_Register_FullMethodName,
-		func() any { return &pb_pf.AuthAck{} })
+func registerRoutes(a *PfRpc) {
+	a.register(&pb_pf.RegisterReq{}, pb_pf.AuthService_Register_FullMethodName, func() any { return &pb_pf.AuthAck{} })
 
 	a.register(&pb_pf.AuthLoginReq{},
 		pb_pf.AuthService_Login_FullMethodName,

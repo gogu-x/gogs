@@ -8,8 +8,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/gogu-x/gogs/def"
 	actor "github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/tlog"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
@@ -136,7 +136,7 @@ func Connect(uri, username, password, dbName string) *mongo.Database {
 
 	client, err := mongo.Connect(clientOptions)
 	if err != nil {
-		def.DLog.Info("rpc/mongo.Connect: %v", err)
+		tlog.Log.Info("rpc/mongo.Connect: %v", err)
 	}
 	return client.Database(dbName)
 }

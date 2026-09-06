@@ -153,7 +153,3 @@ func GateAddr() string {
 func GameAddr() string {
 	return fmt.Sprintf("%s:%d", GrpcHost, GameBasePort+ServerID)
 }
-
-func GrpcAddrFor(serverID int) string {
-	return fmt.Sprintf("%s:%d", GrpcHost, GameBasePort+serverID)
-}

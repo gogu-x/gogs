@@ -5,7 +5,7 @@ import (
 
 	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/pb/pb_pf"
+	"github.com/gogu-x/gogs/pb/pfpb/pb_pf"
 	"github.com/gogu-x/gogs/platform/service"
 	"github.com/gogu-x/tree"
 )

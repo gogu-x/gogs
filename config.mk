@@ -1,4 +1,4 @@
-PROTO_PATH := protocol
+PROTO_PATH := D:\gosrc\g1\protocol
 GO_OUT     := .
 MODULE     := github.com/gogu-x/gogs
 PYTHON     := python

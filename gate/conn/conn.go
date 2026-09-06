@@ -4,7 +4,7 @@ import (
 	"reflect"
 
 	"github.com/gogu-x/gogs/gate/constant"
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gorilla/websocket"

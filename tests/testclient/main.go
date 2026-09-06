@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gogu-x/gogs/pb/pb_chat"
-	"github.com/gogu-x/gogs/pb/pb_gateway"
-	_ "github.com/gogu-x/gogs/pb/pbregister"
+	_ "github.com/gogu-x/gogs/pb"
+	"github.com/gogu-x/gogs/pb/cspb/pb_chat"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"

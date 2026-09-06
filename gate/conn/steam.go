@@ -6,7 +6,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/cluster"
 	"google.golang.org/grpc"

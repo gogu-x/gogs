@@ -1,7 +1,7 @@
 package grpc
 
 import (
-	"github.com/gogu-x/gogs/pb/pb_pf"
+	"github.com/gogu-x/gogs/pb/pfpb/pb_pf"
 	"github.com/gogu-x/gogs/platform/service"
 	"github.com/gogu-x/tree"
 )

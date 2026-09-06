@@ -4,9 +4,9 @@ import (
 	"log"
 
 	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/game/play/internal/common"
+	"github.com/gogu-x/gogs/game/play/internal/context"
 	"github.com/gogu-x/gogs/game/play/internal/module/player"
-	"github.com/gogu-x/gogs/pb/ipb"
+	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/timer"
@@ -30,7 +30,8 @@ func (py *Play) OnInit(ctx tree.Context) {
 	InitTimers(py)
 	InitEvent(py)
 	InitRoutes(py)
-	py.router.Register(&ipb.SessionClosed{}, py.onSessionClosed)
+	//服务器启动
+	py.Event().Emit(context.ServerStart, comm.NewArg())
 }
 
 func (py *Play) HandleMessage(ctx tree.Context, msg interface{}) {
@@ -47,11 +48,12 @@ func (py *Play) Event() *comm.Event { return py.event }
 
 func (py *Play) TreeCtx() tree.Context { return py.ctx }
 
-func (py *Play) Services() *common.Services {
-	return &common.Services{
+func (py *Play) Services() *context.Services {
+	return &context.Services{
 		Players:   py.PlayerMgr,
 		Event:     py.event,
 		TimeWheel: py.timeWheel,
+		TreeCtx:   py.ctx,
 	}
 }
 

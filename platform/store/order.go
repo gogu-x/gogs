@@ -5,7 +5,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
-	"github.com/gogu-x/gogs/pb/pb_pf"
+	"github.com/gogu-x/gogs/pb/pfpb/pb_pf"
 )
 
 type Order struct {

@@ -3,11 +3,11 @@ package conn
 import (
 	"reflect"
 
-	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/pb/pb_common"
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
+	"github.com/gogu-x/tree/tlog"
 	"github.com/gorilla/websocket"
 )
 
@@ -26,7 +26,7 @@ func initHandler(c *Conn) {
 func (c *Conn) onWsMsg(ctx tree.Context, msg interface{}) {
 	inner, err := c.codec.Unmarshal(msg.(*WsMsg).Data)
 	if err != nil {
-		def.DLog.Info("ConnActor[%d]: unmarshal error: %v", c.connID, err)
+		tlog.Log.Info("ConnActor[%d]: unmarshal error: %v", c.connID, err)
 		return
 	}
 	msgType := reflect.TypeOf(inner)
@@ -36,11 +36,11 @@ func (c *Conn) onWsMsg(ctx tree.Context, msg interface{}) {
 	}
 
 	if c.state == StateLoggIng {
-		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_ERR_LOGIN_IN_PROGRESS, Msg: "login in progress"})
+		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_LOGIN_IN_PROGRESS, Msg: "login in progress"})
 		return
 	}
 	if c.state != StateAuthed {
-		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_ERR_UNAUTHORIZED, Msg: "unauthorized"})
+		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_UNAUTHORIZED, Msg: "unauthorized"})
 		return
 	}
 	c.router.SetFallback(func(ctx tree.Context, _ interface{}) {
@@ -56,7 +56,7 @@ func (c *Conn) onFrame(ctx tree.Context, msg interface{}) {
 	}
 	inner, err := codec.ProtoCodec.Unmarshal(frame.GetPayload())
 	if err != nil {
-		def.DLog.Info("ConnActor[%d]: decode game payload: %v", c.connID, err)
+		tlog.Log.Info("ConnActor[%d]: decode game payload: %v", c.connID, err)
 		return
 	}
 	msgType := reflect.TypeOf(inner)
@@ -67,7 +67,7 @@ func (c *Conn) onFrame(ctx tree.Context, msg interface{}) {
 
 	//写入ws消息流
 	if err := c.conn.WriteMessage(websocket.BinaryMessage, frame.GetPayload()); err != nil {
-		def.DLog.Info("ConnActor[%d]: ws write error: %v", c.connID, err)
+		tlog.Log.Info("ConnActor[%d]: ws write error: %v", c.connID, err)
 		ctx.Stop()
 	}
 }
@@ -82,7 +82,7 @@ func (c *Conn) onStop(ctx tree.Context, _ interface{}) {
 
 func (c *Conn) onStreamClosed(ctx tree.Context, msg interface{}) {
 	if err := msg.(*streamClosed).err; err != nil {
-		def.DLog.Info("ConnActor[%d]: game stream closed: %v", c.connID, err)
+		tlog.Log.Info("ConnActor[%d]: game stream closed: %v", c.connID, err)
 	}
 	ctx.Stop()
 }

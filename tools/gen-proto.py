@@ -24,7 +24,7 @@ REQ_HEADER_END = 4  # 业务字段从此号开始
 # 不注入公共头的模块目录：
 #   - gateway：传输层消息，元数据已由 Frame 携带；
 #   - platform：服务间 gRPC RPC（如 CreateOrderReq 已自带 uid 字段）。
-EXCLUDE_MODULES = {"gateway", "platform"}
+EXCLUDE_MODULES = {"sspb", "pfpb"}
 
 
 def _transform_req_block(body, name):

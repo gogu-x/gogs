@@ -7,12 +7,13 @@ import (
 
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/pb/ipb"
-	"github.com/gogu-x/gogs/pb/pb_auth"
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/ipb"
+	"github.com/gogu-x/gogs/pb/cspb/pb_auth"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/cluster"
 	"github.com/gogu-x/tree/codec"
+	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/grpc"
 )
 
@@ -32,7 +33,7 @@ func NewGateActor() *GateActor {
 	}
 }
 
-func (g *GateActor) Name() string { return def.Gate }
+func (g *GateActor) Name() string { return def.GameGate }
 
 func (g *GateActor) OnInit(ctx tree.Context) {
 	g.router.Register(&openSession{}, g.onOpenSession)
@@ -45,7 +46,7 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 
 	lis, err := net.Listen("tcp", conf.GameAddr())
 	if err != nil {
-		def.DLog.Info("GateActor: listen error: %v", err)
+		tlog.Log.Info("GateActor: listen error: %v", err)
 	}
 
 	g.grpcServer = grpc.NewServer()
@@ -56,9 +57,9 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 	})
 
 	go func() {
-		def.DLog.Info("GateActor: gRPC server listening on %v", conf.GameAddr())
+		tlog.Log.Info("GateActor: gRPC server listening on %v", conf.GameAddr())
 		if err := g.grpcServer.Serve(lis); err != nil {
-			def.DLog.Info("GateActor: grpc serve error: %v", err)
+			tlog.Log.Info("GateActor: grpc serve error: %v", err)
 		}
 	}()
 
@@ -67,9 +68,9 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 		fmt.Sprintf("%d", os.Getpid()),
 		conf.GameAddr(),
 	); err != nil {
-		def.DLog.Info("GateActor: cluster register error: %v", err)
+		tlog.Log.Info("GateActor: cluster register error: %v", err)
 	} else {
-		def.DLog.Info("GateActor: registered [%d] -> %s", conf.ServerID, conf.GameAddr())
+		tlog.Log.Info("GateActor: registered [%d] -> %s", conf.ServerID, conf.GameAddr())
 	}
 }
 
@@ -124,7 +125,7 @@ func (g *GateActor) onCloseSession(ctx tree.Context, msg interface{}) {
 	delete(g.sessions, closed.uid)
 	ctx.Send(current.pid, &stopAgent{})
 	g.notifySessionClosed(ctx, closed.uid)
-	def.DLog.Info("GateActor: closed UID %d: %s", closed.uid, closed.reason)
+	tlog.Log.Info("GateActor: closed UID %d: %s", closed.uid, closed.reason)
 }
 
 func (g *GateActor) onPushToMsg(ctx tree.Context, msg interface{}) {
@@ -165,7 +166,7 @@ func (g *GateActor) closeCurrent(
 	delete(g.sessions, uid)
 	ctx.Send(current.pid, &stopAgent{})
 	g.notifySessionClosed(ctx, uid)
-	def.DLog.Info("GateActor: closed UID %d: %s", uid, reason)
+	tlog.Log.Info("GateActor: closed UID %d: %s", uid, reason)
 }
 
 func (g *GateActor) notifySessionClosed(ctx tree.Context, uid uint64) {

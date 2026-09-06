@@ -1,7 +1,7 @@
 package registry
 
 import (
-	"github.com/gogu-x/gogs/pb/pb_gateway"
+	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	actor "github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/cluster"
 )

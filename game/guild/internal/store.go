@@ -3,8 +3,8 @@ package internal
 import (
 	"sync/atomic"
 
-	"github.com/gogu-x/gogs/pb/pb_common"
-	"github.com/gogu-x/gogs/pb/pb_guild"
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
+	"github.com/gogu-x/gogs/pb/cspb/pb_guild"
 	"github.com/gogu-x/tree"
 )
 
@@ -67,7 +67,7 @@ func (s *Store) Join(ctx tree.Context, req *pb_guild.JoinGuildReq) {
 	uid := req.GetUID()
 	g, ok := s.guilds[req.GuildId]
 	if !ok {
-		ack.Code = pb_common.ErrCode_ERR_GUILD_NOT_FOUND
+		ack.Code = pb_common.ErrCode_GUILD_NOT_FOUND
 		return
 	}
 	g.Members[uid] = &Member{UID: uid, Name: req.GetMemberName(), Level: req.GetMemberLevel(), Role: pb_guild.GuildRole_MEMBER}
@@ -80,7 +80,7 @@ func (s *Store) Get(ctx tree.Context, req *pb_guild.GetGuildReq) {
 	defer ctx.Response(ack, nil)
 	g, ok := s.guilds[req.GuildId]
 	if !ok {
-		ack.Code = pb_common.ErrCode_ERR_GUILD_NOT_FOUND
+		ack.Code = pb_common.ErrCode_GUILD_NOT_FOUND
 		return
 	}
 	ack.Guild = g.ToProto()

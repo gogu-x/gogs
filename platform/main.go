@@ -6,11 +6,12 @@ import (
 	"os"
 
 	"github.com/gogu-x/gogs/conf"
-	actor "github.com/gogu-x/tree"
+	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/tlog"
 	"github.com/urfave/cli/v3"
 
-	natsclient "github.com/gogu-x/gogs/natsrpc"
-	_ "github.com/gogu-x/gogs/pb/pbregister"
+	"github.com/gogu-x/gogs/natsrpc"
+	_ "github.com/gogu-x/gogs/pb"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
 	"github.com/gogu-x/gogs/platform/webhook"
 	"github.com/gogu-x/gogs/rpc/mongorpc"
@@ -26,10 +27,7 @@ func main() {
 				return err
 			}
 
-			if err := natsclient.Init(conf.NatsURL); err != nil {
-				log.Fatalf("NATS init: %v", err)
-			}
-			defer natsclient.Close()
+			tlog.NewLog(conf.LogPath, 0)
 
 			db := mongorpc.Connect(
 				conf.MongoURL,
@@ -38,13 +36,13 @@ func main() {
 				"platform",
 			)
 
-			actor.Spawn(
-				natsclient.NewActor(natsclient.ActorConfig{}),
+			tree.Spawn(
 				platformgrpc.NewActor(db),
 				&webhook.Actor{},
+				natsrpc.NewNats(natsrpc.PF, conf.ServerID, conf.NodeId, conf.NatsURL),
 			)
 
-			actor.Default().Start()
+			tree.Default().Start()
 			return nil
 		},
 	}

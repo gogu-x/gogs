@@ -10,13 +10,12 @@ import (
 	"github.com/gogu-x/gogs/game/activity"
 	"github.com/gogu-x/gogs/game/gate"
 	"github.com/gogu-x/gogs/game/guild"
-	gamenats "github.com/gogu-x/gogs/game/nats"
 	"github.com/gogu-x/gogs/game/play"
-	natsclient "github.com/gogu-x/gogs/natsrpc"
-	_ "github.com/gogu-x/gogs/pb/pbregister"
+	"github.com/gogu-x/gogs/natsrpc"
+	_ "github.com/gogu-x/gogs/pb"
 	"github.com/gogu-x/gogs/rpc/mongorpc"
 	cluster2 "github.com/gogu-x/tree/cluster"
-	"github.com/gogu-x/tree/log"
+	"github.com/gogu-x/tree/tlog"
 
 	"github.com/gogu-x/tree"
 	"github.com/urfave/cli/v3"
@@ -31,24 +30,19 @@ func main() {
 			if err := conf.LoadAndApply(c); err != nil {
 				return err
 			}
-			def.NewLog(conf.LogPath, 0)
+			tlog.NewLog(conf.LogPath, 0)
 
 			if err := cluster2.Init(conf.EtcdEndpoints); err != nil {
-				log.Fatal("cluster init error: " + err.Error())
+				tlog.Log.Error("cluster init error: %v", err)
 			}
 			defer cluster2.Close()
-
-			if err := natsclient.Init(conf.NatsURL); err != nil {
-				log.Fatal("NATS init error: " + err.Error())
-			}
-			defer natsclient.Close()
 
 			serverID := fmt.Sprintf("%d", conf.ServerID)
 			NodeID := fmt.Sprintf("%d", conf.NodeId)
 			addr := conf.GameAddr()
 
 			if err := cluster2.Register(serverID, NodeID, addr); err != nil {
-				log.Fatal("cluster register error: " + err.Error())
+				tlog.Log.Error("cluster register error: %v", err)
 			}
 			fmt.Printf("game server [%s] inst=%s registered at %s\n", serverID, NodeID, addr)
 
@@ -65,7 +59,7 @@ func main() {
 				guild.NewGuild(),
 				activity.NewActivity(),
 				mongorpc.NewActor(def.Mongo, db),
-				gamenats.NewNats(uint32(conf.ServerID), uint32(conf.NodeId)),
+				natsrpc.NewNats(natsrpc.Game, conf.ServerID, conf.NodeId, conf.NatsURL),
 			)
 			tree.Default().Start()
 
@@ -74,6 +68,6 @@ func main() {
 	}
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
-		log.Fatal(err.Error())
+		tlog.Log.Error("%s", err)
 	}
 }
