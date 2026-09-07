@@ -6,7 +6,6 @@ import (
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/tlog"
-	"google.golang.org/protobuf/proto"
 )
 
 // NatsMsgReq 将消息发送目标actor模块中
@@ -39,23 +38,23 @@ func (ns *Nats) NatsMsgReq(ctx tree.Context, m *sspb.NatsMsgReq) {
 // NatsMsgAck 将消息发送目标actor模块中
 func (ns *Nats) NatsMsgAck(ctx tree.Context, m *sspb.NatsMsgAck) {
 	//这是订阅者nats收到消息处理。解析消息数据，将消息请求发送给目标act
-	pid, ok := tree.Default().Lookup(m.SendName)
-	if !ok {
-		tlog.Log.Error("NatsMsgReq actor no name=%v", m.SendName)
-		return
-	}
 	msg, err := ns.codec.Unmarshal(m.Msg)
 	if err != nil {
 		tlog.Log.Error("%s", err)
 		return
 	}
-	ctx.Request(pid, msg)
+	sessionId := m.SessionID
+	el, ok := ns.ReqMsgMap[sessionId]
+	if !ok {
+		tlog.Log.Error("%s", err)
+		return
+	}
+	el.Respond(msg, nil)
 
 }
 
 // MsgHandle 处理所有消息回调，只处理带有sessionId的消息
 func (ns *Nats) MsgHandle(ctx tree.Context, m interface{}) {
-	//把消息处理成natsMsgAck 发给发送者的nats中
 	sessionID := ctx.GetValue("sessionID").(int64)
 	id := ctx.GetValue("id").(int32)
 	nodeID := ctx.GetValue("nodeID").(int32)
@@ -80,7 +79,7 @@ func (ns *Nats) MsgHandle(ctx tree.Context, m interface{}) {
 		Msg:          msgBytes,
 	}
 
-	data, err := proto.Marshal(ack)
+	data, err := ns.codec.Marshal(ack)
 	subject := Subject(ack.SendModule, int(ack.Id), int(ack.NodeID))
 	if err := ns.conn.Publish(subject, data); err != nil {
 		tlog.Log.Info("natsRpc: publish cast to %s: %v", subject, err)
@@ -90,7 +89,7 @@ func (ns *Nats) MsgHandle(ctx tree.Context, m interface{}) {
 }
 
 // catsMsg 发送 fire-and-forget 消息到 NATS。
-func (ns *Nats) catsMsg(msg *CastMsg) {
+func (ns *Nats) catsMsg(msg *NatsMsg) {
 	ns.nextRequestID.Add(1)
 
 	if msg == nil || msg.Msg == nil {
@@ -108,7 +107,7 @@ func (ns *Nats) catsMsg(msg *CastMsg) {
 		tlog.Log.Info("natsRpc: marshal cast %T: %v", msg.Msg, err)
 		return
 	}
-	subject := Subject(msg.Module, msg.ID, msg.NodeId)
+	subject := Subject(msg.TaggerName, msg.ID, msg.NodeId)
 	if err := ns.conn.Publish(subject, data); err != nil {
 		tlog.Log.Info("natsRpc: publish cast to %s: %v", subject, err)
 		return
@@ -117,7 +116,7 @@ func (ns *Nats) catsMsg(msg *CastMsg) {
 }
 
 // handleCall 在 NatsActor goroutine 内执行：生成 reply inbox subject，存 pending，发消息。
-func (ns *Nats) handleCall(ctx tree.Context, m *CallMsg) {
+func (ns *Nats) handleCall(ctx tree.Context, m *NatsMsg) {
 	sessionID := ns.nextRequestID.Add(1)
 	if m == nil {
 		return
@@ -151,7 +150,7 @@ func (ns *Nats) handleCall(ctx tree.Context, m *CallMsg) {
 		Msg:          byteMsg,
 	}
 
-	natsReqMsgBytes, err := proto.Marshal(natsReqMsg)
+	natsReqMsgBytes, err := ns.codec.Marshal(natsReqMsg)
 	if err != nil {
 		ctx.Response(nil, err)
 		tlog.Log.Error("natsRpc call msg marshal: %v", err)

@@ -1,11 +1,11 @@
 package asset
 
 import (
-	"fmt"
-
 	"github.com/gogu-x/tree/comm"
+	"github.com/gogu-x/tree/tlog"
 )
 
 func OnLogin(arg *comm.Arg) {
-	fmt.Println(arg)
+	ctx, _ := arg.Get("ctx")
+	tlog.Log.Info("OnLogin ctx", ctx)
 }

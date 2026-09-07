@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="platform" type="GoApplicationRunConfiguration" factoryName="Go Application">
-    <module name="g1" />
+    <module name="gotree" />
     <working_directory value="$PROJECT_DIR$/gogs/platform" />
     <parameters value="--mongo-url mongodb://43.160.212.55:27018 --mongo-username admin --mongo-password asd620522- --etcd 43.160.212.55:2379 --nats-url nats://43.160.212.55:4222" />
     <kind value="FILE" />

@@ -13,30 +13,31 @@ import (
 )
 
 // NewNats NATS 订阅 这里只是单个进程的订阅 module是一个进程，而非一个actor：
-
 func NewNats(module string, serverID, nodeID int, url string) *internal.Nats {
 	return internal.NewActor(module, serverID, nodeID, url)
 }
 
 // Cast 投递消息（fire-and-forget），不等待任何回复。
 // module/id/nodeID 通过 RegisterModule 注册的规则寻址，nodeID 对无节点维度的模块可传空串。
-func Cast(module string, id, nodeID int, msg interface{}) error {
-	return sendOrErr(&internal.CastMsg{Module: module, ID: id, NodeId: nodeID, Msg: msg})
+func Cast(module, taggerName string, id, nodeID int, msg interface{}) error {
+	return sendOrErr(&internal.NatsMsg{
+		TaggerModule: module,
+		TaggerName:   taggerName,
+		ID:           id,
+		NodeId:       nodeID,
+		Msg:          msg,
+	})
 }
 
-// Call 异步超时请求：发出后立即返回，回调在 callerPID 所属 Actor 的 goroutine 内执行。
-// 适用于业务 Actor（PlayerActor/ConnActor 等）在自己的 HandleMessage 内发起跨节点/跨模块请求，
-// 不阻塞当前 Actor，超时或收到回包都会触发且只触发一次 cb。
-// 响应端需在业务 Actor 中调用 ctx.Response(resp, err) 回复。
-
-func Call(sendModule, taggerModule string, sendActorName, taggerActorName string, id, nodeID int, msg interface{}, callerPID tree.PID, cb func(tree.Context, interface{}, error)) error {
+// CallSync 异步请求：发出后立即返回，回调在 callerPID 所属 Actor 的 goroutine 内执行。
+func CallSync(sendModule, taggerModule string, sendActorName, taggerActorName string, id, nodeID int, msg interface{}, callerPID tree.PID, cb func(tree.Context, interface{}, error)) error {
 	pid, ok := tree.Lookup(def.Nats)
 	if !ok {
 		err := fmt.Errorf("natsrpc: NatsActor(%q) not spawned in this process", def.Nats)
 		tlog.Log.Debug("%s", err)
 		return err
 	}
-	callMsg := &internal.CallMsg{
+	callMsg := &internal.NatsMsg{
 		SendModule:   sendModule,
 		TaggerModule: taggerModule,
 		ID:           id,
@@ -50,8 +51,8 @@ func Call(sendModule, taggerModule string, sendActorName, taggerActorName string
 	return nil
 }
 
-// CallSync
-func CallSync(module string, id, nodeID int, msg proto.Message, timeout time.Duration) {
+// CallASync 带有超市时间的同步请求
+func CallASync(module string, id, nodeID int, msg proto.Message, timeout time.Duration) {
 	data, err := codec.ProtoCodec.Marshal(msg)
 	if err != nil {
 		return

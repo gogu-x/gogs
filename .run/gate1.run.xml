@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="gate1" type="GoApplicationRunConfiguration" factoryName="Go Application">
-    <module name="g1" />
+    <module name="gotree" />
     <working_directory value="$PROJECT_DIR$/gogs/gate" />
     <parameters value="--gate-id 1 --server-id 1 --node-id 1" />
     <kind value="FILE" />

@@ -2,6 +2,7 @@
 package pbregister
 
 import (
+	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree/codec"
 
 	pb_activity "github.com/gogu-x/gogs/pb/cspb/pb_activity"
@@ -51,5 +52,7 @@ func init() {
 		&pb_pf.CreateOrderReq{},
 		&pb_pf.OrderAck{},
 		&pb_pf.QueryOrderReq{},
+		&sspb.NatsMsgAck{},
+		&sspb.NatsMsgReq{},
 	)
 }

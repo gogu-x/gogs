@@ -11,7 +11,6 @@ import (
 	"github.com/gogu-x/tree/timer"
 	"github.com/gogu-x/tree/tlog"
 	natsgo "github.com/nats-io/nats.go"
-	"google.golang.org/protobuf/proto"
 )
 
 const natsRequestTimeout = timer.TimerType(1)
@@ -65,11 +64,8 @@ func (ns *Nats) OnInit(ctx tree.Context) {
 
 func (ns *Nats) HandleMessage(ctx tree.Context, msg interface{}) {
 	switch m := msg.(type) {
-	//消息投递到nats
-	case *CastMsg:
-		ns.catsMsg(m)
 	//带回调的消息
-	case *CallMsg:
+	case *NatsMsg:
 		ns.handleCall(ctx, m)
 	case *sspb.NatsMsgReq:
 		ns.NatsMsgReq(ctx, m)
@@ -97,8 +93,7 @@ func (ns *Nats) subscribe(ctx tree.Context, sub string) {
 	ns.nastSub = s
 	go func() {
 		for m := range ch {
-			msg := &sspb.NatsMsgReq{}
-			err := proto.Unmarshal(m.Data, msg)
+			msg, err := ns.codec.Unmarshal(m.Data)
 			if err != nil {
 				tlog.Log.Info("natsrpc: unmarshal frame from %s: %v", sub, err)
 				continue
