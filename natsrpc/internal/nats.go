@@ -73,6 +73,8 @@ func (ns *Nats) HandleMessage(ctx tree.Context, msg interface{}) {
 		ns.handleCall(ctx, m)
 	case *sspb.NatsMsgReq:
 		ns.NatsMsgReq(ctx, m)
+	case *sspb.NatsMsgAck:
+		ns.NatsMsgAck(ctx, m)
 	default:
 		ns.MsgHandle(ctx, msg)
 	}

@@ -17,7 +17,9 @@ func (ns *Nats) NatsMsgReq(ctx tree.Context, m *sspb.NatsMsgReq) {
 		tlog.Log.Error("NatsMsgReq actor no name=%v", m.TaggerName)
 		return
 	}
-	//发送到目标actor，等待恢复 这里不处理，直接到默认的消息中处理所有的回复，统一处理
+	//发送到目标actor，等待回复。回复不走 Await/cb，而是作为普通消息投递回
+	//本 Nats actor 的 mailbox，统一在 HandleMessage(default 分支即 MsgHandle) 中处理，
+	//这样才能读到下面设置的 sessionID/taggerName 等路由信息。
 	ctx.SetValue("sessionID", m.SessionID)
 	ctx.SetValue("nodeID", m.NodeID)
 	ctx.SetValue("id", m.Id)
@@ -25,6 +27,23 @@ func (ns *Nats) NatsMsgReq(ctx tree.Context, m *sspb.NatsMsgReq) {
 	ctx.SetValue("sendName", m.SendName)
 	ctx.SetValue("sendModule", m.SendModule)
 	ctx.SetValue("taggerModule", m.TaggerModule)
+	msg, err := ns.codec.Unmarshal(m.Msg)
+	if err != nil {
+		tlog.Log.Error("%s", err)
+		return
+	}
+	ctx.RequestAsMessage(pid, msg)
+
+}
+
+// NatsMsgAck 将消息发送目标actor模块中
+func (ns *Nats) NatsMsgAck(ctx tree.Context, m *sspb.NatsMsgAck) {
+	//这是订阅者nats收到消息处理。解析消息数据，将消息请求发送给目标act
+	pid, ok := tree.Default().Lookup(m.SendName)
+	if !ok {
+		tlog.Log.Error("NatsMsgReq actor no name=%v", m.SendName)
+		return
+	}
 	msg, err := ns.codec.Unmarshal(m.Msg)
 	if err != nil {
 		tlog.Log.Error("%s", err)
