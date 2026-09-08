@@ -6,5 +6,6 @@ const (
 	Gate     = "GATE"
 	Cross    = "CROSS"
 	Activity = "ACTIVITY"
+	Battle   = "Battle"
 	PF       = "PF"
 )

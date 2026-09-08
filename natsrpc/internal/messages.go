@@ -24,4 +24,8 @@ type NatsMsg struct {
 	SendName     string
 	TaggerName   string
 	Callback     func(tree.Context, interface{}, error)
+
+	// Cast marks a fire-and-forget notification. It is kept on the internal
+	// envelope so Cast and Call can share the Nats actor mailbox safely.
+	Cast bool
 }

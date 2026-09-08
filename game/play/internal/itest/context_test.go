@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogu-x/gogs/game/play/internal"
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/tree/comm"
@@ -31,11 +30,11 @@ func TestEventFromRequestKeepsRequestContext(t *testing.T) {
 		})
 	})
 
-	got, err := tr.Request(pid, &testReq{UID: internal.testUID}).AwaitTimeout(time.Second)
+	got, err := tr.Request(pid, &testReq{UID: testUID}).AwaitTimeout(time.Second)
 	if err != nil {
 		t.Fatalf("监听者未拿到可回复的请求上下文: %v", err)
 	}
-	if got != internal.testUID {
+	if got != testUID {
 		t.Fatalf("ctx.UID() = %v, want %v", got, testUID)
 	}
 }
@@ -50,7 +49,7 @@ func TestEventOutsideRequestUsesSysCtx(t *testing.T) {
 	}
 	ch := make(chan result, 1)
 
-	internal.spawnPlay(t, func(py *core.Play) {
+	spawnPlay(t, func(py *core.Play) {
 		py.OnEvent(core.ServerStart, func(ctx *core.Context, _ *comm.Arg) {
 			ch <- result{
 				playerNil: ctx.Player == nil,
@@ -81,8 +80,8 @@ func TestTimerHandlerGetsSysCtx(t *testing.T) {
 	}
 	ch := make(chan result, 1)
 
-	internal.spawnPlay(t, func(py *core.Play) {
-		py.PlayerMgr.Add(player.NewPlayerData(internal.testUID))
+	spawnPlay(t, func(py *core.Play) {
+		py.PlayerMgr.Add(player.NewPlayerData(testUID))
 		py.OnTimer(testTimer, func(ctx *core.Context, _ interface{}) {
 			ch <- result{playerNil: ctx.Player == nil, online: ctx.Players().Count()}
 		})
@@ -106,8 +105,8 @@ func TestTimerHandlerGetsSysCtx(t *testing.T) {
 // 第一个监听者内部用 Play.Emit 触发了另一个事件（SysCtx），
 // 返回后第二个监听者必须仍然拿到原请求的 Context。
 func TestNestedEmitRestoresContext(t *testing.T) {
-	tr, pid := internal.spawnPlay(t, func(py *core.Play) {
-		py.PlayerMgr.Add(player.NewPlayerData(internal.testUID))
+	tr, pid := spawnPlay(t, func(py *core.Play) {
+		py.PlayerMgr.Add(player.NewPlayerData(testUID))
 		py.OnEvent(innerEvt, func(ctx *core.Context, _ *comm.Arg) {})
 		// priority 越大越先执行
 		py.OnEvent(testEvent, func(ctx *core.Context, _ *comm.Arg) {
@@ -116,16 +115,16 @@ func TestNestedEmitRestoresContext(t *testing.T) {
 		py.OnEvent(testEvent, func(ctx *core.Context, _ *comm.Arg) {
 			ctx.Response(ctx.PlayerID(), nil)
 		}, 0)
-		core.RegisterPlayer(py, (*internal.testReq)(nil), func(ctx *core.Context, _ *internal.testReq) {
+		core.RegisterPlayer(py, (*testReq)(nil), func(ctx *core.Context, _ *testReq) {
 			ctx.Emit(testEvent, comm.NewArg())
 		})
 	})
 
-	got, err := tr.Request(pid, &internal.testReq{UID: internal.testUID}).AwaitTimeout(time.Second)
+	got, err := tr.Request(pid, &testReq{UID: testUID}).AwaitTimeout(time.Second)
 	if err != nil {
 		t.Fatalf("嵌套 Emit 后上下文未恢复: %v", err)
 	}
-	if got != internal.testUID {
-		t.Fatalf("ctx.UID() = %v, want %v（上下文被内层 Emit 污染）", got, internal.testUID)
+	if got != testUID {
+		t.Fatalf("ctx.UID() = %v, want %v（上下文被内层 Emit 污染）", got, testUID)
 	}
 }

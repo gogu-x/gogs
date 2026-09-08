@@ -31,12 +31,13 @@ func RegisterPlayer[Req any](
 			ctx.Response(nil, fmt.Errorf("play: uid=%d not online", request.GetUID()))
 			return
 		}
-		h(&Context{
+		requestCtx := &Context{
 			Play:    py,
 			TreeCtx: ctx,
 			Req:     msg,
 			Player:  p,
-		}, msg.(Req))
+		}
+		py.withContext(requestCtx, func() { h(requestCtx, msg.(Req)) })
 	})
 }
 
@@ -47,10 +48,11 @@ func RegisterSys[Msg any](
 	h func(*Context, Msg),
 ) {
 	py.Router().Register(prototype, func(ctx tree.Context, msg interface{}) {
-		h(&Context{
+		requestCtx := &Context{
 			Play:    py,
 			TreeCtx: ctx,
 			Req:     msg,
-		}, msg.(Msg))
+		}
+		py.withContext(requestCtx, func() { h(requestCtx, msg.(Msg)) })
 	})
 }

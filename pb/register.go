@@ -2,15 +2,16 @@
 package pbregister
 
 import (
-	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree/codec"
 
 	pb_activity "github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	pb_auth "github.com/gogu-x/gogs/pb/cspb/pb_auth"
+	pb_battle "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	pb_chat "github.com/gogu-x/gogs/pb/cspb/pb_chat"
 	pb_gateway "github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	pb_guild "github.com/gogu-x/gogs/pb/cspb/pb_guild"
 	pb_pf "github.com/gogu-x/gogs/pb/pfpb/pb_pf"
+	sspb "github.com/gogu-x/gogs/pb/sspb"
 )
 
 func init() {
@@ -25,6 +26,18 @@ func init() {
 		&pb_activity.ClaimRewardReq{},
 		&pb_auth.LoginGameAck{},
 		&pb_auth.LoginGameReq{},
+		&pb_battle.StartBattleAck{},
+		&pb_battle.VerifyBattleReplayAck{},
+		&pb_battle.QueryBattleAck{},
+		&pb_battle.RebuildBattleAck{},
+		&pb_battle.StartBattleReq{},
+		&pb_battle.VerifyBattleReplayReq{},
+		&pb_battle.QueryBattleReq{},
+		&pb_battle.RebuildBattleReq{},
+		&pb_battle.BattleCreatedNtf{},
+		&pb_battle.BattleActionNtf{},
+		&pb_battle.BattleFinishedNtf{},
+		&pb_battle.BattleResultConfirmedNtf{},
 		&pb_chat.ChatAck{},
 		&pb_chat.ChatReq{},
 		&pb_gateway.LoginAck{},
@@ -52,7 +65,8 @@ func init() {
 		&pb_pf.CreateOrderReq{},
 		&pb_pf.OrderAck{},
 		&pb_pf.QueryOrderReq{},
-		&sspb.NatsMsgAck{},
 		&sspb.NatsMsgReq{},
+		&sspb.NatsMsgAck{},
+		&sspb.NatsMsgNtf{},
 	)
 }

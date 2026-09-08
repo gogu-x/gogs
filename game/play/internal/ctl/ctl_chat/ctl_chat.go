@@ -6,11 +6,11 @@ import (
 )
 
 // OnServerStart 开服事件。它由 Play.Emit 在 OnInit 中触发，
-func OnServerStart(py *core.Play, arg *comm.Arg) {
+func OnServerStart(ctx *core.Context, arg *comm.Arg) {
 
 }
 
-// OnLogin 开服事件。它由 Play.Emit 在 OnInit 中触发，
-func OnLogin(py *core.Play, arg *comm.Arg) {
+// OnLogin 登录事件。
+func OnLogin(ctx *core.Context, arg *comm.Arg) {
 
 }

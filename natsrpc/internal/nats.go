@@ -1,8 +1,11 @@
 package internal
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"sync/atomic"
+	"time"
 
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/pb/sspb"
@@ -15,7 +18,18 @@ import (
 
 const natsRequestTimeout = timer.TimerType(1)
 
-// Nats NATS 订阅 Nats，负责收消息、反序列化、投递，并承载 Cast/Call 的发送与超时管理。
+// publisher is the minimal NATS transport needed by the send path. Keeping it
+// small permits deterministic unit tests without opening a network connection.
+type publisher interface {
+	Publish(subject string, data []byte) error
+}
+
+type stoppable interface {
+	Stop()
+}
+
+// Nats subscribes to one module/server/node subject, routes inbound messages,
+// and owns pending request timeout state.
 type Nats struct {
 	typ       string
 	serverId  int
@@ -25,29 +39,38 @@ type Nats struct {
 	codec     codec.Codec
 	system    *tree.Tree
 	conn      *natsgo.Conn
+	transport publisher
 	natsURl   string
 
-	//ReqMsgMap 发送者消息
+	// ReqMsgMap contains requests awaiting ACK. It remains exported for
+	// compatibility with existing code.
 	ReqMsgMap map[int64]*tree.Envelope
 
+	requestTimers map[int64]stoppable
+	afterTimeout  func(time.Duration, int64) stoppable
 	nextRequestID atomic.Int64
+}
+
+func init() {
+	// NatsMsgNtf already exists in generated code but is deliberately registered
+	// here rather than changing generated pb/register.go.
+	codec.RegisterMsg(&sspb.NatsMsgNtf{})
 }
 
 func NewActor(typ string, serverId int, nodeId int, url string) *Nats {
 	return &Nats{
-		typ:       typ,
-		serverId:  serverId,
-		nodeId:    nodeId,
-		codec:     codec.ProtoCodec,
-		natsURl:   url,
-		ReqMsgMap: make(map[int64]*tree.Envelope),
+		typ:           typ,
+		serverId:      serverId,
+		nodeId:        nodeId,
+		codec:         codec.ProtoCodec,
+		natsURl:       url,
+		ReqMsgMap:     make(map[int64]*tree.Envelope),
+		requestTimers: make(map[int64]stoppable),
 	}
 }
 
-// Name 实现 tree.Actor，注册名默认为 constant.ActorNats。
-func (ns *Nats) Name() string {
-	return def.Nats
-}
+// Name implements tree.Actor.
+func (ns *Nats) Name() string { return def.Nats }
 
 func (ns *Nats) OnInit(ctx tree.Context) {
 	nc, err := natsgo.Connect(ns.natsURl)
@@ -55,22 +78,39 @@ func (ns *Nats) OnInit(ctx tree.Context) {
 		panic(err)
 	}
 	ns.conn = nc
+	ns.transport = nc
 	ns.system = ctx.System()
 	ns.timeWheel = timer.NewTimeWheel(1024, ctx.Self(), ns.system)
-	ns.timeWheel.Register(natsRequestTimeout, func(data interface{}) {})
-	//订阅消息
+	ns.timeWheel.Register(natsRequestTimeout, func(data interface{}) {
+		sessionID, ok := data.(int64)
+		if ok {
+			ns.timeoutRequest(sessionID)
+		}
+	})
+	ns.afterTimeout = func(d time.Duration, sessionID int64) stoppable {
+		return ns.timeWheel.After(natsRequestTimeout, d, sessionID)
+	}
 	ns.subscribe(ctx, Subject(ns.typ, ns.serverId, ns.nodeId))
 }
 
 func (ns *Nats) HandleMessage(ctx tree.Context, msg interface{}) {
 	switch m := msg.(type) {
-	//带回调的消息
 	case *NatsMsg:
-		ns.handleCall(ctx, m)
+		if m.Cast {
+			err := ns.catsMsg(m)
+			ctx.Response(nil, err)
+			if err != nil {
+				tlog.Log.Error("%v", err)
+			}
+		} else {
+			ns.handleCall(ctx, m)
+		}
 	case *sspb.NatsMsgReq:
 		ns.NatsMsgReq(ctx, m)
 	case *sspb.NatsMsgAck:
 		ns.NatsMsgAck(ctx, m)
+	case *sspb.NatsMsgNtf:
+		ns.NatsMsgNtf(ctx, m)
 	default:
 		ns.MsgHandle(ctx, msg)
 	}
@@ -80,15 +120,32 @@ func (ns *Nats) OnStop(_ tree.Context) {
 	if ns.timeWheel != nil {
 		ns.timeWheel.Stop()
 	}
-	ns.nastSub.Unsubscribe()
+	for sessionID := range ns.ReqMsgMap {
+		ns.finishPending(sessionID, nil, errors.New("natsrpc: actor stopped"))
+	}
+	if ns.nastSub != nil {
+		if err := ns.nastSub.Unsubscribe(); err != nil {
+			tlog.Log.Error("natsrpc: unsubscribe: %v", err)
+		}
+	}
+}
+
+func (ns *Nats) publish(subject string, data []byte) error {
+	if ns.transport == nil {
+		return errors.New("natsrpc: publish before initialization")
+	}
+	return ns.transport.Publish(subject, data)
 }
 
 func (ns *Nats) subscribe(ctx tree.Context, sub string) {
+	if ns.conn == nil {
+		panic("natsrpc: subscribe before connection initialization")
+	}
 	ch := make(chan *natsgo.Msg, 128)
-
 	s, err := ns.conn.ChanSubscribe(sub, ch)
 	if err != nil {
-		log.Fatalf("natsrpc: subscribe %s: %v", sub, err)
+		log.Printf("natsrpc: subscribe %s: %v", sub, err)
+		panic(fmt.Sprintf("natsrpc: subscribe %s: %v", sub, err))
 	}
 	ns.nastSub = s
 	go func() {
@@ -98,9 +155,11 @@ func (ns *Nats) subscribe(ctx tree.Context, sub string) {
 				tlog.Log.Info("natsrpc: unmarshal frame from %s: %v", sub, err)
 				continue
 			}
-			tlog.Log.Info("natsrpc msg=%v", msg)
-			ctx.Send(ctx.Self(), msg)
+			if !ctx.Send(ctx.Self(), msg) {
+				tlog.Log.Info("natsrpc: drop frame from %s: actor stopped", sub)
+				return
+			}
 		}
 	}()
-	tlog.Log.Info("natsrpc: subscribed %s ", sub)
+	tlog.Log.Info("natsrpc: subscribed %s", sub)
 }

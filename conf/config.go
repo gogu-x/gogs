@@ -17,6 +17,17 @@ var (
 	// GameBasePort game gRPC 基础端口，实际端口 = GameBasePort + ServerID
 	GameBasePort = 9900
 
+	// BattleBasePort/Host 用于 Battle 服务发现地址（战斗消息仍通过 NATS）。
+	BattleBasePort = 10900
+	BattleHost     = "127.0.0.1"
+
+	// BattleConfigPath 可选的 JSON 引擎配置；为空时使用内置开发配置。
+	BattleConfigPath = ""
+	BattleWorkers    = 2
+	BattleQueueSize  = 64
+	BattleRetryCount = 3
+	BattleRetryDelay = 1000
+
 	// LogLevel 日志级别
 	LogLevel = "debug"
 
@@ -73,6 +84,13 @@ func ConnectionFlags() []cli.Flag {
 		&cli.StringFlag{Name: "etcd", Usage: "etcd, comma-separated"},
 		&cli.IntFlag{Name: "gate-base-port", Usage: "gate WebSocket base port"},
 		&cli.IntFlag{Name: "game-base-port", Usage: "game gRPC base port"},
+		&cli.IntFlag{Name: "battle-base-port", Usage: "battle service discovery base port"},
+		&cli.StringFlag{Name: "battle-host", Usage: "battle service discovery host"},
+		&cli.StringFlag{Name: "battle-config", Usage: "battle engine JSON config"},
+		&cli.IntFlag{Name: "battle-workers", Usage: "battle bounded worker count"},
+		&cli.IntFlag{Name: "battle-queue-size", Usage: "battle bounded work queue size"},
+		&cli.IntFlag{Name: "battle-retry-count", Usage: "battle result delivery attempts"},
+		&cli.IntFlag{Name: "battle-retry-delay-ms", Usage: "battle result retry delay in milliseconds"},
 		&cli.StringFlag{Name: "grpc-host", Usage: "game gRPC host"},
 		&cli.StringFlag{Name: "mongo-url", Usage: "MongoDB connection URI"},
 		&cli.StringFlag{Name: "mongo-username", Usage: "MongoDB authentication username"},
@@ -97,6 +115,27 @@ func LoadAndApply(c *cli.Command) error {
 	}
 	if c.IsSet("game-base-port") {
 		GameBasePort = c.Int("game-base-port")
+	}
+	if c.IsSet("battle-base-port") {
+		BattleBasePort = c.Int("battle-base-port")
+	}
+	if c.IsSet("battle-host") {
+		BattleHost = c.String("battle-host")
+	}
+	if c.IsSet("battle-config") {
+		BattleConfigPath = c.String("battle-config")
+	}
+	if c.IsSet("battle-workers") {
+		BattleWorkers = c.Int("battle-workers")
+	}
+	if c.IsSet("battle-queue-size") {
+		BattleQueueSize = c.Int("battle-queue-size")
+	}
+	if c.IsSet("battle-retry-count") {
+		BattleRetryCount = c.Int("battle-retry-count")
+	}
+	if c.IsSet("battle-retry-delay-ms") {
+		BattleRetryDelay = c.Int("battle-retry-delay-ms")
 	}
 	if c.IsSet("grpc-host") {
 		GrpcHost = c.String("grpc-host")
@@ -152,4 +191,8 @@ func GateAddr() string {
 
 func GameAddr() string {
 	return fmt.Sprintf("%s:%d", GrpcHost, GameBasePort+ServerID)
+}
+
+func BattleAddr() string {
+	return fmt.Sprintf("%s:%d", BattleHost, BattleBasePort+NodeId)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/activity"
+	"github.com/gogu-x/gogs/game/battleclient"
 	"github.com/gogu-x/gogs/game/gate"
 	"github.com/gogu-x/gogs/game/guild"
 	"github.com/gogu-x/gogs/game/play"
@@ -55,6 +56,7 @@ func main() {
 
 			tree.Spawn(
 				play.NewPlay(),
+				battleclient.New(nil, nil, conf.ServerID, conf.NodeId),
 				gate.NewGate(),
 				guild.NewGuild(),
 				activity.NewActivity(),

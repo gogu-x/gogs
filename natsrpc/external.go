@@ -26,6 +26,7 @@ func Cast(module, taggerName string, id, nodeID int, msg interface{}) error {
 		ID:           id,
 		NodeId:       nodeID,
 		Msg:          msg,
+		Cast:         true,
 	})
 }
 
@@ -68,8 +69,12 @@ func sendOrErr(msg interface{}) error {
 	if !ok {
 		return fmt.Errorf("natsrpc: NatsActor(%q) not spawned in this process", def.Nats)
 	}
-	if !tree.Send(pid, msg) {
-		return fmt.Errorf("natsrpc: send to NatsActor failed (mailbox full or actor stopped)")
+	// Wait only for the local encode/publish operation. Cast remains
+	// fire-and-forget with respect to the remote target, while callers receive
+	// actionable transport errors through the existing error return value.
+	_, err := tree.Request(pid, msg).AwaitTimeout(5 * time.Second)
+	if err != nil {
+		return fmt.Errorf("natsrpc: cast: %w", err)
 	}
 	return nil
 }

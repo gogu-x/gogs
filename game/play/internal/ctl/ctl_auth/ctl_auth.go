@@ -2,6 +2,7 @@ package ctl_auth
 
 import (
 	"github.com/gogu-x/gogs/game/play/internal/core"
+	"github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/gogs/pb/cspb/pb_auth"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/tree/comm"
@@ -15,6 +16,9 @@ func AutoLogin(ctx *core.Context, req *pb_auth.LoginGameReq) {
 
 	if req.UID == 0 {
 		return
+	}
+	if ctx.GetPlayer(playerId) == nil {
+		ctx.Players().Add(player.NewPlayerData(playerId))
 	}
 
 	//触发登录事件。事件参数只传值类型：*core.Context 生命周期仅限本条消息，

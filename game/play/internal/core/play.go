@@ -29,6 +29,7 @@ type Play struct {
 
 	router tree.Router
 	ctx    tree.Context
+	active *Context
 
 	// Boot 在公共能力就绪之后、开服事件触发之前被调用，由上层装配时注入，
 	// 用于注册路由、事件监听与定时任务。
@@ -69,48 +70,57 @@ func (py *Play) Router() *tree.Router { return &py.router }
 // 处理请求时一律使用 Context.TreeCtx，否则 Response 会静默失效。
 func (py *Play) BootCtx() tree.Context { return py.ctx }
 
-// SysCtx 返回 Actor 级上下文，供定时器、事件与启停流程使用。
+// EventFunc 是事件监听的业务签名。ctx 由框架注入：请求中触发的
+// 事件复用请求 Context，开服等系统事件使用不带请求信息的 SysCtx。
+type EventFunc func(ctx *Context, arg *comm.Arg)
 
-// EventFunc 是事件监听的业务签名。ctx 由框架注入：
-// 事件在请求处理中触发时是那条请求的 Context，否则是 SysCtx。
-type EventFunc func(py *Play, arg *comm.Arg)
+func (py *Play) sysCtx() *Context {
+	return &Context{Play: py, TreeCtx: py.ctx}
+}
 
-// OnEvent 注册事件监听。相比直接使用 Play.Event.Register，
-// 它会在分发时注入正确的 *Context，业务无需自行捕获能力。
+func (py *Play) withContext(ctx *Context, fn func()) {
+	previous := py.active
+	py.active = ctx
+	defer func() { py.active = previous }()
+	fn()
+}
+
 func (py *Play) OnEvent(name comm.EventName, fn EventFunc, priority ...int) {
 	if fn == nil {
 		return
 	}
 	py.Event.Register(name, func(arg *comm.Arg) {
-		fn(py, arg)
+		ctx := py.active
+		if ctx == nil {
+			ctx = py.sysCtx()
+		}
+		fn(ctx, arg)
 	}, priority...)
 }
 
-// Emit 在无请求上下文的场景（开服、定时器之外的内部流程）同步触发事件，
-// 监听者拿到 SysCtx。请求处理中请用 Context.Emit 以保留请求上下文。
+// Emit always starts a system event scope. Context.Emit should be used while
+// handling a request so sender/request metadata is retained.
 func (py *Play) Emit(name comm.EventName, arg *comm.Arg) int {
-	return py.emit(name, arg)
+	return py.emitWithContext(py.sysCtx(), name, arg)
 }
 
-// emit 在 ctx 绑定期间同步分发事件，结束后恢复原值以支持事件嵌套触发。
-func (py *Play) emit(name comm.EventName, arg *comm.Arg) int {
-	return py.Event.Emit(name, arg)
+func (py *Play) emitWithContext(ctx *Context, name comm.EventName, arg *comm.Arg) int {
+	count := 0
+	py.withContext(ctx, func() { count = py.Event.Emit(name, arg) })
+	return count
 }
 
 // ---------- 定时器 ----------
 
-// TimerFunc 是定时任务的业务签名。ctx 恒为 SysCtx：定时器到期没有请求方，
-// 因此 ctx.Response 是空操作，但其余能力齐全。
-type TimerFunc func(py *Play, data interface{})
+type TimerFunc func(ctx *Context, data interface{})
 
-// OnTimer 注册 timerType 对应的定时回调，分发时注入 SysCtx。
-// 必须在 Play 的 Actor goroutine 内调用（即 Boot 期间）。
 func (py *Play) OnTimer(timerType timer.TimerType, fn TimerFunc) {
 	if fn == nil {
 		return
 	}
 	py.TimeWheel.Register(timerType, func(data interface{}) {
-		fn(py, data)
+		ctx := py.sysCtx()
+		py.withContext(ctx, func() { fn(ctx, data) })
 	})
 }
 

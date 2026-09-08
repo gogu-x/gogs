@@ -20,6 +20,6 @@ func InitTimers(py *core.Play) {
 }
 
 // onSavePlayers 定时存盘。
-func onSavePlayers(py *core.Play, _ interface{}) {
-	py.PlayerMgr.Count()
+func onSavePlayers(ctx *core.Context, _ interface{}) {
+	ctx.Players().Count()
 }

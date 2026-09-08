@@ -24,5 +24,14 @@ const (
 	// GameGate 旧 gRPC 网关 Actor，新架构已由 NATS 替代，保留供旧代码引用
 	GameGate = "GAMEGATE"
 
+	// BattleService 是独立 Battle 进程内的服务 Actor。
+	BattleService = "BATTLE_SERVICE"
+
+	// BattleClient 是 Game 进程内接收 Battle 生命周期事件的 Actor。
+	BattleClient = "BATTLE_CLIENT"
+
+	// ServiceBattle 是 etcd 通用服务发现中的 Battle 服务类型。
+	ServiceBattle = "Battle"
+
 	Web = "Web"
 )

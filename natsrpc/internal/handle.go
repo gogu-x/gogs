@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gogu-x/gogs/pb/sspb"
@@ -8,17 +9,23 @@ import (
 	"github.com/gogu-x/tree/tlog"
 )
 
-// NatsMsgReq 将消息发送目标actor模块中
+// NatsMsgReq routes an RPC request to the target actor. The actor response is
+// delivered back to this Nats actor as an ordinary message so MsgHandle can
+// preserve the routing metadata carried in the context.
 func (ns *Nats) NatsMsgReq(ctx tree.Context, m *sspb.NatsMsgReq) {
-	//这是订阅者nats收到消息处理。解析消息数据，将消息请求发送给目标act
-	pid, ok := tree.Default().Lookup(m.TaggerName)
+	if m == nil {
+		return
+	}
+	pid, ok := ctx.Lookup(m.TaggerName)
 	if !ok {
 		tlog.Log.Error("NatsMsgReq actor no name=%v", m.TaggerName)
 		return
 	}
-	//发送到目标actor，等待回复。回复不走 Await/cb，而是作为普通消息投递回
-	//本 Nats actor 的 mailbox，统一在 HandleMessage(default 分支即 MsgHandle) 中处理，
-	//这样才能读到下面设置的 sessionID/taggerName 等路由信息。
+	msg, err := ns.codec.Unmarshal(m.Msg)
+	if err != nil {
+		tlog.Log.Error("natsrpc: decode request: %v", err)
+		return
+	}
 	ctx.SetValue("sessionID", m.SessionID)
 	ctx.SetValue("nodeID", m.NodeID)
 	ctx.SetValue("id", m.Id)
@@ -26,46 +33,64 @@ func (ns *Nats) NatsMsgReq(ctx tree.Context, m *sspb.NatsMsgReq) {
 	ctx.SetValue("sendName", m.SendName)
 	ctx.SetValue("sendModule", m.SendModule)
 	ctx.SetValue("taggerModule", m.TaggerModule)
-	msg, err := ns.codec.Unmarshal(m.Msg)
-	if err != nil {
-		tlog.Log.Error("%s", err)
-		return
-	}
 	ctx.RequestAsMessage(pid, msg)
-
 }
 
-// NatsMsgAck 将消息发送目标actor模块中
-func (ns *Nats) NatsMsgAck(ctx tree.Context, m *sspb.NatsMsgAck) {
-	//这是订阅者nats收到消息处理。解析消息数据，将消息请求发送给目标act
+// NatsMsgNtf routes a fire-and-forget notification to its target actor.
+func (ns *Nats) NatsMsgNtf(ctx tree.Context, m *sspb.NatsMsgNtf) {
+	if m == nil {
+		return
+	}
+	pid, ok := ctx.Lookup(m.TaggerName)
+	if !ok {
+		tlog.Log.Error("NatsMsgNtf actor no name=%v", m.TaggerName)
+		return
+	}
 	msg, err := ns.codec.Unmarshal(m.Msg)
 	if err != nil {
-		tlog.Log.Error("%s", err)
+		tlog.Log.Error("natsrpc: decode notification: %v", err)
 		return
 	}
-	sessionId := m.SessionID
-	el, ok := ns.ReqMsgMap[sessionId]
-	if !ok {
-		tlog.Log.Error("%s", err)
-		return
+	if !ctx.Send(pid, msg) {
+		tlog.Log.Error("natsrpc: route notification to actor %q failed", m.TaggerName)
 	}
-	el.Respond(msg, nil)
-
 }
 
-// MsgHandle 处理所有消息回调，只处理带有sessionId的消息
+// NatsMsgAck resolves and removes a pending request. Decode failures are also
+// returned to the original caller instead of leaving it pending until timeout.
+func (ns *Nats) NatsMsgAck(_ tree.Context, m *sspb.NatsMsgAck) {
+	if m == nil {
+		return
+	}
+	if _, ok := ns.ReqMsgMap[m.SessionID]; !ok {
+		tlog.Log.Debug("natsrpc: ack for unknown session %d", m.SessionID)
+		return
+	}
+	msg, err := ns.codec.Unmarshal(m.Msg)
+	ns.finishPending(m.SessionID, msg, err)
+}
+
+// MsgHandle publishes a target actor's response back to the request origin.
 func (ns *Nats) MsgHandle(ctx tree.Context, m interface{}) {
-	sessionID := ctx.GetValue("sessionID").(int64)
-	id := ctx.GetValue("id").(int32)
-	nodeID := ctx.GetValue("nodeID").(int32)
-	taggerName := ctx.GetValue("taggerName").(string)
-	sendName := ctx.GetValue("sendName").(string)
-	sendModule := ctx.GetValue("sendModule").(string)
-	taggerModule := ctx.GetValue("taggerModule").(string)
+	sessionID, ok := ctx.GetValue("sessionID").(int64)
+	if !ok {
+		tlog.Log.Error("natsrpc: response has no session routing metadata")
+		return
+	}
+	id, idOK := ctx.GetValue("id").(int32)
+	nodeID, nodeOK := ctx.GetValue("nodeID").(int32)
+	taggerName, taggerOK := ctx.GetValue("taggerName").(string)
+	sendName, sendOK := ctx.GetValue("sendName").(string)
+	sendModule, moduleOK := ctx.GetValue("sendModule").(string)
+	taggerModule, targetModuleOK := ctx.GetValue("taggerModule").(string)
+	if !idOK || !nodeOK || !taggerOK || !sendOK || !moduleOK || !targetModuleOK {
+		tlog.Log.Error("natsrpc: response has incomplete routing metadata")
+		return
+	}
 
 	msgBytes, err := ns.codec.Marshal(m)
 	if err != nil {
-		tlog.Log.Error("codec MsgHandle marshal err=%v", err)
+		tlog.Log.Error("natsrpc: encode response: %v", err)
 		return
 	}
 	ack := &sspb.NatsMsgAck{
@@ -78,89 +103,133 @@ func (ns *Nats) MsgHandle(ctx tree.Context, m interface{}) {
 		NodeID:       nodeID,
 		Msg:          msgBytes,
 	}
-
 	data, err := ns.codec.Marshal(ack)
-	subject := Subject(ack.SendModule, int(ack.Id), int(ack.NodeID))
-	if err := ns.conn.Publish(subject, data); err != nil {
-		tlog.Log.Info("natsRpc: publish cast to %s: %v", subject, err)
-		return
-	}
-	tlog.Log.Debug("natsRpc: cast %T to %s", ack, subject)
-}
-
-// catsMsg 发送 fire-and-forget 消息到 NATS。
-func (ns *Nats) catsMsg(msg *NatsMsg) {
-	ns.nextRequestID.Add(1)
-
-	if msg == nil || msg.Msg == nil {
-		tlog.Log.Info("natsrpc: cast nil message")
-		return
-	}
-	if ns.conn == nil {
-		tlog.Log.Info("natsRpc: cast before Init")
-		return
-	}
-	//把消息转换成
-
-	data, err := ns.codec.Marshal(msg.Msg)
 	if err != nil {
-		tlog.Log.Info("natsRpc: marshal cast %T: %v", msg.Msg, err)
+		tlog.Log.Error("natsrpc: encode ack: %v", err)
 		return
 	}
-	subject := Subject(msg.TaggerName, msg.ID, msg.NodeId)
-	if err := ns.conn.Publish(subject, data); err != nil {
-		tlog.Log.Info("natsRpc: publish cast to %s: %v", subject, err)
+	subject := Subject(ack.SendModule, int(ack.Id), int(ack.NodeID))
+	if err := ns.publish(subject, data); err != nil {
+		tlog.Log.Info("natsrpc: publish ack to %s: %v", subject, err)
 		return
 	}
-	tlog.Log.Debug("natsRpc: cast %T to %s", msg.Msg, subject)
+	tlog.Log.Debug("natsrpc: publish %T to %s", ack, subject)
 }
 
-// handleCall 在 NatsActor goroutine 内执行：生成 reply inbox subject，存 pending，发消息。
-func (ns *Nats) handleCall(ctx tree.Context, m *NatsMsg) {
+// catsMsg sends a fire-and-forget message wrapped in NatsMsgNtf. The wrapper
+// carries the target actor name; the NATS subject addresses module/server/node.
+func (ns *Nats) catsMsg(msg *NatsMsg) error {
+	if msg == nil || msg.Msg == nil {
+		return fmt.Errorf("natsrpc: cast nil message")
+	}
+	payload, err := ns.codec.Marshal(msg.Msg)
+	if err != nil {
+		return fmt.Errorf("natsrpc: marshal cast %T: %w", msg.Msg, err)
+	}
 	sessionID := ns.nextRequestID.Add(1)
+	ntf := &sspb.NatsMsgNtf{
+		SessionID:    sessionID,
+		SendModule:   ns.typ,
+		TaggerModule: msg.TaggerModule,
+		SendName:     msg.SendName,
+		TaggerName:   msg.TaggerName,
+		Id:           int32(msg.ID),
+		NodeID:       int32(msg.NodeId),
+		Msg:          payload,
+	}
+	data, err := ns.codec.Marshal(ntf)
+	if err != nil {
+		return fmt.Errorf("natsrpc: marshal notification: %w", err)
+	}
+	subject := Subject(msg.TaggerModule, msg.ID, msg.NodeId)
+	if err := ns.publish(subject, data); err != nil {
+		return fmt.Errorf("natsrpc: publish cast to %s: %w", subject, err)
+	}
+	tlog.Log.Debug("natsrpc: cast %T to %s", msg.Msg, subject)
+	return nil
+}
+
+// handleCall runs in the Nats actor goroutine.
+func (ns *Nats) handleCall(ctx tree.Context, m *NatsMsg) {
 	if m == nil {
+		ctx.Response(nil, fmt.Errorf("natsrpc: nil call"))
+		return
+	}
+	env := ctx.RequestEnvelope()
+	if env == nil {
+		tlog.Log.Error("natsrpc: call must be sent as a Tree request")
+		return
+	}
+	ns.sendCall(m, env)
+}
+
+// sendCall contains the transport-facing request logic and is intentionally
+// independent of tree.Context so encoding, publication and timeout behavior can
+// be tested without a live NATS server.
+func (ns *Nats) sendCall(m *NatsMsg, env *tree.Envelope) {
+	if m == nil || env == nil {
 		return
 	}
 	timeout := m.Timeout
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
-	//这里把消息转换一下发给nats 服务器， 比如一个natsReq 然后 订阅者收到以后应该也是一个req
-	//这个req是NatS发给目标actor,给目标actor一定是投递一个带有回复的请求 tree.Request 这里不需要设置回调函数
-	//回调函数在nats收到目标actor数据以后根据消息回复给你发送者的actor，这里必须给你每一条消息建立一个map，一遍回包使用
-
-	ns.ReqMsgMap[sessionID] = ctx.RequestEnvelope()
-
-	//编码如何无法编码直接返回err
-
-	byteMsg, err := ns.codec.Marshal(m.Msg)
+	payload, err := ns.codec.Marshal(m.Msg)
 	if err != nil {
-		ctx.Response(nil, err)
-		tlog.Log.Error("natsRpc call msg marshal: %v", err)
+		env.Respond(nil, fmt.Errorf("natsrpc: marshal call payload: %w", err))
 		return
 	}
-	natsReqMsg := &sspb.NatsMsgReq{
+
+	sessionID := ns.nextRequestID.Add(1)
+	originModule := m.SendModule
+	if originModule == "" {
+		originModule = ns.typ
+	}
+	req := &sspb.NatsMsgReq{
 		SessionID:    sessionID,
-		SendModule:   m.SendModule,
+		SendModule:   originModule,
 		TaggerModule: m.TaggerModule,
 		SendName:     m.SendName,
 		TaggerName:   m.TaggerName,
-		Id:           int32(m.ID),
-		NodeID:       int32(m.NodeId),
-		Msg:          byteMsg,
+		// Id and NodeID identify the request origin so the target can route ACK.
+		Id:     int32(ns.serverId),
+		NodeID: int32(ns.nodeId),
+		Msg:    payload,
 	}
-
-	natsReqMsgBytes, err := ns.codec.Marshal(natsReqMsg)
+	data, err := ns.codec.Marshal(req)
 	if err != nil {
-		ctx.Response(nil, err)
-		tlog.Log.Error("natsRpc call msg marshal: %v", err)
-		return
-	}
-	subject := Subject(m.TaggerModule, m.ID, m.NodeId)
-	if err := ns.conn.Publish(subject, natsReqMsgBytes); err != nil {
-		tlog.Log.Info("natsRpc: publish cast to %s: %v", subject, err)
+		env.Respond(nil, fmt.Errorf("natsrpc: marshal request: %w", err))
 		return
 	}
 
-	tlog.Log.Debug("natsRpc: cast call %T to %s", m.Msg, subject)
+	ns.ReqMsgMap[sessionID] = env
+	subject := Subject(m.TaggerModule, m.ID, m.NodeId)
+	if err := ns.publish(subject, data); err != nil {
+		delete(ns.ReqMsgMap, sessionID)
+		env.Respond(nil, fmt.Errorf("natsrpc: publish call to %s: %w", subject, err))
+		return
+	}
+	if ns.afterTimeout != nil {
+		if h := ns.afterTimeout(timeout, sessionID); h != nil {
+			ns.requestTimers[sessionID] = h
+		}
+	}
+	tlog.Log.Debug("natsrpc: call %T to %s", m.Msg, subject)
+}
+
+func (ns *Nats) timeoutRequest(sessionID int64) {
+	ns.finishPending(sessionID, nil, tree.ErrTimeout)
+}
+
+func (ns *Nats) finishPending(sessionID int64, value interface{}, err error) {
+	env, ok := ns.ReqMsgMap[sessionID]
+	if !ok {
+		return
+	}
+	delete(ns.ReqMsgMap, sessionID)
+	if h := ns.requestTimers[sessionID]; h != nil {
+		h.Stop()
+	}
+	delete(ns.requestTimers, sessionID)
+	env.Respond(value, err)
 }

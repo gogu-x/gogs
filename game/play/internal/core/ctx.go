@@ -92,7 +92,7 @@ func (c *Context) CastPlayerIdMsg(uid uint64, msg proto.Message) bool {
 // 仍然可以 Response、仍然能透传 trace values。分发在本 goroutine 内完成，
 // 返回时上下文绑定已解除，监听者不得留存 ctx。
 func (c *Context) Emit(name comm.EventName, arg *comm.Arg) int {
-	return c.Play.emit(name, arg)
+	return c.Play.emitWithContext(c, name, arg)
 }
 
 // After 挂一条一次性延时任务。注意定时回调拿到的是 SysCtx 而不是本 Context，
