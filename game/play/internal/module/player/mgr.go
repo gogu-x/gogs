@@ -1,14 +1,5 @@
 package player
 
-import (
-	"time"
-)
-
-const collPlayer = "player"
-
-// loadTimeout 是同步加载玩家数据的最大等待时间，超时则放弃，避免 goroutine 永久阻塞。
-const loadTimeout = 5 * time.Second
-
 // PlayerMgr 管理本节点所有在线玩家，只在 Play Actor goroutine 内访问，无需加锁。
 type PlayerMgr struct {
 	players map[uint64]*Player

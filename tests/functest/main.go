@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "github.com/gogu-x/gogs/pb"
@@ -22,11 +24,11 @@ import (
 )
 
 var (
-	addrs       = flag.String("addrs", "ws://127.0.0.1:8081/ws,ws://127.0.0.1:8082/ws", "gate websocket addresses (comma-separated)")
+	addrs       = flag.String("addrs", "ws://127.0.0.1:8081/ws", "gate websocket addresses (comma-separated)")
 	serverID    = flag.Int("server-id", 1, "game server id")
-	users       = flag.Int("users", 1, "total user count")
-	concurrency = flag.Int("c", 1, "max concurrent connections")
-	dialRate    = flag.Int("dial-rate", 1, "max new dials per second")
+	users       = flag.Int("users", 10000, "total user count")
+	concurrency = flag.Int("c", 100, "max concurrent connections")
+	dialRate    = flag.Int("dial-rate", 1000, "max new dials per second")
 	timeout     = flag.Duration("timeout", 10*time.Second, "per-message read timeout")
 
 	gateAddrs []string
@@ -135,53 +137,48 @@ func main() {
 	gateAddrs = strings.Split(*addrs, ",")
 	log.Printf("压测开始: addrs=%v users=%d", gateAddrs, *users)
 
-	runUser(1)
+	var (
+		wg      sync.WaitGroup
+		success int64
+		failure int64
+		//start   = time.Now()
+		sem = make(chan struct{}, *concurrency)
 
-	for true {
+		errMu    sync.Mutex
+		errCount = map[string]int{}
+	)
 
+	// dialRate 限速：每秒最多建 dialRate 个新连接，避免瞬间冲击 OS backlog
+	ticker := time.NewTicker(time.Second / time.Duration(*dialRate))
+	defer ticker.Stop()
+
+	wg.Add(*users)
+	for i := range *users {
+		<-ticker.C // 控制建连速率
+		sem <- struct{}{}
+		go func(idx int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if err := runUser(idx); err != nil {
+				atomic.AddInt64(&failure, 1)
+				// 按错误前缀（"dial:"/"register recv:"等）分类计数
+				key := err.Error()
+				if idx := len(key); idx > 40 {
+					key = key[:40]
+				}
+				errMu.Lock()
+				errCount[key]++
+				errMu.Unlock()
+			} else {
+				n := atomic.AddInt64(&success, 1)
+				if n%int64(*dialRate) == 0 {
+					log.Printf("progress: %d/%d done", n, *users)
+				}
+			}
+		}(i)
 	}
-	//var (
-	//	wg      sync.WaitGroup
-	//	success int64
-	//	failure int64
-	//	start   = time.Now()
-	//	sem     = make(chan struct{}, *concurrency)
-	//
-	//	errMu    sync.Mutex
-	//	errCount = map[string]int{}
-	//)
+	wg.Wait()
 
-	//// dialRate 限速：每秒最多建 dialRate 个新连接，避免瞬间冲击 OS backlog
-	//ticker := time.NewTicker(time.Second / time.Duration(*dialRate))
-	//defer ticker.Stop()
-	//
-	//wg.Add(*users)
-	//for i := range *users {
-	//	<-ticker.C // 控制建连速率
-	//	sem <- struct{}{}
-	//	go func(idx int) {
-	//		defer wg.Done()
-	//		defer func() { <-sem }()
-	//		if err := runUser(idx); err != nil {
-	//			atomic.AddInt64(&failure, 1)
-	//			// 按错误前缀（"dial:"/"register recv:"等）分类计数
-	//			key := err.Error()
-	//			if idx := len(key); idx > 40 {
-	//				key = key[:40]
-	//			}
-	//			errMu.Lock()
-	//			errCount[key]++
-	//			errMu.Unlock()
-	//		} else {
-	//			n := atomic.AddInt64(&success, 1)
-	//			if n%int64(*dialRate) == 0 {
-	//				log.Printf("progress: %d/%d done", n, *users)
-	//			}
-	//		}
-	//	}(i)
-	//}
-	//wg.Wait()
-	//
 	//elapsed := time.Since(start)
 
 	//total := success + failure

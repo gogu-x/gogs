@@ -1,9 +1,11 @@
 package play
 
 import (
-	"github.com/gogu-x/gogs/game/play/internal"
+	"github.com/gogu-x/gogs/game/play/internal/core"
+	"github.com/gogu-x/tree"
 )
 
-func NewPlay() *internal.Play {
-	return &internal.Play{}
+// NewPlay 创建 play 模块的 Actor。
+func NewPlay() tree.Actor {
+	return &core.Play{}
 }

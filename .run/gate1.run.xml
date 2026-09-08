@@ -1,12 +1,12 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="gate1" type="GoApplicationRunConfiguration" factoryName="Go Application">
-    <module name="gotree" />
-    <working_directory value="$PROJECT_DIR$/gogs/gate" />
-    <parameters value="--gate-id 1 --server-id 1 --node-id 1" />
+    <module name="gogs" />
+    <working_directory value="$PROJECT_DIR$/gate" />
+    <parameters value="--gate-id 1 --server-id 1 --node-id 1 --etcd 127.0.0.1:2379 --nats-url nats://127.0.0.1:4222" />
     <kind value="FILE" />
     <package value="github.com/gogu-x/gogs" />
     <directory value="$PROJECT_DIR$" />
-    <filePath value="$PROJECT_DIR$/gogs/gate/main.go" />
+    <filePath value="$PROJECT_DIR$/gate/main.go" />
     <method v="2" />
   </configuration>
 </component>

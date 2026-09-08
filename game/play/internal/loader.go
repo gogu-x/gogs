@@ -1,5 +1,9 @@
 package internal
 
+import (
+	"github.com/gogu-x/gogs/game/play/internal/core"
+)
+
 type Db interface {
 	Loader()
 	Save()
@@ -17,7 +21,7 @@ func NewDbMgr() *DbMgr {
 }
 
 // OnLoader 统一加载 将play 上面的数据统一调度加载到play上面只限注册到db里面的，这里应该要按类型注册，查找然后绑定数据
-func (mgr *DbMgr) OnLoader(play *Play) {
+func (mgr *DbMgr) OnLoader(play *core.Play) {
 
 }
 

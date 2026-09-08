@@ -58,7 +58,7 @@ func (a *Actor) OnInit(_ actor.Context) {
 	a.router.Register(&FindOne{}, a.onFind)
 	a.router.Register(&UpdateOne{}, a.onUpdate)
 	a.router.Register(&DeleteOne{}, a.onDelete)
-	log.Printf("rpc/mongo: ready, db=%s", a.db.Name())
+	tlog.Log.Info("rpc/mongo: ready, db=%s", a.db.Name())
 }
 
 func (a *Actor) HandleMessage(ctx actor.Context, msg interface{}) {

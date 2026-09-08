@@ -3,7 +3,7 @@
 nul
 .idea/
 tree/
-
+.run
 
 # Local service connection settings; copy config.example.json and set secrets locally.
 /config.json
