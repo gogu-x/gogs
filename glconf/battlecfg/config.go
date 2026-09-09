@@ -1,11 +1,12 @@
-package engine
+package battlecfg
 
 import (
 	"fmt"
-	"sync"
+
+	"github.com/gogu-x/gogs/battle/iproto"
 )
 
-func (c Config) Validate() error {
+func (c iproto.Config) Validate() error {
 	if c.Version == "" {
 		return invalid("config.version", "required")
 	}
@@ -31,13 +32,13 @@ func (c Config) Validate() error {
 		if id == "" || s.ID != id {
 			return invalid("status.id", "map key and id must match")
 		}
-		if s.Kind < StatusStun || s.Kind > StatusAttributeModifier {
+		if s.Kind < iproto.StatusStun || s.Kind > iproto.StatusAttributeModifier {
 			return invalid("status.kind", "unknown")
 		}
 		if s.DurationTurns <= 0 {
 			return invalid("status.duration_turns", "must be positive")
 		}
-		if (s.Kind == StatusDOT || s.Kind == StatusHOT) && s.Potency <= 0 {
+		if (s.Kind == iproto.StatusDOT || s.Kind == iproto.StatusHOT) && s.Potency <= 0 {
 			return invalid("status.potency", "must be positive for periodic status")
 		}
 	}
@@ -50,11 +51,11 @@ func (c Config) Validate() error {
 		}
 		for _, e := range s.Effects {
 			switch e.Kind {
-			case EffectDamage, EffectHeal:
+			case iproto.EffectDamage, iproto.EffectHeal:
 				if e.CoefficientPermille < 0 {
 					return invalid("effect.coefficient_permille", "must not be negative")
 				}
-			case EffectApplyStatus:
+			case iproto.EffectApplyStatus:
 				if _, ok := c.Statuses[e.StatusID]; !ok {
 					return invalid("effect.status_id", "not found")
 				}
@@ -82,7 +83,7 @@ func (c Config) Validate() error {
 	return nil
 }
 
-func (in BattleInput) Validate(c Config) error {
+func (in iproto.BattleInput) Validate(c iproto.Config) error {
 	if in.ConfigVersion == "" || in.ConfigVersion != c.Version {
 		return invalid("input.config_version", "does not match config")
 	}
@@ -91,7 +92,7 @@ func (in BattleInput) Validate(c Config) error {
 	}
 	ids := make(map[string]struct{}, len(in.Combatants))
 	positions := make(map[string]struct{}, len(in.Combatants))
-	teams := map[Team]int{}
+	teams := map[iproto.Team]int{}
 	for _, p := range in.Combatants {
 		if p.InstanceID == "" {
 			return invalid("combatant.instance_id", "required")
@@ -116,70 +117,29 @@ func (in BattleInput) Validate(c Config) error {
 		}
 		teams[p.Team]++
 	}
-	if teams[TeamAttacker] == 0 || teams[TeamDefender] == 0 {
+	if teams[iproto.TeamAttacker] == 0 || teams[iproto.TeamDefender] == 0 {
 		return invalid("input.combatants", "both teams required")
 	}
 	return nil
 }
 
-func cloneConfig(c Config) Config {
+func cloneConfig(c iproto.Config) iproto.Config {
 	out := c
-	out.Units = make(map[string]UnitConfig, len(c.Units))
+	out.Units = make(map[string]iproto.UnitConfig, len(c.Units))
 	for k, v := range c.Units {
 		v.ActiveSkillIDs = append([]string(nil), v.ActiveSkillIDs...)
 		out.Units[k] = v
 	}
-	out.Skills = make(map[string]SkillConfig, len(c.Skills))
+	out.Skills = make(map[string]iproto.SkillConfig, len(c.Skills))
 	for k, v := range c.Skills {
-		v.Effects = append([]EffectConfig(nil), v.Effects...)
+		v.Effects = append([]iproto.EffectConfig(nil), v.Effects...)
 		out.Skills[k] = v
 	}
-	out.Statuses = make(map[string]StatusConfig, len(c.Statuses))
+	out.Statuses = make(map[string]iproto.StatusConfig, len(c.Statuses))
 	for k, v := range c.Statuses {
 		out.Statuses[k] = v
 	}
 	return out
 }
 
-type ConfigRepository interface {
-	Put(Config) error
-	Get(version string) (Config, error)
-}
-
-type MemoryConfigRepository struct {
-	mu       sync.RWMutex
-	versions map[string]Config
-	hashes   map[string]string
-}
-
-func NewMemoryConfigRepository() *MemoryConfigRepository {
-	return &MemoryConfigRepository{versions: map[string]Config{}, hashes: map[string]string{}}
-}
-
-func (r *MemoryConfigRepository) Put(c Config) error {
-	if err := c.Validate(); err != nil {
-		return err
-	}
-	hash, err := StableConfigHash(c)
-	if err != nil {
-		return err
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if old, exists := r.hashes[c.Version]; exists && old != hash {
-		return fmt.Errorf("config version %q already exists with different content", c.Version)
-	}
-	r.versions[c.Version] = cloneConfig(c)
-	r.hashes[c.Version] = hash
-	return nil
-}
-
-func (r *MemoryConfigRepository) Get(version string) (Config, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	c, ok := r.versions[version]
-	if !ok {
-		return Config{}, fmt.Errorf("config version %q not found", version)
-	}
-	return cloneConfig(c), nil
-}
+func invalid(field, reason string) error { return fmt.Errorf("invalid %s: %s", field, reason) }

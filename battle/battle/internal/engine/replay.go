@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+
+	. "github.com/gogu-x/gogs/battle/iproto"
+	. "github.com/gogu-x/gogs/glconf/battlecfg"
 )
 
 type Replay struct {
@@ -44,7 +47,7 @@ func (b *Battle) resultChecksum(result Result) (string, error) {
 		}
 		state = append(state, cu)
 	}
-	return hashJSON(struct {
+	return HashJSON(struct {
 		BattleID   string         `json:"battle_id"`
 		ConfigHash string         `json:"config_hash"`
 		Outcome    Outcome        `json:"outcome"`

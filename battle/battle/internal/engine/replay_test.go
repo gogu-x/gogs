@@ -1,6 +1,11 @@
 package engine
 
-import "testing"
+import (
+	"testing"
+
+	. "github.com/gogu-x/gogs/battle/iproto"
+	. "github.com/gogu-x/gogs/glconf/battlecfg"
+)
 
 func TestDeterministicBattleIDAndChecksumTable(t *testing.T) {
 	tests := []struct {

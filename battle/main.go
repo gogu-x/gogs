@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/gogu-x/gogs/battle/service"
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
+	"github.com/gogu-x/gogs/glconf/battlecfg"
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb"
 	"github.com/gogu-x/gogs/rpc/mongorpc"
@@ -28,7 +28,7 @@ func main() {
 				return err
 			}
 			tlog.NewLog(conf.LogPath, 0)
-			configs, err := service.LoadConfigRepository(conf.BattleConfigPath)
+			configs, err := battlecfg.LoadConfigRepository(conf.BattleConfigPath)
 			if err != nil {
 				return err
 			}
@@ -42,9 +42,10 @@ func main() {
 			}
 
 			db := mongorpc.Connect(conf.MongoURL, conf.MongoUsername, conf.MongoPassword, "battle")
-			reports := service.NewMongoRepository(db, "battle_reports")
+
 			tree.Spawn(
-				service.New(configs, reports, service.NATSNotifier{}, service.Options{Workers: conf.BattleWorkers, QueueSize: conf.BattleQueueSize, RetryAttempts: conf.BattleRetryCount, RetryDelay: time.Duration(conf.BattleRetryDelay) * time.Millisecond}),
+				mongorpc.NewActor(def.Mongo, db),
+				service.New(),
 				natsrpc.NewNats(natsrpc.Battle, conf.ServerID, conf.NodeId, conf.NatsURL),
 			)
 			fmt.Printf("battle service [%d/%d] registered at %s\n", conf.ServerID, conf.NodeId, conf.BattleAddr())

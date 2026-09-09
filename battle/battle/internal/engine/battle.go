@@ -3,6 +3,8 @@ package engine
 import (
 	"fmt"
 	"sort"
+
+	. "github.com/gogu-x/gogs/glconf/battlecfg"
 )
 
 type activeStatus struct {
@@ -87,7 +89,7 @@ func NewBattle(repo ConfigRepository, input BattleInput) (*Battle, error) {
 	if err := input.Validate(config); err != nil {
 		return nil, err
 	}
-	input = canonicalInput(input)
+	input = CanonicalInput(input)
 	inputHash, err := StableInputHash(input)
 	if err != nil {
 		return nil, err
@@ -96,7 +98,7 @@ func NewBattle(repo ConfigRepository, input BattleInput) (*Battle, error) {
 	if err != nil {
 		return nil, err
 	}
-	idHash, err := hashJSON(struct{ InputHash, ConfigHash string }{inputHash, configHash})
+	idHash, err := HashJSON(struct{ InputHash, ConfigHash string }{inputHash, configHash})
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +381,7 @@ func (b *Battle) Run() (Result, error) {
 		}
 		actor := b.nextActor()
 		if actor == nil {
-			return Result{}, fmt.Errorf("no living actor available")
+			return Result{}, fmt.Errorf("no living battle available")
 		}
 		b.execute(actor)
 	}

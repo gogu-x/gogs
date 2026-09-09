@@ -28,18 +28,13 @@ type Play struct {
 	TimeWheel *timer.TimeWheel
 
 	router tree.Router
-	ctx    tree.Context
-	active *Context
-
 	// Boot 在公共能力就绪之后、开服事件触发之前被调用，由上层装配时注入，
-	// 用于注册路由、事件监听与定时任务。
 	Boot func(*Play)
 }
 
 func (py *Play) Name() string { return def.PLAY }
 
 func (py *Play) OnInit(ctx tree.Context) {
-	py.ctx = ctx
 	py.PlayerMgr = player.NewPlayerMgr()
 	py.Event = comm.NewEvent()
 	py.TimeWheel = timer.NewTimeWheel(timeWheelChanLen, ctx.Self(), ctx.System())
@@ -64,63 +59,35 @@ func (py *Play) OnStop(_ tree.Context) {
 // Router 供上层注册路由。tree.Router 的方法是指针接收者，故返回指针。
 func (py *Play) Router() *tree.Router { return &py.router }
 
-// BootCtx 返回 OnInit 期捕获的 Actor context，仅可用于取 Self() / System()。
-//
-// 它不携带任何请求信息（sender / request / values 均为零值），因此
-// 处理请求时一律使用 Context.TreeCtx，否则 Response 会静默失效。
-func (py *Play) BootCtx() tree.Context { return py.ctx }
-
 // EventFunc 是事件监听的业务签名。ctx 由框架注入：请求中触发的
 // 事件复用请求 Context，开服等系统事件使用不带请求信息的 SysCtx。
-type EventFunc func(ctx *Context, arg *comm.Arg)
-
-func (py *Play) sysCtx() *Context {
-	return &Context{Play: py, TreeCtx: py.ctx}
-}
-
-func (py *Play) withContext(ctx *Context, fn func()) {
-	previous := py.active
-	py.active = ctx
-	defer func() { py.active = previous }()
-	fn()
-}
+type EventFunc func(play *Play, arg *comm.Arg)
 
 func (py *Play) OnEvent(name comm.EventName, fn EventFunc, priority ...int) {
 	if fn == nil {
 		return
 	}
 	py.Event.Register(name, func(arg *comm.Arg) {
-		ctx := py.active
-		if ctx == nil {
-			ctx = py.sysCtx()
-		}
-		fn(ctx, arg)
+		fn(py, arg)
 	}, priority...)
 }
 
 // Emit always starts a system event scope. Context.Emit should be used while
 // handling a request so sender/request metadata is retained.
 func (py *Play) Emit(name comm.EventName, arg *comm.Arg) int {
-	return py.emitWithContext(py.sysCtx(), name, arg)
-}
-
-func (py *Play) emitWithContext(ctx *Context, name comm.EventName, arg *comm.Arg) int {
-	count := 0
-	py.withContext(ctx, func() { count = py.Event.Emit(name, arg) })
-	return count
+	return py.Event.Emit(name, arg)
 }
 
 // ---------- 定时器 ----------
 
-type TimerFunc func(ctx *Context, data interface{})
+type TimerFunc func(play *Play, data interface{})
 
 func (py *Play) OnTimer(timerType timer.TimerType, fn TimerFunc) {
 	if fn == nil {
 		return
 	}
 	py.TimeWheel.Register(timerType, func(data interface{}) {
-		ctx := py.sysCtx()
-		py.withContext(ctx, func() { fn(ctx, data) })
+		fn(py, data)
 	})
 }
 

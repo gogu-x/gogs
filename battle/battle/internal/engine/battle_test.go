@@ -3,6 +3,9 @@ package engine
 import (
 	"reflect"
 	"testing"
+
+	. "github.com/gogu-x/gogs/battle/iproto"
+	. "github.com/gogu-x/gogs/glconf/battlecfg"
 )
 
 func newTestBattle(t *testing.T, c Config, in BattleInput) *Battle {
@@ -94,7 +97,12 @@ func TestIntegerEventJumpATBTable(t *testing.T) {
 func TestFourTargetRulesTable(t *testing.T) {
 	c := testConfig()
 	in := testInput()
-	in.Combatants = []CombatantInput{{"a0", "fighter", TeamAttacker, 0}, {"a1", "fighter", TeamAttacker, 1}, {"d0", "fighter", TeamDefender, 0}, {"d1", "fighter", TeamDefender, 1}}
+	in.Combatants = []CombatantInput{
+		{InstanceID: "a0", ConfigID: "fighter", Team: TeamAttacker, Position: 0},
+		{InstanceID: "a1", ConfigID: "fighter", Team: TeamAttacker, Position: 1},
+		{InstanceID: "d0", ConfigID: "fighter", Team: TeamDefender, Position: 0},
+		{InstanceID: "d1", ConfigID: "fighter", Team: TeamDefender, Position: 1},
+	}
 	b := newTestBattle(t, c, in)
 	findUnit(b, "a1").HP = 20
 	tests := []struct {

@@ -10,10 +10,10 @@ type uidRequest interface {
 	GetUID() uint64
 }
 
-// RegisterPlayer 注册必须已有在线玩家的 UID 请求。
+// RegisterPlayerMsg 注册必须已有在线玩家的 UID 请求。
 //
 // 校验通过的玩家会直接注入 Context.Player，业务侧无需再查一次。
-func RegisterPlayer[Req any](
+func RegisterPlayerMsg[Req any](
 	py *Play,
 	prototype Req,
 	h func(*Context, Req),
@@ -21,8 +21,6 @@ func RegisterPlayer[Req any](
 	py.Router().Register(prototype, func(ctx tree.Context, msg interface{}) {
 		request, ok := msg.(uidRequest)
 		if !ok || request.GetUID() == 0 {
-			// 显式回错：若本条消息是通过 Request 发来的，静默 return 会让
-			// 请求方一直等到超时。非请求消息下 Response 是空操作。
 			ctx.Response(nil, fmt.Errorf("play: %T missing uid", msg))
 			return
 		}
@@ -37,12 +35,12 @@ func RegisterPlayer[Req any](
 			Req:     msg,
 			Player:  p,
 		}
-		py.withContext(requestCtx, func() { h(requestCtx, msg.(Req)) })
+		h(requestCtx, msg.(Req))
 	})
 }
 
-// RegisterSys 注册登录及其他不要求玩家已在线的消息，Context.Player 为 nil。
-func RegisterSys[Msg any](
+// RegisterSysMsg 注册登录及其他不要求玩家已在线的消息，Context.Player 为 nil。
+func RegisterSysMsg[Msg any](
 	py *Play,
 	prototype Msg,
 	h func(*Context, Msg),
@@ -53,6 +51,6 @@ func RegisterSys[Msg any](
 			TreeCtx: ctx,
 			Req:     msg,
 		}
-		py.withContext(requestCtx, func() { h(requestCtx, msg.(Msg)) })
+		h(requestCtx, msg.(Msg))
 	})
 }

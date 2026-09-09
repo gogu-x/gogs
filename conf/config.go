@@ -23,8 +23,6 @@ var (
 
 	// BattleConfigPath 可选的 JSON 引擎配置；为空时使用内置开发配置。
 	BattleConfigPath = ""
-	BattleWorkers    = 2
-	BattleQueueSize  = 64
 	BattleRetryCount = 3
 	BattleRetryDelay = 1000
 
@@ -87,8 +85,6 @@ func ConnectionFlags() []cli.Flag {
 		&cli.IntFlag{Name: "battle-base-port", Usage: "battle service discovery base port"},
 		&cli.StringFlag{Name: "battle-host", Usage: "battle service discovery host"},
 		&cli.StringFlag{Name: "battle-config", Usage: "battle engine JSON config"},
-		&cli.IntFlag{Name: "battle-workers", Usage: "battle bounded worker count"},
-		&cli.IntFlag{Name: "battle-queue-size", Usage: "battle bounded work queue size"},
 		&cli.IntFlag{Name: "battle-retry-count", Usage: "battle result delivery attempts"},
 		&cli.IntFlag{Name: "battle-retry-delay-ms", Usage: "battle result retry delay in milliseconds"},
 		&cli.StringFlag{Name: "grpc-host", Usage: "game gRPC host"},
@@ -124,12 +120,6 @@ func LoadAndApply(c *cli.Command) error {
 	}
 	if c.IsSet("battle-config") {
 		BattleConfigPath = c.String("battle-config")
-	}
-	if c.IsSet("battle-workers") {
-		BattleWorkers = c.Int("battle-workers")
-	}
-	if c.IsSet("battle-queue-size") {
-		BattleQueueSize = c.Int("battle-queue-size")
 	}
 	if c.IsSet("battle-retry-count") {
 		BattleRetryCount = c.Int("battle-retry-count")

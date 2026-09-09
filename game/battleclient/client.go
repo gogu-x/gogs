@@ -278,6 +278,8 @@ func (NATSSender) Start(node Node, req *pb.StartBattleReq) error {
 	return natsrpc.Cast(natsrpc.Battle, def.BattleService, node.ServerID, node.NodeID, req)
 }
 
+// Confirm 发往该场战斗的 per-battle battle（按 battle_id 推导 battle 名），
+// 使确认从 BATTLE_SERVICE manager 直达战斗 battle。
 func (NATSSender) Confirm(node Node, msg *pb.BattleResultConfirmedNtf) error {
-	return natsrpc.Cast(natsrpc.Battle, def.BattleService, node.ServerID, node.NodeID, msg)
+	return natsrpc.Cast(natsrpc.Battle, def.BattleActorName(msg.BattleId), node.ServerID, node.NodeID, msg)
 }

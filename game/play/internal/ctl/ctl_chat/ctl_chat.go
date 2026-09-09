@@ -11,6 +11,6 @@ func OnServerStart(ctx *core.Context, arg *comm.Arg) {
 }
 
 // OnLogin 登录事件。
-func OnLogin(ctx *core.Context, arg *comm.Arg) {
+func OnLogin(play *core.Play, arg *comm.Arg) {
 
 }

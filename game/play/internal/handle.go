@@ -1,12 +1,9 @@
 package internal
 
 import (
-	"fmt"
-
-	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/game/battleclient"
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_auth"
+	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_battle"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_auth"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
@@ -18,12 +15,9 @@ import (
 func InitRoutes(py *core.Play) {
 	py.Router().Register((*ipb.SessionClosed)(nil), onSessionClosed(py))
 	//注册回调时的消息路由
-	core.RegisterSys(py, (*pb_auth.LoginGameReq)(nil), ctl_auth.AutoLogin)
-	core.RegisterPlayer(py, (*pb_battle.StartBattleReq)(nil), func(ctx *core.Context, req *pb_battle.StartBattleReq) {
-		if !ctx.Cast(def.BattleClient, &battleclient.Begin{UID: req.UID, Input: req.Input}) {
-			ctx.Response(nil, fmt.Errorf("play: battle client is unavailable"))
-		}
-	})
+	core.RegisterSysMsg(py, (*pb_auth.LoginGameReq)(nil), ctl_auth.AutoLogin)
+
+	core.RegisterPlayerMsg(py, (*pb_battle.StartBattleReq)(nil), ctl_battle.OnCreateBattle)
 }
 
 // onSessionClosed 网关会话断开时清理本节点的在线玩家。

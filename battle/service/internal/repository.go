@@ -1,4 +1,4 @@
-package service
+package internal
 
 import (
 	"context"
@@ -9,42 +9,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gogu-x/gogs/battle/engine"
+	"github.com/gogu-x/gogs/battle/battle/internal"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-var ErrReportNotFound = errors.New("battle report not found")
+// 战报模型与存取契约定义在 battle/battle（归属 per-battle battle 的战报）；
+// 本文件只提供 Repository 的两种进程内实现（内存 / Mongo）。
 
-// Report is the durable hand-off between battle execution and result delivery.
-// A Finished notification must never be sent before this document is saved.
-type Report struct {
-	BattleID       string        `bson:"_id" json:"battle_id"`
-	UID            uint64        `bson:"uid" json:"uid"`
-	SourceServerID int           `bson:"source_server_id" json:"source_server_id"`
-	SourceNodeID   int           `bson:"source_node_id" json:"source_node_id"`
-	Result         engine.Result `bson:"result" json:"result"`
-	CreatedAt      time.Time     `bson:"created_at" json:"created_at"`
-	UpdatedAt      time.Time     `bson:"updated_at" json:"updated_at"`
-	Confirmed      bool          `bson:"confirmed" json:"confirmed"`
-}
-
-type Repository interface {
-	Save(context.Context, Report) error
-	Get(context.Context, string) (Report, error)
-	ListByPlayer(context.Context, uint64, int) ([]Report, error)
-	Confirm(context.Context, string) error
-}
-
-func cloneReport(in Report) (Report, error) {
+func cloneReport(in internal.Report) (internal.Report, error) {
 	data, err := json.Marshal(in)
 	if err != nil {
-		return Report{}, err
+		return internal.Report{}, err
 	}
-	var out Report
+	var out internal.Report
 	if err := json.Unmarshal(data, &out); err != nil {
-		return Report{}, err
+		return internal.Report{}, err
 	}
 	return out, nil
 }
@@ -53,14 +34,14 @@ func cloneReport(in Report) (Report, error) {
 // end-to-end tests so neither MongoDB nor NATS is required.
 type MemoryRepository struct {
 	mu      sync.RWMutex
-	reports map[string]Report
+	reports map[string]internal.Report
 }
 
 func NewMemoryRepository() *MemoryRepository {
-	return &MemoryRepository{reports: make(map[string]Report)}
+	return &MemoryRepository{reports: make(map[string]internal.Report)}
 }
 
-func (r *MemoryRepository) Save(_ context.Context, report Report) error {
+func (r *MemoryRepository) Save(_ context.Context, report internal.Report) error {
 	if report.BattleID == "" || report.Result.BattleID != report.BattleID {
 		return fmt.Errorf("battle repository: invalid report identity")
 	}
@@ -74,22 +55,22 @@ func (r *MemoryRepository) Save(_ context.Context, report Report) error {
 	return nil
 }
 
-func (r *MemoryRepository) Get(_ context.Context, battleID string) (Report, error) {
+func (r *MemoryRepository) Get(_ context.Context, battleID string) (internal.Report, error) {
 	r.mu.RLock()
 	report, ok := r.reports[battleID]
 	r.mu.RUnlock()
 	if !ok {
-		return Report{}, ErrReportNotFound
+		return internal.Report{}, internal.ErrReportNotFound
 	}
 	return cloneReport(report)
 }
 
-func (r *MemoryRepository) ListByPlayer(_ context.Context, uid uint64, limit int) ([]Report, error) {
+func (r *MemoryRepository) ListByPlayer(_ context.Context, uid uint64, limit int) ([]internal.Report, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	r.mu.RLock()
-	items := make([]Report, 0)
+	items := make([]internal.Report, 0)
 	for _, report := range r.reports {
 		if report.UID == uid {
 			items = append(items, report)
@@ -100,7 +81,7 @@ func (r *MemoryRepository) ListByPlayer(_ context.Context, uid uint64, limit int
 	if len(items) > limit {
 		items = items[:limit]
 	}
-	out := make([]Report, 0, len(items))
+	out := make([]internal.Report, 0, len(items))
 	for _, report := range items {
 		copy, err := cloneReport(report)
 		if err != nil {
@@ -116,7 +97,7 @@ func (r *MemoryRepository) Confirm(_ context.Context, battleID string) error {
 	defer r.mu.Unlock()
 	report, ok := r.reports[battleID]
 	if !ok {
-		return ErrReportNotFound
+		return internal.ErrReportNotFound
 	}
 	report.Confirmed = true
 	report.UpdatedAt = time.Now().UTC()
@@ -143,7 +124,7 @@ func (r *MongoRepository) withTimeout(parent context.Context) (context.Context, 
 	return context.WithTimeout(parent, r.timeout)
 }
 
-func (r *MongoRepository) Save(parent context.Context, report Report) error {
+func (r *MongoRepository) Save(parent context.Context, report internal.Report) error {
 	if report.BattleID == "" || report.Result.BattleID != report.BattleID {
 		return fmt.Errorf("battle repository: invalid report identity")
 	}
@@ -153,18 +134,18 @@ func (r *MongoRepository) Save(parent context.Context, report Report) error {
 	return err
 }
 
-func (r *MongoRepository) Get(parent context.Context, battleID string) (Report, error) {
+func (r *MongoRepository) Get(parent context.Context, battleID string) (internal.Report, error) {
 	ctx, cancel := r.withTimeout(parent)
 	defer cancel()
-	var report Report
+	var report internal.Report
 	err := r.collection.FindOne(ctx, bson.M{"_id": battleID}).Decode(&report)
 	if errors.Is(err, mongo.ErrNoDocuments) {
-		return Report{}, ErrReportNotFound
+		return internal.Report{}, internal.ErrReportNotFound
 	}
 	return report, err
 }
 
-func (r *MongoRepository) ListByPlayer(parent context.Context, uid uint64, limit int) ([]Report, error) {
+func (r *MongoRepository) ListByPlayer(parent context.Context, uid uint64, limit int) ([]internal.Report, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -175,7 +156,7 @@ func (r *MongoRepository) ListByPlayer(parent context.Context, uid uint64, limit
 		return nil, err
 	}
 	defer cursor.Close(ctx)
-	var reports []Report
+	var reports []internal.Report
 	if err := cursor.All(ctx, &reports); err != nil {
 		return nil, err
 	}
@@ -187,7 +168,7 @@ func (r *MongoRepository) Confirm(parent context.Context, battleID string) error
 	defer cancel()
 	res, err := r.collection.UpdateOne(ctx, bson.M{"_id": battleID}, bson.M{"$set": bson.M{"confirmed": true, "updated_at": time.Now().UTC()}})
 	if err == nil && res.MatchedCount == 0 {
-		return ErrReportNotFound
+		return internal.ErrReportNotFound
 	}
 	return err
 }

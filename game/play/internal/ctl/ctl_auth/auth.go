@@ -21,9 +21,6 @@ func AutoLogin(ctx *core.Context, req *pb_auth.LoginGameReq) {
 		ctx.Players().Add(player.NewPlayerData(playerId))
 	}
 
-	//触发登录事件。事件参数只传值类型：*core.Context 生命周期仅限本条消息，
-	//监听者一旦留存就会拿到失效的请求上下文。
-	//Context.Emit 会把当前请求上下文透传给监听者，因此监听者内部能力齐全。
 	arg := comm.NewArg()
 	arg.Set("playerId", playerId)
 	ctx.Emit(core.PlayerOnLogin, arg)

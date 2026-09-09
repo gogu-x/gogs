@@ -35,7 +35,7 @@ func spawnPlay(t *testing.T, boot func(*core.Play)) (*tree.Tree, tree.PID) {
 func TestContextResponseReachesRequester(t *testing.T) {
 	tr, pid := spawnPlay(t, func(py *core.Play) {
 		py.PlayerMgr.Add(player.NewPlayerData(testUID))
-		core.RegisterPlayer(py, (*testReq)(nil), func(ctx *core.Context, req *testReq) {
+		core.RegisterPlayerMsg(py, (*testReq)(nil), func(ctx *core.Context, req *testReq) {
 			ctx.Response(ctx.PlayerID(), nil)
 		})
 	})
@@ -53,7 +53,7 @@ func TestContextResponseReachesRequester(t *testing.T) {
 func TestRegisterPlayerInjectsPlayer(t *testing.T) {
 	tr, pid := spawnPlay(t, func(py *core.Play) {
 		py.PlayerMgr.Add(player.NewPlayerData(testUID))
-		core.RegisterPlayer(py, (*testReq)(nil), func(ctx *core.Context, req *testReq) {
+		core.RegisterPlayerMsg(py, (*testReq)(nil), func(ctx *core.Context, req *testReq) {
 			if ctx.Player == nil {
 				ctx.Response(nil, errNoPlayer)
 				return
@@ -75,7 +75,7 @@ func TestRegisterPlayerInjectsPlayer(t *testing.T) {
 // 而不是静默丢弃请求让调用方等到 DeadlineExceeded。
 func TestRegisterPlayerOfflineRespondsError(t *testing.T) {
 	tr, pid := spawnPlay(t, func(py *core.Play) {
-		core.RegisterPlayer(py, (*testReq)(nil), func(ctx *core.Context, req *testReq) {
+		core.RegisterPlayerMsg(py, (*testReq)(nil), func(ctx *core.Context, req *testReq) {
 			t.Error("handler 不应被调用：玩家不在线")
 		})
 	})
@@ -88,7 +88,7 @@ func TestRegisterPlayerOfflineRespondsError(t *testing.T) {
 // TestRegisterSysHasNilPlayer 验证系统消息下 Context.Player 为 nil 且 UID 为 0。
 func TestRegisterSysHasNilPlayer(t *testing.T) {
 	tr, pid := spawnPlay(t, func(py *core.Play) {
-		core.RegisterSys(py, (*testReq)(nil), func(ctx *core.Context, req *testReq) {
+		core.RegisterSysMsg(py, (*testReq)(nil), func(ctx *core.Context, req *testReq) {
 			ctx.Response(ctx.Player == nil && ctx.PlayerID() == 0, nil)
 		})
 	})

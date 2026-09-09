@@ -25,7 +25,7 @@ func TestEventFromRequestKeepsRequestContext(t *testing.T) {
 			// 监听者直接用注入的 ctx 回复原请求
 			ctx.Response(ctx.PlayerID(), nil)
 		})
-		core.RegisterPlayer(py, (*testReq)(nil), func(ctx *core.Context, _ *testReq) {
+		core.RegisterPlayerMsg(py, (*testReq)(nil), func(ctx *core.Context, _ *testReq) {
 			ctx.Emit(testEvent, comm.NewArg())
 		})
 	})
@@ -115,7 +115,7 @@ func TestNestedEmitRestoresContext(t *testing.T) {
 		py.OnEvent(testEvent, func(ctx *core.Context, _ *comm.Arg) {
 			ctx.Response(ctx.PlayerID(), nil)
 		}, 0)
-		core.RegisterPlayer(py, (*testReq)(nil), func(ctx *core.Context, _ *testReq) {
+		core.RegisterPlayerMsg(py, (*testReq)(nil), func(ctx *core.Context, _ *testReq) {
 			ctx.Emit(testEvent, comm.NewArg())
 		})
 	})
