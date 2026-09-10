@@ -12,6 +12,7 @@ import (
 	"github.com/gogu-x/gogs/game/gate"
 	"github.com/gogu-x/gogs/game/guild"
 	"github.com/gogu-x/gogs/game/play"
+	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb"
 	"github.com/gogu-x/gogs/rpc/mongorpc"
@@ -54,6 +55,12 @@ func main() {
 				fmt.Sprintf("game_%v", serverID),
 			)
 
+			//加载配置表
+			err := glconf.LoadAllConfs(conf.GconfDbUri, conf.GconfDb, true)
+			if err != nil {
+				tlog.Log.Error("load confs error: %v", err)
+				return err
+			}
 			tree.Spawn(
 				play.NewPlay(),
 				battleclient.New(nil, nil, conf.ServerID, conf.NodeId),

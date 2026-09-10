@@ -71,7 +71,9 @@ var (
 	LogPath = ""
 
 	//GconfDb  配置库名
-	GconfDb = ""
+	GconfDb = "gs_conf_dev"
+
+	GconfDbUri = "mongodb://127.0.0.1:27017"
 )
 
 // ConnectionFlags returns flags shared by all service entrypoints. Values passed
@@ -100,6 +102,7 @@ func ConnectionFlags() []cli.Flag {
 		&cli.StringFlag{Name: "platform-webhook-addr", Usage: "platform webhook listen address"},
 		&cli.StringFlag{Name: "log_path", Usage: "log path"},
 		&cli.StringFlag{Name: "gconf-db", Usage: "gconf-db"},
+		&cli.StringFlag{Name: "gconf-db-uri", Usage: "gconf-db-uri"},
 	}
 }
 
@@ -166,6 +169,10 @@ func LoadAndApply(c *cli.Command) error {
 	}
 	if c.IsSet("log_path") {
 		LogPath = c.String("log_path")
+	}
+
+	if c.IsSet("gconf-db-uri") {
+		GconfDbUri = c.String("gconf-db-uri")
 	}
 
 	if c.IsSet("gconf-db") {
