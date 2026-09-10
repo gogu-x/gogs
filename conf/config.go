@@ -69,6 +69,9 @@ var (
 	JWTSecret = "changeme-secret"
 
 	LogPath = ""
+
+	//GconfDb  配置库名
+	GconfDb = ""
 )
 
 // ConnectionFlags returns flags shared by all service entrypoints. Values passed
@@ -96,6 +99,7 @@ func ConnectionFlags() []cli.Flag {
 		&cli.StringFlag{Name: "platform-grpc-addr", Usage: "platform gRPC connection address"},
 		&cli.StringFlag{Name: "platform-webhook-addr", Usage: "platform webhook listen address"},
 		&cli.StringFlag{Name: "log_path", Usage: "log path"},
+		&cli.StringFlag{Name: "gconf-db", Usage: "gconf-db"},
 	}
 }
 
@@ -164,6 +168,9 @@ func LoadAndApply(c *cli.Command) error {
 		LogPath = c.String("log_path")
 	}
 
+	if c.IsSet("gconf-db") {
+		GconfDb = c.String("gconf-db")
+	}
 	return nil
 }
 

@@ -6,60 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gogu-x/gogs/battle/battle/internal"
 	engine2 "github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/def"
-	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
+	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/tlog"
 )
-
-// Options 是 manager 的装配参数。retry 项在创建 per-battle battle 时透传给
-// battle（重试归属 battle）；recent 项供 manager 的进程内"玩家最近战斗"索引使用。
-type Options struct {
-	RecentTTL     time.Duration
-	RecentLimit   int
-	RetryDelay    time.Duration
-	RetryAttempts int
-}
-
-func (o Options) normalized() Options {
-	if o.RecentTTL <= 0 {
-		o.RecentTTL = 10 * time.Minute
-	}
-	if o.RecentLimit <= 0 {
-		o.RecentLimit = 20
-	}
-	if o.RetryDelay <= 0 {
-		o.RetryDelay = time.Second
-	}
-	if o.RetryAttempts <= 0 {
-		o.RetryAttempts = 3
-	}
-	return o
-}
-
-type recentBattle struct {
-	BattleID string
-	At       time.Time
-}
-
-// QueryPlayerRecent is an in-process query backed by the manager's short-lived
-// per-player index. The durable repository remains the source of truth.
-type QueryPlayerRecent struct {
-	UID   uint64
-	Limit int
-}
-
-type PlayerRecent struct{ BattleIDs []string }
-
-// spawnSpec 描述 manager 需在旧 battle 停止后"让位替换"运行的一场战斗
-// （rebuild-while-active）。复用同一 battle 保证确定性输出。
-type spawnSpec struct {
-	uid    uint64
-	source internal.Source
-	battle *engine2.Battle
-}
 
 // Service 是 battle 进程内的 manager battle：只负责 battle 编排、登记与只读
 // 查询。每场战斗的"战报"（结算/落库/推送/确认/重试）全部在 manager 运行期
@@ -68,23 +20,16 @@ type spawnSpec struct {
 // 仅作只读用途：start 幂等预判、QueryBattle/RebuildBattle 读历史、旧客户端
 // 确认兜底落库。
 type Service struct {
-	opts Options
-
 	router tree.Router
 	self   tree.PID
 	system *tree.Tree
 	active map[string]tree.PID
-	// retiring 记录 rebuild-while-active 时等待"旧 battle 停止后替换运行"的战斗。
-	retiring map[string]*spawnSpec
-	recent   map[uint64][]recentBattle
 }
 
 func New() *Service {
 
 	return &Service{
-		active:   make(map[string]tree.PID),
-		retiring: make(map[string]*spawnSpec),
-		recent:   make(map[uint64][]recentBattle),
+		active: make(map[string]tree.PID),
 	}
 }
 
@@ -104,7 +49,7 @@ func (s *Service) HandleMessage(ctx tree.Context, msg interface{}) {
 
 // start 是创建入口：校验输入后按 battle_id 做幂等判定，需要现场结算/补发的
 // 场景一律 spawn 一个 per-battle battle 处理，manager 自身不碰战报。
-func (s *Service) start(ctx tree.Context, req *pb.StartBattleReq) {
+func (s *Service) start(ctx tree.Context, req *pb_battle.StartBattleReq) {
 	if req == nil || req.UID == 0 || req.ServerID == 0 || req.SourceNodeId == 0 {
 		ctx.Response(nil, fmt.Errorf("battle service: uid, source server and source node are required"))
 		return

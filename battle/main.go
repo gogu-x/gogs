@@ -8,7 +8,6 @@ import (
 	"github.com/gogu-x/gogs/battle/service"
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/glconf/battlecfg"
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb"
 	"github.com/gogu-x/gogs/rpc/mongorpc"
@@ -28,10 +27,7 @@ func main() {
 				return err
 			}
 			tlog.NewLog(conf.LogPath, 0)
-			configs, err := battlecfg.LoadConfigRepository(conf.BattleConfigPath)
-			if err != nil {
-				return err
-			}
+
 			if err := cluster.Init(conf.EtcdEndpoints); err != nil {
 				tlog.Log.Error("battle cluster init: %v", err)
 			} else {
