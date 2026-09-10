@@ -12,24 +12,6 @@ import (
 	"github.com/gogu-x/tree/tlog"
 )
 
-// Mode 区分 per-battle battle 的行为：ModeRun 用传入的 Battle 现场结算；
-// ModeRedeliver 把库里已有的战报重新投递给一个新的请求方。
-type Mode uint8
-
-const (
-	ModeRun Mode = iota + 1
-	ModeRedeliver
-)
-
-// 进程内消息（仅按 PID 投递，无需 codec 注册）。
-type RetireBattle struct{ BattleID string }
-type ActorStopped struct {
-	BattleID string
-	PID      tree.PID
-}
-
-type retryTick struct{}
-
 // BattleActor 是一场战斗的独立 battle。整场战斗的"创建回执→结算→落库→
 // 事件/结束推送→确认/重试→退出"全部在它自己的 goroutine 内串行完成。
 // 注册名 = def.BattleActorName(battleID)，跨进程可被 NATS 按 TaggerName

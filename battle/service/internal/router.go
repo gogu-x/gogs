@@ -8,9 +8,9 @@ import (
 )
 
 // InitRoutes 同风格：按具体消息类型分发，未注册类型由 fallback 给出错误。
-func (s *Service) initRouter() {
-	tree.RegisterFunc(&s.router, (*pb_battle.StartBattleReq)(nil), s.start)
-	tree.RegisterFunc(&s.router, (*pb_battle.QueryBattleReq)(nil), s.query)
+func (s *Server) initRouter() {
+	tree.RegisterFunc(&s.router, (*pb_battle.StartBattleReq)(nil), s.OnCreateBattle)
+
 	s.router.SetFallback(func(ctx tree.Context, msg interface{}) {
 		ctx.Response(nil, fmt.Errorf("battle service: unsupported message %T", msg))
 	})

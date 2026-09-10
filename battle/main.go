@@ -8,6 +8,7 @@ import (
 	"github.com/gogu-x/gogs/battle/service"
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
+	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb"
 	"github.com/gogu-x/gogs/rpc/mongorpc"
@@ -38,6 +39,13 @@ func main() {
 			}
 
 			db := mongorpc.Connect(conf.MongoURL, conf.MongoUsername, conf.MongoPassword, "battle")
+
+			//加载配置表
+			err := glconf.LoadAllConfs(conf.GconfDbUri, conf.GconfDb, true)
+			if err != nil {
+				tlog.Log.Error("load confs error: %v", err)
+				return err
+			}
 
 			tree.Spawn(
 				mongorpc.NewActor(def.Mongo, db),
