@@ -9,6 +9,7 @@ import (
 	"github.com/gogu-x/gogs/def"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/timer"
 	"github.com/gogu-x/tree/tlog"
 )
 
@@ -20,7 +21,7 @@ type BattleActor struct {
 	p        Params
 	report   Report // 待推送/已推送的战报载体
 	attempts int
-	timer    *time.Timer
+	timer    *timer.TimeWheel
 	released bool
 	system   *tree.Tree
 	self     tree.PID
@@ -31,7 +32,7 @@ func NewBattleActor(p Params) *BattleActor {
 }
 
 func (a *BattleActor) Name() string     { return def.BattleActorName(a.p.BattleID) }
-func (a *BattleActor) MailboxSize() int { return 256 }
+func (a *BattleActor) MailboxSize() int { return 12 }
 
 func (a *BattleActor) OnInit(ctx tree.Context) {
 	a.system = ctx.System()
@@ -68,11 +69,32 @@ func (a *BattleActor) begin(ctx tree.Context) {
 	}
 	a.notifyCreated()
 	if a.p.Mode == ModeRun {
+		if tlog.Log != nil {
+			tlog.Log.Info("[战斗/执行] 开始自动战斗, battleID=%v uid=%v seed=%v", a.p.BattleID, a.p.UID, a.p.Seed)
+		}
 		result, err := a.p.Battle.Run()
 		if err != nil {
 			tlog.Log.Error("[战斗/执行] 自动战斗失败, battleID=%v uid=%v err=%v", a.p.BattleID, a.p.UID, err)
 			a.finish(ctx)
 			return
+		}
+		if tlog.Log != nil {
+			for _, event := range result.Events {
+				if event == nil {
+					continue
+				}
+				tlog.Log.Info("[战斗/过程] battleID=%v seq=%v action=%v tick=%v type=%v actor=%v target=%v skill=%v status=%v amount=%v hp=%v->%v detail=%v", result.BattleID, event.GetSequence(), event.GetAction(), event.GetTick(), event.GetType(), event.GetActorId(), event.GetTargetId(), event.GetSkillId(), event.GetStatusId(), event.GetAmount(), event.GetHpBefore(), event.GetHpAfter(), event.GetDetail())
+				if event.GetType() == pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE && event.GetHpBefore() > 0 && event.GetHpAfter() == 0 {
+					tlog.Log.Info("[战斗/死亡] battleID=%v unit=%v killer=%v skill=%v action=%v tick=%v", result.BattleID, event.GetTargetId(), event.GetActorId(), event.GetSkillId(), event.GetAction(), event.GetTick())
+				}
+			}
+			for _, unit := range result.Units {
+				if unit == nil {
+					continue
+				}
+				tlog.Log.Info("[战斗/单位] battleID=%v unit=%v team=%v hp=%v/%v alive=%v", result.BattleID, unit.GetInstanceId(), unit.GetTeam(), unit.GetHp(), unit.GetMaxHp(), unit.GetAlive())
+			}
+			tlog.Log.Info("[战斗/结算] 自动战斗完成, battleID=%v uid=%v outcome=%v tick=%v events=%v checksum=%v", result.BattleID, a.p.UID, result.Outcome, result.Tick, len(result.Events), result.Checksum)
 		}
 		now := time.Now().UTC()
 		report := Report{BattleID: result.BattleID, UID: a.p.UID, SourceServerID: a.p.Source.ServerID, SourceNodeID: a.p.Source.NodeID, Result: result, CreatedAt: now, UpdatedAt: now}
@@ -134,9 +156,9 @@ func (a *BattleActor) pushFinished() {
 
 func (a *BattleActor) scheduleRetry() {
 	a.stopTimer()
-	a.timer = time.AfterFunc(a.p.RetryDelay, func() {
-		a.system.Send(a.self, &retryTick{})
-	})
+	//a.timer = a.timer.After(a.p.RetryDelay, func() {
+	//	a.system.Send(a.self, &retryTick{})
+	//})
 }
 
 func (a *BattleActor) retry(ctx tree.Context) {

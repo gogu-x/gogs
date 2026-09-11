@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="game1-1" type="GoApplicationRunConfiguration" factoryName="Go Application">
-    <module name="g1" />
+    <module name="gotree" />
     <working_directory value="$PROJECT_DIR$/gogs/game" />
-    <parameters value="--server-id 1 --node-id 1 --mongo-url mongodb://127.0.0.1:27017 --etcd 127.0.0.1:2379 --nats-url nats://127.0.0.1:4222 --gconf-db-uri mongodb://127.0.0.1:27017 --gconf-db gs_conf_g1_dev" />
+    <parameters value="--server-id 1 --node-id 1 --mongo-url mongodb://43.160.212.55:27018 --mongo-username admin --mongo-password asd620522- 43.160.212.55:2379 --nats-url nats://43.160.212.551:4222 --gconf-db-uri mongodb://43.160.212.55\:27017 --gconf-db gs_conf_g1_dev" />
     <kind value="FILE" />
     <package value="github.com/gogu-x/gogs" />
     <directory value="$PROJECT_DIR$/gogs/game" />

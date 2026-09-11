@@ -27,8 +27,8 @@ func Get{{struct_name}}Interface(id int32) interface{} {
     return '''// Package {{package_name}} 包含自动生成的游戏配置。
 package {{package_name}}
 
-import ({% for pkg in packages %}
-    "{{pkg}}"{% endfor %}
+import ({% for alias, path in packages %}
+    {% if alias %}{{alias}} {% endif %}"{{path}}"{% endfor %}
 )
 
 // {{struct_name}}Key 是配置表的 MongoDB collection 名称。
@@ -177,14 +177,6 @@ const (
     selectionTag      = "selection"
     mongoTimeout      = 10 * time.Second
 )
-
-// TypIDVal 表示配置表中的资产类型、ID 和数量。
-type TypIDVal struct {
-    Typ string `bson:"typ"` // 资产类型
-    ID  int32  `bson:"id"`  // 资产 ID
-    Val int64  `bson:"val"` // 资产数量
-    Pro int32  `bson:"pro"` // 百分比参数
-}
 
 // CsvConf 保存一张配置表的记录和查询索引。
 type CsvConf struct {

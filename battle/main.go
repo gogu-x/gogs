@@ -52,7 +52,7 @@ func main() {
 				service.New(),
 				natsrpc.NewNats(natsrpc.Battle, conf.ServerID, conf.NodeId, conf.NatsURL),
 			)
-			fmt.Printf("battle service [%d/%d] registered at %s\n", conf.ServerID, conf.NodeId, conf.BattleAddr())
+			tlog.Log.Info("battle service [%d/%d] registered at %s\n", conf.ServerID, conf.NodeId, conf.BattleAddr())
 			tree.Default().Start()
 			return nil
 		},

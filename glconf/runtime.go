@@ -23,14 +23,6 @@ const (
 	mongoTimeout      = 10 * time.Second
 )
 
-// TypIDVal 表示配置表中的资产类型、ID 和数量。
-type TypIDVal struct {
-	Typ string `bson:"typ"` // 资产类型
-	ID  int32  `bson:"id"`  // 资产 ID
-	Val int64  `bson:"val"` // 资产数量
-	Pro int32  `bson:"pro"` // 百分比参数
-}
-
 // CsvConf 保存一张配置表的记录和查询索引。
 type CsvConf struct {
 	Records              []interface{}                               // 全部配置记录

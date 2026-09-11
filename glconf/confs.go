@@ -2,7 +2,11 @@
 // Package glconf 包含自动生成的游戏配置。
 package glconf
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/gogu-x/tree/tlog"
+)
 
 type confLoader func(dbURI, dbName, confName string) (*CsvConf, error)
 
@@ -18,6 +22,13 @@ var confs []*confMeta
 func InitGameCfg() {
 	confs = confs[:0]
 	confs = append(confs, &confMeta{source: ActvOnlineCfgKey, loader: loadActvOnlineCfg})
+	confs = append(confs, &confMeta{source: BattleEquipCfgKey, loader: loadBattleEquipCfg})
+	confs = append(confs, &confMeta{source: BattleMonsterCfgKey, loader: loadBattleMonsterCfg})
+	confs = append(confs, &confMeta{source: BattleMonsterGroupCfgKey, loader: loadBattleMonsterGroupCfg})
+	confs = append(confs, &confMeta{source: BattleRoleCfgKey, loader: loadBattleRoleCfg})
+	confs = append(confs, &confMeta{source: BattleRuleCfgKey, loader: loadBattleRuleCfg})
+	confs = append(confs, &confMeta{source: BattleSkillCfgKey, loader: loadBattleSkillCfg})
+	confs = append(confs, &confMeta{source: BattleStatusCfgKey, loader: loadBattleStatusCfg})
 	confs = append(confs, &confMeta{source: D2DailyGiftCfgKey, loader: loadD2DailyGiftCfg})
 }
 
@@ -71,6 +82,7 @@ func loadConf(meta *confMeta, dbURI, dbName string) error {
 	if err != nil {
 		return fmt.Errorf("load configuration %s: %w", meta.source, err)
 	}
+	tlog.Log.Info("load configuration success %v", meta.source)
 	meta.csv = table
 	return nil
 }
