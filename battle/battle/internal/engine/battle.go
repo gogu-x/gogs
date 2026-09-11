@@ -4,16 +4,15 @@ import (
 	"fmt"
 	"sort"
 
-	. "github.com/gogu-x/gogs/glconf/battlecfg"
+	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
 type activeStatus struct {
-	Config    StatusConfig `json:"config"`
-	Remaining int          `json:"remaining"`
+	Config    StatusConfig
+	Remaining int
 }
 
 type unit struct {
-	Input     CombatantInput
 	Config    UnitConfig
 	HP        int64
 	Gauge     int64
@@ -22,166 +21,140 @@ type unit struct {
 }
 
 func (u *unit) alive() bool { return u.HP > 0 }
+
 func (u *unit) hasStatus(kind StatusKind) bool {
-	for _, s := range u.Statuses {
-		if s.Remaining > 0 && s.Config.Kind == kind {
+	for _, status := range u.Statuses {
+		if status.Remaining > 0 && status.Config.Kind == kind {
 			return true
 		}
 	}
 	return false
 }
+
 func (u *unit) modifier() AttributeModifier {
-	var out AttributeModifier
-	for _, s := range u.Statuses {
-		if s.Remaining > 0 {
-			out.AttackFlat += s.Config.Modifier.AttackFlat
-			out.DefenseFlat += s.Config.Modifier.DefenseFlat
-			out.SpeedFlat += s.Config.Modifier.SpeedFlat
+	var modifier AttributeModifier
+	for _, status := range u.Statuses {
+		if status.Remaining > 0 {
+			modifier.AttackFlat += status.Config.Modifier.AttackFlat
+			modifier.DefenseFlat += status.Config.Modifier.DefenseFlat
+			modifier.SpeedFlat += status.Config.Modifier.SpeedFlat
 		}
 	}
-	return out
-}
-func (u *unit) attack() int64 {
-	v := u.Config.Attack + u.modifier().AttackFlat
-	if v < 0 {
-		return 0
-	}
-	return v
-}
-func (u *unit) defense() int64 {
-	v := u.Config.Defense + u.modifier().DefenseFlat
-	if v < 0 {
-		return 0
-	}
-	return v
-}
-func (u *unit) speed() int64 {
-	v := u.Config.Speed + u.modifier().SpeedFlat
-	if v < 1 {
-		return 1
-	}
-	return v
+	return modifier
 }
 
+func (u *unit) attack() int64  { return max(0, u.Config.Attack+u.modifier().AttackFlat) }
+func (u *unit) defense() int64 { return max(0, u.Config.Defense+u.modifier().DefenseFlat) }
+func (u *unit) speed() int64   { return max(1, u.Config.Speed+u.modifier().SpeedFlat) }
+
+// Battle 是不依赖外部服务的确定性战斗实例。
 type Battle struct {
-	id         string
-	input      BattleInput
-	config     Config
-	configHash string
-	rng        *RNG
-	pipeline   DamagePipeline
-	units      []*unit
-	tick       int64
-	action     uint64
-	events     []Event
-	finished   bool
-	cached     Result
+	setup    Setup
+	rng      *RNG
+	pipeline DamagePipeline
+	units    []*unit
+	tick     int64
+	action   uint64
+	events   []*pb.BattleEvent
+	finished bool
+	cached   Result
 }
 
-func NewBattle(repo ConfigRepository, input BattleInput) (*Battle, error) {
-	if repo == nil {
-		return nil, invalid("config_repository", "required")
-	}
-	config, err := repo.Get(input.ConfigVersion)
-	if err != nil {
+// NewBattle 使用 BattleActor 传入的运行时数据创建战斗。
+func NewBattle(setup Setup) (*Battle, error) {
+	if err := setup.validate(); err != nil {
 		return nil, err
 	}
-	if err := input.Validate(config); err != nil {
-		return nil, err
+	battle := &Battle{setup: setup, rng: NewRNG(setup.Seed), pipeline: NewDamagePipeline()}
+	for _, config := range setup.Units {
+		statuses := make([]activeStatus, 0, len(config.InitialStatus))
+		for _, status := range config.InitialStatus {
+			statuses = append(statuses, activeStatus{Config: status, Remaining: status.DurationTurns})
+		}
+		battle.units = append(battle.units, &unit{Config: config, HP: config.MaxHP, Cooldowns: make(map[string]int), Statuses: statuses})
 	}
-	input = CanonicalInput(input)
-	inputHash, err := StableInputHash(input)
-	if err != nil {
-		return nil, err
-	}
-	configHash, err := StableConfigHash(config)
-	if err != nil {
-		return nil, err
-	}
-	idHash, err := HashJSON(struct{ InputHash, ConfigHash string }{inputHash, configHash})
-	if err != nil {
-		return nil, err
-	}
-	b := &Battle{id: idHash[:32], input: input, config: config, configHash: configHash, rng: NewRNG(input.Seed), pipeline: NewDamagePipeline()}
-	for _, p := range input.Combatants {
-		u := config.Units[p.ConfigID]
-		b.units = append(b.units, &unit{Input: p, Config: u, HP: u.MaxHP, Cooldowns: map[string]int{}})
-	}
-	return b, nil
+	return battle, nil
 }
 
-func (b *Battle) ID() string { return b.id }
+// ID 返回 Manager 生成的战斗 ID。
+func (b *Battle) ID() string { return b.setup.BattleID }
 
-func (b *Battle) emit(typ EventType, actor, target, skill, status string, amount, before, after int64, detail string) {
-	b.events = append(b.events, Event{Sequence: uint64(len(b.events) + 1), Action: b.action, Tick: b.tick, Type: typ, ActorID: actor, TargetID: target, SkillID: skill, StatusID: status, Amount: amount, HPBefore: before, HPAfter: after, Detail: detail})
+func (b *Battle) emit(kind pb.BattleEventType, actor, target, skill, status string, amount, before, after int64, detail string) {
+	b.events = append(b.events, &pb.BattleEvent{
+		Sequence: uint64(len(b.events) + 1), Action: b.action, Tick: b.tick, Type: kind,
+		ActorId: actor, TargetId: target, SkillId: skill, StatusId: status,
+		Amount: amount, HpBefore: before, HpAfter: after, Detail: detail,
+	})
 }
 
-func (b *Battle) teamAlive(team Team) bool {
-	for _, u := range b.units {
-		if u.Input.Team == team && u.alive() {
+func (b *Battle) teamAlive(team pb.BattleTeam) bool {
+	for _, unit := range b.units {
+		if unit.Config.Team == team && unit.alive() {
 			return true
 		}
 	}
 	return false
 }
-func (b *Battle) outcome() (Outcome, bool) {
-	a, d := b.teamAlive(TeamAttacker), b.teamAlive(TeamDefender)
-	if a && d {
-		return 0, false
+
+func (b *Battle) outcome() (pb.BattleOutcome, bool) {
+	attackerAlive := b.teamAlive(pb.BattleTeam_BATTLE_TEAM_ATTACKER)
+	defenderAlive := b.teamAlive(pb.BattleTeam_BATTLE_TEAM_DEFENDER)
+	switch {
+	case attackerAlive && defenderAlive:
+		return pb.BattleOutcome_BATTLE_OUTCOME_UNSPECIFIED, false
+	case attackerAlive:
+		return pb.BattleOutcome_BATTLE_OUTCOME_ATTACKER_WIN, true
+	case defenderAlive:
+		return pb.BattleOutcome_BATTLE_OUTCOME_DEFENDER_WIN, true
+	default:
+		return pb.BattleOutcome_BATTLE_OUTCOME_DRAW, true
 	}
-	if a {
-		return OutcomeAttackerWin, true
-	}
-	if d {
-		return OutcomeDefenderWin, true
-	}
-	return OutcomeDraw, true
 }
 
 func (b *Battle) nextActor() *unit {
 	var delta int64 = -1
-	for _, u := range b.units {
-		if !u.alive() {
+	for _, unit := range b.units {
+		if !unit.alive() {
 			continue
 		}
-		need := b.config.ATBThreshold - u.Gauge
-		var d int64
+		need := b.setup.Rules.ATBThreshold - unit.Gauge
+		ticks := int64(0)
 		if need > 0 {
-			d = (need + u.speed() - 1) / u.speed()
+			ticks = (need + unit.speed() - 1) / unit.speed()
 		}
-		if delta < 0 || d < delta {
-			delta = d
+		if delta < 0 || ticks < delta {
+			delta = ticks
 		}
 	}
 	if delta < 0 {
 		return nil
 	}
 	if delta > 0 {
-		for _, u := range b.units {
-			if u.alive() {
-				u.Gauge += delta * u.speed()
+		for _, unit := range b.units {
+			if unit.alive() {
+				unit.Gauge += delta * unit.speed()
 			}
 		}
 		b.tick += delta
 	}
 	ready := make([]*unit, 0)
-	for _, u := range b.units {
-		if u.alive() && u.Gauge >= b.config.ATBThreshold {
-			ready = append(ready, u)
+	for _, unit := range b.units {
+		if unit.alive() && unit.Gauge >= b.setup.Rules.ATBThreshold {
+			ready = append(ready, unit)
 		}
 	}
 	sort.Slice(ready, func(i, j int) bool {
-		a, c := ready[i], ready[j]
-		if a.Gauge != c.Gauge {
-			return a.Gauge > c.Gauge
+		left, right := ready[i], ready[j]
+		if left.Gauge != right.Gauge {
+			return left.Gauge > right.Gauge
 		}
-		if a.speed() != c.speed() {
-			return a.speed() > c.speed()
+		if left.speed() != right.speed() {
+			return left.speed() > right.speed()
 		}
-		if a.Input.Position != c.Input.Position {
-			return a.Input.Position < c.Input.Position
+		if left.Config.Position != right.Config.Position {
+			return left.Config.Position < right.Config.Position
 		}
-		return a.Input.InstanceID < c.Input.InstanceID
+		return left.Config.InstanceID < right.Config.InstanceID
 	})
 	if len(ready) == 0 {
 		return nil
@@ -189,222 +162,196 @@ func (b *Battle) nextActor() *unit {
 	return ready[0]
 }
 
-func (b *Battle) tickCooldowns(u *unit) {
-	for id, n := range u.Cooldowns {
-		if n <= 1 {
-			delete(u.Cooldowns, id)
+func (b *Battle) tickCooldowns(unit *unit) {
+	for id, turns := range unit.Cooldowns {
+		if turns <= 1 {
+			delete(unit.Cooldowns, id)
 		} else {
-			u.Cooldowns[id] = n - 1
+			unit.Cooldowns[id] = turns - 1
 		}
 	}
 }
 
-func (b *Battle) tickPeriodic(u *unit) {
-	for _, s := range u.Statuses {
-		if !u.alive() {
-			break
+func (b *Battle) tickPeriodic(unit *unit) {
+	for _, status := range unit.Statuses {
+		if !unit.alive() {
+			return
 		}
-		switch s.Config.Kind {
+		before := unit.HP
+		switch status.Config.Kind {
 		case StatusDOT:
-			before := u.HP
-			amount := s.Config.Potency
-			if amount > u.HP {
-				amount = u.HP
-			}
-			u.HP -= amount
-			b.emit(EventDamage, u.Input.InstanceID, u.Input.InstanceID, "", s.Config.ID, amount, before, u.HP, "dot")
+			amount := min(status.Config.Potency, unit.HP)
+			unit.HP -= amount
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, unit.Config.InstanceID, unit.Config.InstanceID, "", status.Config.ID, amount, before, unit.HP, "dot")
 		case StatusHOT:
-			before := u.HP
-			u.HP += s.Config.Potency
-			if u.HP > u.Config.MaxHP {
-				u.HP = u.Config.MaxHP
-			}
-			amount := u.HP - before
-			b.emit(EventHeal, u.Input.InstanceID, u.Input.InstanceID, "", s.Config.ID, amount, before, u.HP, "hot")
+			unit.HP = min(unit.Config.MaxHP, unit.HP+status.Config.Potency)
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, unit.Config.InstanceID, unit.Config.InstanceID, "", status.Config.ID, unit.HP-before, before, unit.HP, "hot")
 		}
 	}
 }
 
-func (b *Battle) expireStatuses(u *unit) {
-	kept := u.Statuses[:0]
-	for _, s := range u.Statuses {
-		s.Remaining--
-		if s.Remaining > 0 {
-			kept = append(kept, s)
+func (b *Battle) expireStatuses(unit *unit) {
+	kept := unit.Statuses[:0]
+	for _, status := range unit.Statuses {
+		status.Remaining--
+		if status.Remaining > 0 {
+			kept = append(kept, status)
 		}
 	}
-	u.Statuses = kept
+	unit.Statuses = kept
 }
 
-func (b *Battle) chooseSkill(u *unit) SkillConfig {
-	if !u.hasStatus(StatusSilence) {
-		for _, id := range u.Config.ActiveSkillIDs {
-			if u.Cooldowns[id] == 0 {
-				return b.config.Skills[id]
+func (b *Battle) chooseSkill(unit *unit) SkillConfig {
+	if !unit.hasStatus(StatusSilence) {
+		for _, skill := range unit.Config.ActiveSkills {
+			if unit.Cooldowns[skill.ID] == 0 {
+				return skill
 			}
 		}
 	}
-	return b.config.Skills[u.Config.BasicSkillID]
+	return unit.Config.BasicSkill
 }
 
-func unitLess(a, c *unit) bool {
-	if a.Input.Position != c.Input.Position {
-		return a.Input.Position < c.Input.Position
+func unitLess(left, right *unit) bool {
+	if left.Config.Position != right.Config.Position {
+		return left.Config.Position < right.Config.Position
 	}
-	return a.Input.InstanceID < c.Input.InstanceID
+	return left.Config.InstanceID < right.Config.InstanceID
 }
 
-func (b *Battle) targets(actor *unit, rule TargetRule) []*unit {
-	var out []*unit
+func (b *Battle) targets(actor *unit, rule pb.TargetRule) []*unit {
+	var targets []*unit
 	switch rule {
-	case TargetSelf:
+	case pb.TargetRule_TARGET_RULE_SELF:
 		if actor.alive() {
-			out = []*unit{actor}
+			targets = append(targets, actor)
 		}
-	case TargetEnemySingle, TargetEnemyAll:
-		for _, u := range b.units {
-			if u.alive() && u.Input.Team != actor.Input.Team {
-				out = append(out, u)
+	case pb.TargetRule_TARGET_RULE_ENEMY_SINGLE, pb.TargetRule_TARGET_RULE_ENEMY_ALL:
+		for _, unit := range b.units {
+			if unit.alive() && unit.Config.Team != actor.Config.Team {
+				targets = append(targets, unit)
 			}
 		}
-		sort.Slice(out, func(i, j int) bool { return unitLess(out[i], out[j]) })
-		if rule == TargetEnemySingle && len(out) > 1 {
-			out = out[:1]
+		sort.Slice(targets, func(i, j int) bool { return unitLess(targets[i], targets[j]) })
+		if rule == pb.TargetRule_TARGET_RULE_ENEMY_SINGLE && len(targets) > 1 {
+			return targets[:1]
 		}
-	case TargetAllyLowestHP:
-		for _, u := range b.units {
-			if u.alive() && u.Input.Team == actor.Input.Team {
-				out = append(out, u)
+	case pb.TargetRule_TARGET_RULE_ALLY_LOWEST_HP:
+		for _, unit := range b.units {
+			if unit.alive() && unit.Config.Team == actor.Config.Team {
+				targets = append(targets, unit)
 			}
 		}
-		sort.Slice(out, func(i, j int) bool {
-			a, c := out[i], out[j]
-			left, right := a.HP*c.Config.MaxHP, c.HP*a.Config.MaxHP
-			if left != right {
-				return left < right
+		sort.Slice(targets, func(i, j int) bool {
+			left, right := targets[i], targets[j]
+			if left.HP*right.Config.MaxHP != right.HP*left.Config.MaxHP {
+				return left.HP*right.Config.MaxHP < right.HP*left.Config.MaxHP
 			}
-			return unitLess(a, c)
+			return unitLess(left, right)
 		})
-		if len(out) > 1 {
-			out = out[:1]
+		if len(targets) > 1 {
+			return targets[:1]
 		}
 	}
-	return out
+	return targets
 }
 
-func (b *Battle) applyEffect(actor, target *unit, skill SkillConfig, e EffectConfig) {
+func (b *Battle) applyEffect(actor, target *unit, skill SkillConfig, effect EffectConfig) {
 	if !target.alive() {
 		return
 	}
-	switch e.Kind {
+	switch effect.Kind {
 	case EffectDamage:
-		ctx := b.pipeline.Calculate(DamageContext{Attack: actor.attack(), Defense: target.defense(), CoefficientPermille: e.CoefficientPermille, Flat: e.Flat, VariancePermille: b.config.DamageVariancePermille, CritChancePermille: b.config.CritChancePermille, CritMultiplierPermille: b.config.CritMultiplierPermille}, b.rng)
+		context := b.pipeline.Calculate(DamageContext{Attack: actor.attack(), Defense: target.defense(), CoefficientPermille: effect.CoefficientPermille, Flat: effect.Flat, VariancePermille: b.setup.Rules.DamageVariancePermille, CritChancePermille: b.setup.Rules.CritChancePermille, CritMultiplierPermille: b.setup.Rules.CritMultiplierPermille}, b.rng)
 		before := target.HP
-		amount := ctx.Amount
-		if amount > target.HP {
-			amount = target.HP
-		}
+		amount := min(context.Amount, target.HP)
 		target.HP -= amount
 		detail := ""
-		if ctx.Critical {
+		if context.Critical {
 			detail = "critical"
 		}
-		b.emit(EventDamage, actor.Input.InstanceID, target.Input.InstanceID, skill.ID, "", amount, before, target.HP, detail)
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", amount, before, target.HP, detail)
 	case EffectHeal:
-		amount := actor.attack()*e.CoefficientPermille/1000 + e.Flat
-		if amount < 0 {
-			amount = 0
-		}
+		amount := max(0, actor.attack()*effect.CoefficientPermille/1000+effect.Flat)
 		before := target.HP
-		target.HP += amount
-		if target.HP > target.Config.MaxHP {
-			target.HP = target.Config.MaxHP
-		}
-		amount = target.HP - before
-		b.emit(EventHeal, actor.Input.InstanceID, target.Input.InstanceID, skill.ID, "", amount, before, target.HP, "")
+		target.HP = min(target.Config.MaxHP, target.HP+amount)
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", target.HP-before, before, target.HP, "")
 	case EffectApplyStatus:
-		status := b.config.Statuses[e.StatusID]
-		found := false
-		for i := range target.Statuses {
-			if target.Statuses[i].Config.ID == status.ID {
-				target.Statuses[i] = activeStatus{Config: status, Remaining: status.DurationTurns}
-				found = true
-				break
-			}
-		}
-		if !found {
-			target.Statuses = append(target.Statuses, activeStatus{Config: status, Remaining: status.DurationTurns})
-		}
-		b.emit(EventStatusApplied, actor.Input.InstanceID, target.Input.InstanceID, skill.ID, status.ID, 0, target.HP, target.HP, fmt.Sprintf("kind=%d duration=%d", status.Kind, status.DurationTurns))
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_STATUS_APPLIED, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, effect.StatusID, 0, target.HP, target.HP, "unsupported status config")
 	}
 }
 
 func (b *Battle) execute(actor *unit) {
 	b.action++
-	b.emit(EventActionStarted, actor.Input.InstanceID, "", "", "", 0, actor.HP, actor.HP, "")
+	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED, actor.Config.InstanceID, "", "", "", 0, actor.HP, actor.HP, "")
 	b.tickCooldowns(actor)
 	b.tickPeriodic(actor)
 	if actor.alive() {
 		if actor.hasStatus(StatusStun) {
-			b.emit(EventActionSkipped, actor.Input.InstanceID, "", "", "", 0, actor.HP, actor.HP, "stun")
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED, actor.Config.InstanceID, "", "", "", 0, actor.HP, actor.HP, "stun")
 		} else {
 			skill := b.chooseSkill(actor)
 			targets := b.targets(actor, skill.TargetRule)
-			b.emit(EventSkillUsed, actor.Input.InstanceID, "", skill.ID, "", 0, actor.HP, actor.HP, "")
-			for _, effect := range skill.Effects {
-				for _, target := range targets {
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED, actor.Config.InstanceID, "", skill.ID, "", 0, actor.HP, actor.HP, "")
+			for _, target := range targets {
+				for _, effect := range skill.Effects {
 					b.applyEffect(actor, target, skill, effect)
 				}
 			}
-			if skill.Cooldown > 0 && skill.ID != actor.Config.BasicSkillID {
+			if skill.Cooldown > 0 && skill.ID != actor.Config.BasicSkill.ID {
 				actor.Cooldowns[skill.ID] = skill.Cooldown
 			}
 		}
 	}
 	b.expireStatuses(actor)
-	actor.Gauge -= b.config.ATBThreshold
-	if actor.Gauge < 0 {
-		actor.Gauge = 0
-	}
-	b.emit(EventActionEnded, actor.Input.InstanceID, "", "", "", 0, actor.HP, actor.HP, "")
+	actor.Gauge = max(0, actor.Gauge-b.setup.Rules.ATBThreshold)
+	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED, actor.Config.InstanceID, "", "", "", 0, actor.HP, actor.HP, "")
 }
 
+// Run 执行一场自动战斗，并返回缓存的确定性结果。
 func (b *Battle) Run() (Result, error) {
 	if b.finished {
 		return b.cached, nil
 	}
-	var outcome Outcome
-	for actions := 0; actions < b.config.MaxActions; actions++ {
-		if o, done := b.outcome(); done {
-			outcome = o
+	outcome := pb.BattleOutcome_BATTLE_OUTCOME_DRAW
+	for action := 0; action < b.setup.Rules.MaxActions; action++ {
+		if value, done := b.outcome(); done {
+			outcome = value
 			break
 		}
 		actor := b.nextActor()
 		if actor == nil {
-			return Result{}, fmt.Errorf("no living battle available")
+			return Result{}, fmt.Errorf("no living battle unit available")
 		}
 		b.execute(actor)
 	}
-	if outcome == 0 {
-		if o, done := b.outcome(); done {
-			outcome = o
-		} else {
-			outcome = OutcomeDraw
-		}
+	if value, done := b.outcome(); done {
+		outcome = value
 	}
-	b.emit(EventBattleEnded, "", "", "", "", 0, 0, 0, fmt.Sprintf("outcome=%d", outcome))
-	units := make([]UnitResult, 0, len(b.units))
-	for _, u := range b.units {
-		units = append(units, UnitResult{InstanceID: u.Input.InstanceID, Team: u.Input.Team, HP: u.HP, MaxHP: u.Config.MaxHP, Alive: u.alive()})
+	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_BATTLE_ENDED, "", "", "", "", 0, 0, 0, fmt.Sprintf("outcome=%d", outcome))
+	units := make([]*pb.BattleUnitResult, 0, len(b.units))
+	for _, unit := range b.units {
+		units = append(units, &pb.BattleUnitResult{InstanceId: unit.Config.InstanceID, Team: unit.Config.Team, Hp: unit.HP, MaxHp: unit.Config.MaxHP, Alive: unit.alive()})
 	}
-	result := Result{BattleID: b.id, Outcome: outcome, Tick: b.tick, Units: units, Events: append([]Event(nil), b.events...)}
-	checksum, err := b.resultChecksum(result)
+	result := Result{BattleID: b.setup.BattleID, Outcome: outcome, Tick: b.tick, Units: units, Events: append([]*pb.BattleEvent(nil), b.events...)}
+	checksum, err := resultChecksum(result)
 	if err != nil {
 		return Result{}, err
 	}
 	result.Checksum = checksum
-	result.Replay = Replay{BattleID: b.id, ConfigVersion: b.config.Version, ConfigHash: b.configHash, Input: b.input, Events: append([]Event(nil), b.events...), Checksum: checksum}
-	b.finished = true
-	b.cached = result
+	b.finished, b.cached = true, result
 	return result, nil
+}
+
+func max(left, right int64) int64 {
+	if left > right {
+		return left
+	}
+	return right
+}
+func min(left, right int64) int64 {
+	if left < right {
+		return left
+	}
+	return right
 }

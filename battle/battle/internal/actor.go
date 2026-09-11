@@ -57,11 +57,20 @@ func (a *BattleActor) HandleMessage(ctx tree.Context, msg interface{}) {
 // begin 在 OnInit 中推进一场战斗到"已推送完成、等待确认"。
 // 顺序保证：Created → (run)结算并 Save → Action 流 → Finished。
 func (a *BattleActor) begin(ctx tree.Context) {
+	if a.p.Mode == ModeRun && a.p.Battle == nil {
+		battle, err := newBattleFromRequest(a.p.BattleID, a.p.Seed, a.p.Request)
+		if err != nil {
+			tlog.Log.Error("[战斗/创建] 读取配置并创建引擎失败, battleID=%v uid=%v err=%v", a.p.BattleID, a.p.UID, err)
+			a.finish(ctx)
+			return
+		}
+		a.p.Battle = battle
+	}
 	a.notifyCreated()
 	if a.p.Mode == ModeRun {
 		result, err := a.p.Battle.Run()
 		if err != nil {
-			tlog.Log.Error("battle battle %s: run failed: %v", a.p.BattleID, err)
+			tlog.Log.Error("[战斗/执行] 自动战斗失败, battleID=%v uid=%v err=%v", a.p.BattleID, a.p.UID, err)
 			a.finish(ctx)
 			return
 		}
@@ -97,13 +106,13 @@ func (a *BattleActor) notifyCreated() {
 }
 
 func (a *BattleActor) pushActions() {
-	//source := a.pushSource()
-	//for _, event := range a.report.Result.Events {
-	//	ntf := &pb.BattleActionNtf{BattleId: a.report.BattleID, Uid: a.report.UID, Event: battle.eventToProto(event)}
-	//	if err := a.p.Notifier.Notify(source, ntf); err != nil {
-	//		tlog.Log.Warn("battle battle %s: notify Action %d: %v", a.p.BattleID, event.Sequence, err)
-	//	}
-	//}
+	source := a.pushSource()
+	for _, event := range a.report.Result.Events {
+		ntf := &pb.BattleActionNtf{BattleId: a.report.BattleID, Uid: a.report.UID, Event: event}
+		if err := a.p.Notifier.Notify(source, ntf); err != nil {
+			tlog.Log.Warn("battle battle %s: notify Action %d: %v", a.p.BattleID, event.GetSequence(), err)
+		}
+	}
 }
 
 func (a *BattleActor) pushSource() Source {
@@ -112,13 +121,15 @@ func (a *BattleActor) pushSource() Source {
 
 // pushFinished 推送 Finished 并（未确认时）安排重试。
 func (a *BattleActor) pushFinished() {
-	//if err := a.p.Notifier.Notify(a.pushSource(), battle.finishedToProto(a.report)); err != nil {
-	//	tlog.Log.Warn("battle battle %s: notify Finished: %v", a.p.BattleID, err)
-	//}
-	//a.attempts++
-	//if !a.report.Confirmed {
-	//	a.scheduleRetry()
-	//}
+	result := a.report.Result
+	ntf := &pb.BattleFinishedNtf{BattleId: a.report.BattleID, Uid: a.report.UID, Outcome: result.Outcome, Units: result.Units, Checksum: result.Checksum}
+	if err := a.p.Notifier.Notify(a.pushSource(), ntf); err != nil {
+		tlog.Log.Warn("battle battle %s: notify Finished: %v", a.p.BattleID, err)
+	}
+	a.attempts++
+	if !a.report.Confirmed {
+		a.scheduleRetry()
+	}
 }
 
 func (a *BattleActor) scheduleRetry() {

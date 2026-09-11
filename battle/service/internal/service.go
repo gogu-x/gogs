@@ -1,21 +1,30 @@
 package internal
 
 import (
+	"github.com/gogu-x/gogs/battle/battle"
 	"github.com/gogu-x/gogs/def"
+	"github.com/gogu-x/gogs/natsrpc"
 	"github.com/gogu-x/tree"
+	"google.golang.org/protobuf/proto"
 )
 
-// Server 是 battle 进程内的 manager battle：只负责 battle 编排、登记与只读
+// Server 是 battle 进程内的 Manager：只管理 BattleActor 生命周期。
 type Server struct {
-	router tree.Router
-	self   tree.PID
-	system *tree.Tree
-	active map[string]tree.PID
+	router   tree.Router
+	self     tree.PID
+	system   *tree.Tree
+	active   map[string]tree.PID
+	reports  battle.Repository
+	notifier battle.Notifier
 }
 
 func New() *Server {
 	return &Server{
-		active: make(map[string]tree.PID),
+		active:  make(map[string]tree.PID),
+		reports: battle.NewMemoryRepository(),
+		notifier: battle.NotifyFunc(func(source battle.Source, message proto.Message) error {
+			return natsrpc.Cast(natsrpc.Game, def.BattleClient, source.ServerID, source.NodeID, message)
+		}),
 	}
 }
 

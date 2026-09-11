@@ -55,8 +55,7 @@ type Sender interface {
 }
 
 type Begin struct {
-	UID   uint64
-	Input *pb.BattleInput
+	Request *pb.StartBattleReq
 }
 
 type Reset struct{ UID uint64 }
@@ -129,13 +128,15 @@ func (c *Client) state(uid uint64) *record {
 }
 
 func (c *Client) begin(ctx tree.Context, msg *Begin) {
-	if msg == nil || msg.UID == 0 || msg.Input == nil {
-		ctx.Response(nil, fmt.Errorf("battle client: uid and input are required"))
+	if msg == nil || msg.Request == nil || msg.Request.GetUID() == 0 {
+		ctx.Response(nil, fmt.Errorf("battle client: request and uid are required"))
 		return
 	}
-	r := c.state(msg.UID)
+	request := proto.Clone(msg.Request).(*pb.StartBattleReq)
+	uid := request.GetUID()
+	r := c.state(uid)
 	if r.Status == Creating || r.Status == CreateUnknown || r.Status == Running {
-		ctx.Response(r.State, fmt.Errorf("battle client: uid=%d is %s", msg.UID, r.Status))
+		ctx.Response(r.State, fmt.Errorf("battle client: uid=%d is %s", uid, r.Status))
 		return
 	}
 	node, err := c.selector.Pick()
@@ -144,16 +145,16 @@ func (c *Client) begin(ctx tree.Context, msg *Begin) {
 		ctx.Response(r.State, err)
 		return
 	}
-	r.State = State{UID: msg.UID, Status: Creating, Node: node}
+	r.State = State{UID: uid, Status: Creating, Node: node}
 	r.seen = make(map[uint64]struct{})
-	req := &pb.StartBattleReq{UID: msg.UID, ServerID: uint32(c.gameServerID), SourceNodeId: uint32(c.gameNodeID), Input: proto.Clone(msg.Input).(*pb.BattleInput)}
-	if err := c.sender.Start(node, req); err != nil {
+	request.ServerID = uint32(c.gameServerID)
+	request.SourceNodeId = uint32(c.gameNodeID)
+	if err := c.sender.Start(node, request); err != nil {
 		r.Status = Idle
 		ctx.Response(r.State, err)
 		return
 	}
-	// There is deliberately no request_id. Once publication succeeds, an
-	// absent Created is ambiguous and must not trigger a blind resend.
+	// 发布成功后不可盲目重发，等待 BattleCreatedNtf 或 Finished 恢复状态。
 	r.Status = CreateUnknown
 	ctx.Response(r.State, nil)
 }

@@ -32,14 +32,12 @@ func (s *fakeSender) Start(_ Node, _ *pb.StartBattleReq) error {
 	s.starts++
 	return s.startErr
 }
-
 func (s *fakeSender) Confirm(_ Node, _ *pb.BattleResultConfirmedNtf) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.confirms++
 	return nil
 }
-
 func (s *fakeSender) counts() (int, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -57,11 +55,8 @@ func (g *gateCapture) HandleMessage(_ tree.Context, msg interface{}) {
 	}
 }
 
-func clientInput() *pb.BattleInput {
-	return &pb.BattleInput{ConfigVersion: "default", Seed: 1, Combatants: []*pb.BattleCombatantInput{
-		{InstanceId: "p", UnitConfigId: "hero", Team: pb.BattleTeam_BATTLE_TEAM_ATTACKER},
-		{InstanceId: "e", UnitConfigId: "enemy", Team: pb.BattleTeam_BATTLE_TEAM_DEFENDER},
-	}}
+func clientRequest(uid uint64) *pb.StartBattleReq {
+	return &pb.StartBattleReq{UID: uid, BattleType: pb.BattleType_BATTLE_TYPE_PVE, BusinessId: "stage-1", AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
 }
 
 func requestState(t *testing.T, tr *tree.Tree, pid tree.PID, uid uint64) State {
@@ -78,7 +73,7 @@ func TestSendFailureReturnsIdle(t *testing.T) {
 	tr := tree.NewTree()
 	pid := tr.SpawnOne(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4))
 	t.Cleanup(tr.Shutdown)
-	if _, err := tr.Request(pid, &Begin{UID: 7, Input: clientInput()}).AwaitTimeout(time.Second); err == nil {
+	if _, err := tr.Request(pid, &Begin{Request: clientRequest(7)}).AwaitTimeout(time.Second); err == nil {
 		t.Fatal("expected publish error")
 	}
 	if got := requestState(t, tr, pid, 7).Status; got != Idle {
@@ -93,26 +88,24 @@ func TestCreateUnknownDedupAndIdempotentResult(t *testing.T) {
 	pids := tr.Spawn(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4), gate)
 	clientPID := pids[0]
 	t.Cleanup(tr.Shutdown)
-
-	value, err := tr.Request(clientPID, &Begin{UID: 7, Input: clientInput()}).AwaitTimeout(time.Second)
+	request := clientRequest(7)
+	value, err := tr.Request(clientPID, &Begin{Request: request}).AwaitTimeout(time.Second)
 	if err != nil || value.(State).Status != CreateUnknown {
 		t.Fatalf("begin = %#v, %v", value, err)
 	}
-	if _, err := tr.Request(clientPID, &Begin{UID: 7, Input: clientInput()}).AwaitTimeout(time.Second); err == nil {
+	if _, err := tr.Request(clientPID, &Begin{Request: request}).AwaitTimeout(time.Second); err == nil {
 		t.Fatal("CreateUnknown must reject a blind resend")
 	}
 	starts, _ := sender.counts()
 	if starts != 1 {
 		t.Fatalf("starts = %d, want 1", starts)
 	}
-
 	tr.Send(clientPID, &pb.BattleCreatedNtf{BattleId: "b1", Uid: 7})
 	tr.Send(clientPID, &pb.BattleActionNtf{BattleId: "b1", Uid: 7, Event: &pb.BattleEvent{Sequence: 1}})
 	tr.Send(clientPID, &pb.BattleActionNtf{BattleId: "b1", Uid: 7, Event: &pb.BattleEvent{Sequence: 1}})
-	finished := &pb.BattleFinishedNtf{BattleId: "b1", Uid: 7, Checksum: "sum", Replay: &pb.BattleReplay{BattleId: "b1", Input: clientInput()}}
+	finished := &pb.BattleFinishedNtf{BattleId: "b1", Uid: 7, Checksum: "sum"}
 	tr.Send(clientPID, finished)
 	tr.Send(clientPID, finished)
-
 	deadline := time.After(2 * time.Second)
 	pushes := 0
 	for pushes < 3 {

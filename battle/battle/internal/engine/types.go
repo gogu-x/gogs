@@ -3,61 +3,140 @@ package engine
 import (
 	"fmt"
 
-	. "github.com/gogu-x/gogs/battle/iproto"
+	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
-type EventType uint8
+// EffectKind 表示运行时技能效果类型。
+type EffectKind uint8
 
 const (
-	EventActionStarted EventType = iota + 1
-	EventSkillUsed
-	EventDamage
-	EventHeal
-	EventStatusApplied
-	EventActionSkipped
-	EventActionEnded
-	EventBattleEnded
+	EffectDamage EffectKind = iota + 1
+	EffectHeal
+	EffectApplyStatus
 )
 
-type Event struct {
-	Sequence uint64    `json:"sequence"`
-	Action   uint64    `json:"action"`
-	Tick     int64     `json:"tick"`
-	Type     EventType `json:"type"`
-	ActorID  string    `json:"actor_id,omitempty"`
-	TargetID string    `json:"target_id,omitempty"`
-	SkillID  string    `json:"skill_id,omitempty"`
-	StatusID string    `json:"status_id,omitempty"`
-	Amount   int64     `json:"amount,omitempty"`
-	HPBefore int64     `json:"hp_before,omitempty"`
-	HPAfter  int64     `json:"hp_after,omitempty"`
-	Detail   string    `json:"detail,omitempty"`
-}
-
-type Outcome uint8
+// StatusKind 表示运行时状态类型。
+type StatusKind uint8
 
 const (
-	OutcomeAttackerWin Outcome = iota + 1
-	OutcomeDefenderWin
-	OutcomeDraw
+	StatusStun StatusKind = iota + 1
+	StatusSilence
+	StatusDOT
+	StatusHOT
+	StatusAttributeModifier
 )
 
-type UnitResult struct {
-	InstanceID string `json:"instance_id"`
-	Team       Team   `json:"team"`
-	HP         int64  `json:"hp"`
-	MaxHP      int64  `json:"max_hp"`
-	Alive      bool   `json:"alive"`
+// AttributeModifier 表示状态的属性修正。
+type AttributeModifier struct {
+	AttackFlat  int64
+	DefenseFlat int64
+	SpeedFlat   int64
 }
 
+// StatusConfig 表示运行时状态配置。
+type StatusConfig struct {
+	ID            string
+	Kind          StatusKind
+	DurationTurns int
+	Potency       int64
+	Modifier      AttributeModifier
+}
+
+// EffectConfig 表示运行时技能效果。
+type EffectConfig struct {
+	Kind                EffectKind
+	CoefficientPermille int64
+	Flat                int64
+	StatusID            string
+}
+
+// SkillConfig 表示运行时技能配置。
+type SkillConfig struct {
+	ID         string
+	Cooldown   int
+	TargetRule pb.TargetRule
+	Effects    []EffectConfig
+}
+
+// UnitConfig 表示 BattleActor 已从 glconf 还原的运行时单位。
+type UnitConfig struct {
+	InstanceID    string
+	Team          pb.BattleTeam
+	Position      int32
+	MaxHP         int64
+	Attack        int64
+	Defense       int64
+	Speed         int64
+	BasicSkill    SkillConfig
+	ActiveSkills  []SkillConfig
+	InitialStatus []StatusConfig
+}
+
+// Rules 表示 BattleActor 已从 glconf 读取的本场规则。
+type Rules struct {
+	ATBThreshold           int64
+	MaxActions             int
+	DamageVariancePermille int64
+	CritChancePermille     int64
+	CritMultiplierPermille int64
+}
+
+// Setup 是 Engine 的完整纯运行时输入。
+type Setup struct {
+	BattleID string
+	Seed     uint64
+	Rules    Rules
+	Units    []UnitConfig
+}
+
+// Result 是确定性战斗的运行结果。
 type Result struct {
-	BattleID string       `json:"battle_id"`
-	Outcome  Outcome      `json:"outcome"`
-	Tick     int64        `json:"tick"`
-	Units    []UnitResult `json:"units"`
-	Events   []Event      `json:"events"`
-	Checksum string       `json:"checksum"`
-	Replay   Replay       `json:"replay"`
+	BattleID string                 `json:"battle_id"`
+	Outcome  pb.BattleOutcome       `json:"outcome"`
+	Tick     int64                  `json:"tick"`
+	Units    []*pb.BattleUnitResult `json:"units"`
+	Events   []*pb.BattleEvent      `json:"events"`
+	Checksum string                 `json:"checksum"`
+}
+
+func (s Setup) validate() error {
+	if s.BattleID == "" {
+		return invalid("battle_id", "required")
+	}
+	if s.Rules.ATBThreshold <= 0 {
+		return invalid("atb_threshold", "must be positive")
+	}
+	if s.Rules.MaxActions <= 0 {
+		return invalid("max_actions", "must be positive")
+	}
+	if len(s.Units) < 2 {
+		return invalid("units", "at least two units required")
+	}
+	teams := make(map[pb.BattleTeam]bool)
+	ids := make(map[string]struct{}, len(s.Units))
+	for _, unit := range s.Units {
+		if unit.InstanceID == "" {
+			return invalid("unit.instance_id", "required")
+		}
+		if _, exists := ids[unit.InstanceID]; exists {
+			return invalid("unit.instance_id", fmt.Sprintf("duplicate %q", unit.InstanceID))
+		}
+		ids[unit.InstanceID] = struct{}{}
+		if unit.Team != pb.BattleTeam_BATTLE_TEAM_ATTACKER && unit.Team != pb.BattleTeam_BATTLE_TEAM_DEFENDER {
+			return invalid("unit.team", "must be attacker or defender")
+		}
+		teams[unit.Team] = true
+		if unit.MaxHP <= 0 || unit.Speed <= 0 {
+			return invalid("unit.attributes", "max hp and speed must be positive")
+		}
+		if unit.BasicSkill.ID == "" {
+			return invalid("unit.basic_skill", "required")
+		}
+	}
+	if !teams[pb.BattleTeam_BATTLE_TEAM_ATTACKER] || !teams[pb.BattleTeam_BATTLE_TEAM_DEFENDER] {
+		return invalid("units", "both teams required")
+	}
+	return nil
 }
 
 func invalid(field, reason string) error { return fmt.Errorf("invalid %s: %s", field, reason) }

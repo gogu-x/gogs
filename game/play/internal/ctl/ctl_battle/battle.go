@@ -10,7 +10,7 @@ import (
 )
 
 func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
-	if !ctx.Cast(def.BattleClient, &battleclient.Begin{UID: req.UID, Input: req.Input}) {
+	if !ctx.Cast(def.BattleClient, &battleclient.Begin{Request: req}) {
 		ctx.Response(nil, fmt.Errorf("play: battle client is unavailable"))
 	}
 }
