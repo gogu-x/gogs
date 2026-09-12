@@ -2,11 +2,7 @@
 // Package glconf 包含自动生成的游戏配置。
 package glconf
 
-import (
-	"fmt"
-
-	"github.com/gogu-x/tree/tlog"
-)
+import "fmt"
 
 type confLoader func(dbURI, dbName, confName string) (*CsvConf, error)
 
@@ -82,7 +78,6 @@ func loadConf(meta *confMeta, dbURI, dbName string) error {
 	if err != nil {
 		return fmt.Errorf("load configuration %s: %w", meta.source, err)
 	}
-	tlog.Log.Info("load configuration success %v", meta.source)
 	meta.csv = table
 	return nil
 }

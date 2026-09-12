@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.36.0
-// source: sspb/battle/ack.proto
+// source: cspb/battle/ack.proto
 
 package pb_battle
 
@@ -21,17 +21,18 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// StartBattleAck 表示创建请求的同步接收结果。
+// StartBattleAck 表示 Game 是否接受创建请求；battle_id 可能要等 Created 推送才确定。
 type StartBattleAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BattleId      string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StartBattleAck) Reset() {
 	*x = StartBattleAck{}
-	mi := &file_sspb_battle_ack_proto_msgTypes[0]
+	mi := &file_cspb_battle_ack_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +44,7 @@ func (x *StartBattleAck) String() string {
 func (*StartBattleAck) ProtoMessage() {}
 
 func (x *StartBattleAck) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_ack_proto_msgTypes[0]
+	mi := &file_cspb_battle_ack_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +57,7 @@ func (x *StartBattleAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartBattleAck.ProtoReflect.Descriptor instead.
 func (*StartBattleAck) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_ack_proto_rawDescGZIP(), []int{0}
+	return file_cspb_battle_ack_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *StartBattleAck) GetBattleId() string {
@@ -66,31 +67,39 @@ func (x *StartBattleAck) GetBattleId() string {
 	return ""
 }
 
-var File_sspb_battle_ack_proto protoreflect.FileDescriptor
+func (x *StartBattleAck) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
 
-const file_sspb_battle_ack_proto_rawDesc = "" +
+var File_cspb_battle_ack_proto protoreflect.FileDescriptor
+
+const file_cspb_battle_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x15sspb/battle/ack.proto\"-\n" +
+	"\x15cspb/battle/ack.proto\"C\n" +
 	"\x0eStartBattleAck\x12\x1b\n" +
-	"\tbattle_id\x18\x01 \x01(\tR\bbattleIdB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
+	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05errorB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
 
 var (
-	file_sspb_battle_ack_proto_rawDescOnce sync.Once
-	file_sspb_battle_ack_proto_rawDescData []byte
+	file_cspb_battle_ack_proto_rawDescOnce sync.Once
+	file_cspb_battle_ack_proto_rawDescData []byte
 )
 
-func file_sspb_battle_ack_proto_rawDescGZIP() []byte {
-	file_sspb_battle_ack_proto_rawDescOnce.Do(func() {
-		file_sspb_battle_ack_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_sspb_battle_ack_proto_rawDesc), len(file_sspb_battle_ack_proto_rawDesc)))
+func file_cspb_battle_ack_proto_rawDescGZIP() []byte {
+	file_cspb_battle_ack_proto_rawDescOnce.Do(func() {
+		file_cspb_battle_ack_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_cspb_battle_ack_proto_rawDesc), len(file_cspb_battle_ack_proto_rawDesc)))
 	})
-	return file_sspb_battle_ack_proto_rawDescData
+	return file_cspb_battle_ack_proto_rawDescData
 }
 
-var file_sspb_battle_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_sspb_battle_ack_proto_goTypes = []any{
+var file_cspb_battle_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_cspb_battle_ack_proto_goTypes = []any{
 	(*StartBattleAck)(nil), // 0: StartBattleAck
 }
-var file_sspb_battle_ack_proto_depIdxs = []int32{
+var file_cspb_battle_ack_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -98,26 +107,26 @@ var file_sspb_battle_ack_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_sspb_battle_ack_proto_init() }
-func file_sspb_battle_ack_proto_init() {
-	if File_sspb_battle_ack_proto != nil {
+func init() { file_cspb_battle_ack_proto_init() }
+func file_cspb_battle_ack_proto_init() {
+	if File_cspb_battle_ack_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sspb_battle_ack_proto_rawDesc), len(file_sspb_battle_ack_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_battle_ack_proto_rawDesc), len(file_cspb_battle_ack_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_sspb_battle_ack_proto_goTypes,
-		DependencyIndexes: file_sspb_battle_ack_proto_depIdxs,
-		MessageInfos:      file_sspb_battle_ack_proto_msgTypes,
+		GoTypes:           file_cspb_battle_ack_proto_goTypes,
+		DependencyIndexes: file_cspb_battle_ack_proto_depIdxs,
+		MessageInfos:      file_cspb_battle_ack_proto_msgTypes,
 	}.Build()
-	File_sspb_battle_ack_proto = out.File
-	file_sspb_battle_ack_proto_goTypes = nil
-	file_sspb_battle_ack_proto_depIdxs = nil
+	File_cspb_battle_ack_proto = out.File
+	file_cspb_battle_ack_proto_goTypes = nil
+	file_cspb_battle_ack_proto_depIdxs = nil
 }

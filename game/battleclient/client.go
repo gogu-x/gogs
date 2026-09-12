@@ -91,13 +91,17 @@ func New(selector NodeSelector, sender Sender, gameServerID, gameNodeID int) *Cl
 	if sender == nil {
 		sender = NATSSender{}
 	}
-	return &Client{selector: selector, sender: sender, gameServerID: gameServerID, gameNodeID: gameNodeID, players: make(map[uint64]*record), completed: make(map[string]string)}
+	return &Client{
+		selector: selector, sender: sender,
+		gameServerID: gameServerID, gameNodeID: gameNodeID,
+		players: make(map[uint64]*record), completed: make(map[string]string),
+	}
 }
 
 func (c *Client) Name() string        { return def.BattleClient }
 func (c *Client) OnInit(tree.Context) {}
 func (c *Client) OnStop(tree.Context) {}
-func (c *Client) MailboxSize() int    { return 256 }
+func (c *Client) MailboxSize() int    { return 8 * 1024 }
 
 func (c *Client) HandleMessage(ctx tree.Context, msg interface{}) {
 	switch m := msg.(type) {
@@ -154,7 +158,7 @@ func (c *Client) begin(ctx tree.Context, msg *Begin) {
 		ctx.Response(r.State, err)
 		return
 	}
-	// 发布成功后不可盲目重发，等待 BattleCreatedNtf 或 Finished 恢复状态。
+	// NATS 已发布但尚未收到 Created；此时禁止盲目重发，避免生成两场战斗。
 	r.Status = CreateUnknown
 	ctx.Response(r.State, nil)
 }
@@ -205,10 +209,8 @@ func (c *Client) finished(ctx tree.Context, msg *pb.BattleFinishedNtf) {
 	if r.BattleID != "" && r.BattleID != msg.BattleId {
 		return
 	}
-	// A Finished can recover a lost Created, but it never causes Start to be
-	// retransmitted. Duplicate results are acknowledged without reapplying.
-	_, alreadyApplied := c.completed[msg.BattleId]
-	if !alreadyApplied {
+	// Finished 可恢复丢失的 Created；重复 Finished 只确认，不重复推给客户端。
+	if _, alreadyApplied := c.completed[msg.BattleId]; !alreadyApplied {
 		c.completed[msg.BattleId] = msg.Checksum
 		r.BattleID = msg.BattleId
 		r.Checksum = msg.Checksum
@@ -247,9 +249,7 @@ func (c *Client) push(ctx tree.Context, uid uint64, msg proto.Message) {
 	}
 }
 
-// ClusterSelector picks Battle nodes from the generic service registry. The
-// registry returns newest instances first; round-robin avoids pinning all
-// players to the newest process.
+// ClusterSelector 从通用服务注册表轮询 Battle 节点。
 type ClusterSelector struct{ next uint64 }
 
 func (s *ClusterSelector) Pick() (Node, error) {
@@ -279,8 +279,6 @@ func (NATSSender) Start(node Node, req *pb.StartBattleReq) error {
 	return natsrpc.Cast(natsrpc.Battle, def.BattleService, node.ServerID, node.NodeID, req)
 }
 
-// Confirm 发往该场战斗的 per-battle battle（按 battle_id 推导 battle 名），
-// 使确认从 BATTLE_SERVICE manager 直达战斗 battle。
 func (NATSSender) Confirm(node Node, msg *pb.BattleResultConfirmedNtf) error {
 	return natsrpc.Cast(natsrpc.Battle, def.BattleActorName(msg.BattleId), node.ServerID, node.NodeID, msg)
 }

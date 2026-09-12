@@ -8,28 +8,38 @@ import (
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/glconf"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
+	cspb "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/protobuf/proto"
 )
 
-func MainTest() {
+func MainTest(t *testing.T) {
+	t.Helper()
 	tlog.NewLog(conf.LogPath, 0)
-	conf.GconfDbUri = "mongodb://admin:asd620522-@43.160.212.55:27018/?authSource=admin"
-	conf.GconfDb = "gs_conf_g1_dev"
-	//加载配置表
-	err := glconf.LoadAllConfs(conf.GconfDbUri, conf.GconfDb, true)
+	err := glconf.SetBattleConfigsForTest(
+		[]*glconf.BattleRoleCfg{{CfgID: 1, MaxHP: 100, Attack: 20, Defense: 5, Speed: 10, DefaultPosition: 1, BasicSkillID: 1}},
+		[]*glconf.BattleSkillCfg{{CfgID: 1, TargetRule: int32(pb.TargetRule_TARGET_RULE_ENEMY_SINGLE), Effects: []*cspb.TypIDVal{{Typ: "battle_damage", Pro: 1000}}}},
+		nil,
+		[]*glconf.BattleMonsterCfg{{CfgID: 1, MaxHP: 40, Attack: 10, Defense: 2, Speed: 8, BasicSkillID: 1}},
+		[]*glconf.BattleMonsterGroupCfg{{CfgID: 1, Members: []*cspb.TypIDVal{{Typ: "battle_monster", Id: 1, Val: 1}}}},
+		[]*glconf.BattleRuleCfg{{BattleType: int32(pb.BattleType_BATTLE_TYPE_PVE), ATBThreshold: 100, MaxActions: 20, TickDurationMS: 100, CritMultiplierPermille: 1500}},
+	)
 	if err != nil {
-		tlog.Log.Error("load confs error: %v", err)
+		t.Fatal(err)
 	}
 }
 
 func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
-	MainTest()
+	MainTest(t)
 	server := New()
 	finished := make(chan struct{}, 1)
+	var createdTickDuration int32
 	server.notifier = battle.NotifyFunc(func(_ battle.Source, message proto.Message) error {
-		if _, ok := message.(*pb.BattleFinishedNtf); ok {
+		switch value := message.(type) {
+		case *pb.BattleCreatedNtf:
+			createdTickDuration = value.GetTickDurationMs()
+		case *pb.BattleFinishedNtf:
 			select {
 			case finished <- struct{}{}:
 			default:
@@ -40,7 +50,7 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	treeSystem := tree.NewTree()
 	managerPID := treeSystem.SpawnOne(server)
 	t.Cleanup(treeSystem.Shutdown)
-	request := &pb.StartBattleReq{Uid: 7, Sid: 1, SourceNodeId: 2, BattleType: pb.BattleType_BATTLE_TYPE_PVE, AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
+	request := &pb.StartBattleReq{UID: 7, ServerID: 1, SourceNodeId: 2, BattleType: pb.BattleType_BATTLE_TYPE_PVE, AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
 	value, err := treeSystem.Request(managerPID, request).AwaitTimeout(time.Second)
 	if err != nil {
 		t.Fatal(err)
@@ -55,6 +65,9 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	}
 	select {
 	case <-finished:
+		if createdTickDuration != 100 {
+			t.Fatalf("created tick duration = %d, want 100", createdTickDuration)
+		}
 	case <-time.After(30 * time.Second):
 		t.Fatal("battle did not finish")
 	}

@@ -35,6 +35,9 @@ func NewGateActor() *GateActor {
 
 func (g *GateActor) Name() string { return def.GameGate }
 
+// MailboxSize must hold bursty server pushes such as a complete battle report.
+func (g *GateActor) MailboxSize() int { return 8 * 1024 }
+
 func (g *GateActor) OnInit(ctx tree.Context) {
 	g.router.Register(&openSession{}, g.onOpenSession)
 	g.router.Register(&closeSession{}, g.onCloseSession)

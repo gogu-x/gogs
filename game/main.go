@@ -16,7 +16,7 @@ import (
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb"
 	"github.com/gogu-x/gogs/rpc/mongorpc"
-	cluster2 "github.com/gogu-x/tree/cluster"
+	"github.com/gogu-x/tree/cluster"
 	"github.com/gogu-x/tree/tlog"
 
 	"github.com/gogu-x/tree"
@@ -34,16 +34,16 @@ func main() {
 			}
 			tlog.NewLog(conf.LogPath, 0)
 
-			if err := cluster2.Init(conf.EtcdEndpoints); err != nil {
+			if err := cluster.Init(conf.EtcdEndpoints); err != nil {
 				tlog.Log.Error("cluster init error: %v", err)
 			}
-			defer cluster2.Close()
+			defer cluster.Close()
 
 			serverID := fmt.Sprintf("%d", conf.ServerID)
 			NodeID := fmt.Sprintf("%d", conf.NodeId)
 			addr := conf.GameAddr()
 
-			if err := cluster2.Register(serverID, NodeID, addr); err != nil {
+			if err := cluster.Register(serverID, NodeID, addr); err != nil {
 				tlog.Log.Error("cluster register error: %v", err)
 			}
 			fmt.Printf("game server [%s] inst=%s registered at %s\n", serverID, NodeID, addr)

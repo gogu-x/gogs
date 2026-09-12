@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"container/heap"
 	"fmt"
 	"sort"
 
@@ -15,7 +16,6 @@ type activeStatus struct {
 type unit struct {
 	Config    UnitConfig
 	HP        int64
-	Gauge     int64
 	Cooldowns map[string]int
 	Statuses  []activeStatus
 }
@@ -49,19 +49,24 @@ func (u *unit) speed() int64   { return max(1, u.Config.Speed+u.modifier().Speed
 
 // Battle 是不依赖外部服务的确定性战斗实例。
 type Battle struct {
-	setup    Setup
-	rng      *RNG
-	pipeline DamagePipeline
-	units    []*unit
-	tick     int64
-	action   uint64
-	events   []*pb.BattleEvent
-	finished bool
-	cached   Result
+	setup          Setup
+	rng            *RNG
+	pipeline       DamagePipeline
+	units          []*unit
+	timeline       timelineQueue
+	tick           int64
+	action         uint64
+	nextAction     uint64
+	startedActions int
+	activeActions  int
+	events         []*pb.BattleEvent
+	finished       bool
+	cached         Result
 }
 
 // NewBattle 使用 BattleActor 传入的运行时数据创建战斗。
 func NewBattle(setup Setup) (*Battle, error) {
+	setup.normalize()
 	if err := setup.validate(); err != nil {
 		return nil, err
 	}
@@ -73,17 +78,25 @@ func NewBattle(setup Setup) (*Battle, error) {
 		}
 		battle.units = append(battle.units, &unit{Config: config, HP: config.MaxHP, Cooldowns: make(map[string]int), Statuses: statuses})
 	}
+	for _, actor := range battle.units {
+		battle.schedule(&timelineItem{Tick: battle.attackInterval(actor), Phase: phaseStart, Actor: actor})
+	}
+	heap.Init(&battle.timeline)
 	return battle, nil
 }
 
 // ID 返回 Manager 生成的战斗 ID。
 func (b *Battle) ID() string { return b.setup.BattleID }
 
-func (b *Battle) emit(kind pb.BattleEventType, actor, target, skill, status string, amount, before, after int64, detail string) {
+// TickDurationMS 返回客户端播放时间轴使用的权威 tick 时长。
+func (b *Battle) TickDurationMS() int32 { return b.setup.Rules.TickDurationMS }
+
+func (b *Battle) emit(kind pb.BattleEventType, actor, target, skill, status string, amount, before, after int64, detail string, targetIDs []string) {
 	b.events = append(b.events, &pb.BattleEvent{
 		Sequence: uint64(len(b.events) + 1), Action: b.action, Tick: b.tick, Type: kind,
 		ActorId: actor, TargetId: target, SkillId: skill, StatusId: status,
 		Amount: amount, HpBefore: before, HpAfter: after, Detail: detail,
+		TargetIds: append([]string(nil), targetIDs...),
 	})
 }
 
@@ -111,105 +124,58 @@ func (b *Battle) outcome() (pb.BattleOutcome, bool) {
 	}
 }
 
-func (b *Battle) nextActor() *unit {
-	var delta int64 = -1
-	for _, unit := range b.units {
-		if !unit.alive() {
-			continue
-		}
-		need := b.setup.Rules.ATBThreshold - unit.Gauge
-		ticks := int64(0)
-		if need > 0 {
-			ticks = (need + unit.speed() - 1) / unit.speed()
-		}
-		if delta < 0 || ticks < delta {
-			delta = ticks
-		}
-	}
-	if delta < 0 {
-		return nil
-	}
-	if delta > 0 {
-		for _, unit := range b.units {
-			if unit.alive() {
-				unit.Gauge += delta * unit.speed()
-			}
-		}
-		b.tick += delta
-	}
-	ready := make([]*unit, 0)
-	for _, unit := range b.units {
-		if unit.alive() && unit.Gauge >= b.setup.Rules.ATBThreshold {
-			ready = append(ready, unit)
-		}
-	}
-	sort.Slice(ready, func(i, j int) bool {
-		left, right := ready[i], ready[j]
-		if left.Gauge != right.Gauge {
-			return left.Gauge > right.Gauge
-		}
-		if left.speed() != right.speed() {
-			return left.speed() > right.speed()
-		}
-		if left.Config.Position != right.Config.Position {
-			return left.Config.Position < right.Config.Position
-		}
-		return left.Config.InstanceID < right.Config.InstanceID
-	})
-	if len(ready) == 0 {
-		return nil
-	}
-	return ready[0]
+func (b *Battle) attackInterval(actor *unit) int64 {
+	return max(1, (b.setup.Rules.ATBThreshold+actor.speed()-1)/actor.speed())
 }
 
-func (b *Battle) tickCooldowns(unit *unit) {
-	for id, turns := range unit.Cooldowns {
+func (b *Battle) tickCooldowns(actor *unit) {
+	for id, turns := range actor.Cooldowns {
 		if turns <= 1 {
-			delete(unit.Cooldowns, id)
+			delete(actor.Cooldowns, id)
 		} else {
-			unit.Cooldowns[id] = turns - 1
+			actor.Cooldowns[id] = turns - 1
 		}
 	}
 }
 
-func (b *Battle) tickPeriodic(unit *unit) {
-	for _, status := range unit.Statuses {
-		if !unit.alive() {
+func (b *Battle) tickPeriodic(actor *unit) {
+	for _, status := range actor.Statuses {
+		if !actor.alive() {
 			return
 		}
-		before := unit.HP
+		before := actor.HP
 		switch status.Config.Kind {
 		case StatusDOT:
-			amount := min(status.Config.Potency, unit.HP)
-			unit.HP -= amount
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, unit.Config.InstanceID, unit.Config.InstanceID, "", status.Config.ID, amount, before, unit.HP, "dot")
+			amount := min(status.Config.Potency, actor.HP)
+			actor.HP -= amount
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID, amount, before, actor.HP, "dot", nil)
 		case StatusHOT:
-			unit.HP = min(unit.Config.MaxHP, unit.HP+status.Config.Potency)
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, unit.Config.InstanceID, unit.Config.InstanceID, "", status.Config.ID, unit.HP-before, before, unit.HP, "hot")
+			actor.HP = min(actor.Config.MaxHP, actor.HP+status.Config.Potency)
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID, actor.HP-before, before, actor.HP, "hot", nil)
 		}
 	}
 }
 
-func (b *Battle) expireStatuses(unit *unit) {
-	kept := unit.Statuses[:0]
-	for _, status := range unit.Statuses {
+func (b *Battle) expireStatuses(actor *unit) {
+	kept := actor.Statuses[:0]
+	for _, status := range actor.Statuses {
 		status.Remaining--
 		if status.Remaining > 0 {
 			kept = append(kept, status)
 		}
 	}
-	unit.Statuses = kept
+	actor.Statuses = kept
 }
 
-func (b *Battle) chooseSkill(unit *unit) SkillConfig {
-	if !unit.hasStatus(StatusSilence) {
-		for _, skill := range unit.Config.ActiveSkills {
-			if unit.Cooldowns[skill.ID] == 0 {
+func (b *Battle) chooseSkill(actor *unit) SkillConfig {
+	if !actor.hasStatus(StatusSilence) {
+		for _, skill := range actor.Config.ActiveSkills {
+			if actor.Cooldowns[skill.ID] == 0 {
 				return skill
 			}
 		}
 	}
-	return unit.Config.BasicSkill
+	return actor.Config.BasicSkill
 }
 
 func unitLess(left, right *unit) bool {
@@ -227,9 +193,9 @@ func (b *Battle) targets(actor *unit, rule pb.TargetRule) []*unit {
 			targets = append(targets, actor)
 		}
 	case pb.TargetRule_TARGET_RULE_ENEMY_SINGLE, pb.TargetRule_TARGET_RULE_ENEMY_ALL:
-		for _, unit := range b.units {
-			if unit.alive() && unit.Config.Team != actor.Config.Team {
-				targets = append(targets, unit)
+		for _, candidate := range b.units {
+			if candidate.alive() && candidate.Config.Team != actor.Config.Team {
+				targets = append(targets, candidate)
 			}
 		}
 		sort.Slice(targets, func(i, j int) bool { return unitLess(targets[i], targets[j]) })
@@ -237,9 +203,9 @@ func (b *Battle) targets(actor *unit, rule pb.TargetRule) []*unit {
 			return targets[:1]
 		}
 	case pb.TargetRule_TARGET_RULE_ALLY_LOWEST_HP:
-		for _, unit := range b.units {
-			if unit.alive() && unit.Config.Team == actor.Config.Team {
-				targets = append(targets, unit)
+		for _, candidate := range b.units {
+			if candidate.alive() && candidate.Config.Team == actor.Config.Team {
+				targets = append(targets, candidate)
 			}
 		}
 		sort.Slice(targets, func(i, j int) bool {
@@ -256,6 +222,21 @@ func (b *Battle) targets(actor *unit, rule pb.TargetRule) []*unit {
 	return targets
 }
 
+func targetIDs(targets []*unit) []string {
+	ids := make([]string, 0, len(targets))
+	for _, target := range targets {
+		ids = append(ids, target.Config.InstanceID)
+	}
+	return ids
+}
+
+func firstTarget(ids []string) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	return ids[0]
+}
+
 func (b *Battle) applyEffect(actor, target *unit, skill SkillConfig, effect EffectConfig) {
 	if !target.alive() {
 		return
@@ -270,42 +251,85 @@ func (b *Battle) applyEffect(actor, target *unit, skill SkillConfig, effect Effe
 		if context.Critical {
 			detail = "critical"
 		}
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", amount, before, target.HP, detail)
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", amount, before, target.HP, detail, nil)
 	case EffectHeal:
 		amount := max(0, actor.attack()*effect.CoefficientPermille/1000+effect.Flat)
 		before := target.HP
 		target.HP = min(target.Config.MaxHP, target.HP+amount)
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", target.HP-before, before, target.HP, "")
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", target.HP-before, before, target.HP, "", nil)
 	case EffectApplyStatus:
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_STATUS_APPLIED, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, effect.StatusID, 0, target.HP, target.HP, "unsupported status config")
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_STATUS_APPLIED, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, effect.StatusID, 0, target.HP, target.HP, "unsupported status config", nil)
 	}
 }
 
-func (b *Battle) execute(actor *unit) {
-	b.action++
-	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED, actor.Config.InstanceID, "", "", "", 0, actor.HP, actor.HP, "")
+func (b *Battle) startAction(actor *unit) {
+	b.nextAction++
+	b.startedActions++
+	b.action = b.nextAction
 	b.tickCooldowns(actor)
+	skill := b.chooseSkill(actor)
+	stunned := actor.hasStatus(StatusStun)
+	var targets []*unit
+	if !stunned {
+		targets = b.targets(actor, skill.TargetRule)
+	}
+	ids := targetIDs(targets)
+	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED, actor.Config.InstanceID, firstTarget(ids), skill.ID, "", 0, actor.HP, actor.HP, "", ids)
 	b.tickPeriodic(actor)
-	if actor.alive() {
-		if actor.hasStatus(StatusStun) {
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED, actor.Config.InstanceID, "", "", "", 0, actor.HP, actor.HP, "stun")
-		} else {
-			skill := b.chooseSkill(actor)
-			targets := b.targets(actor, skill.TargetRule)
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED, actor.Config.InstanceID, "", skill.ID, "", 0, actor.HP, actor.HP, "")
-			for _, target := range targets {
-				for _, effect := range skill.Effects {
-					b.applyEffect(actor, target, skill, effect)
-				}
-			}
-			if skill.Cooldown > 0 && skill.ID != actor.Config.BasicSkill.ID {
-				actor.Cooldowns[skill.ID] = skill.Cooldown
-			}
+
+	action := &scheduledAction{ID: b.action, Actor: actor, Skill: skill, Targets: targets, TargetIDs: ids, StartTick: b.tick, Basic: skill.ID == actor.Config.BasicSkill.ID}
+	if !actor.alive() {
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED, actor.Config.InstanceID, "", skill.ID, "", 0, actor.HP, actor.HP, "dead_at_start", ids)
+		action.ImpactTick, action.EndTick = b.tick, b.tick
+	} else if stunned {
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED, actor.Config.InstanceID, "", skill.ID, "", 0, actor.HP, actor.HP, "stun", ids)
+		action.ImpactTick, action.EndTick = b.tick, b.tick+skill.RecoveryTicks
+	} else {
+		detail := "skill"
+		if action.Basic {
+			detail = "basic"
+		}
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED, actor.Config.InstanceID, firstTarget(ids), skill.ID, "", 0, actor.HP, actor.HP, detail, ids)
+		action.ImpactTick = b.tick + skill.WindupTicks
+		action.EndTick = action.ImpactTick + skill.RecoveryTicks
+		b.schedule(&timelineItem{Tick: action.ImpactTick, Phase: phaseImpact, Actor: actor, Action: action})
+		if skill.Cooldown > 0 && !action.Basic {
+			actor.Cooldowns[skill.ID] = skill.Cooldown
 		}
 	}
-	b.expireStatuses(actor)
-	actor.Gauge = max(0, actor.Gauge-b.setup.Rules.ATBThreshold)
-	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED, actor.Config.InstanceID, "", "", "", 0, actor.HP, actor.HP, "")
+	b.activeActions++
+	b.schedule(&timelineItem{Tick: action.EndTick, Phase: phaseEnd, Actor: actor, Action: action})
+	if actor.alive() {
+		nextReady := max(action.EndTick, action.StartTick+b.attackInterval(actor))
+		b.schedule(&timelineItem{Tick: nextReady, Phase: phaseStart, Actor: actor})
+	}
+}
+
+func (b *Battle) impactAction(action *scheduledAction) {
+	actor := action.Actor
+	if !actor.alive() {
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, firstTarget(action.TargetIDs), action.Skill.ID, "", 0, actor.HP, actor.HP, "attacker_dead", action.TargetIDs)
+		return
+	}
+	if len(action.Targets) == 0 {
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, "", action.Skill.ID, "", 0, actor.HP, actor.HP, "target_dead", action.TargetIDs)
+		return
+	}
+	for _, target := range action.Targets {
+		if !target.alive() {
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, target.Config.InstanceID, action.Skill.ID, "", 0, target.HP, target.HP, "target_dead", []string{target.Config.InstanceID})
+			continue
+		}
+		for _, effect := range action.Skill.Effects {
+			b.applyEffect(actor, target, action.Skill, effect)
+		}
+	}
+}
+
+func (b *Battle) endAction(action *scheduledAction) {
+	b.expireStatuses(action.Actor)
+	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED, action.Actor.Config.InstanceID, firstTarget(action.TargetIDs), action.Skill.ID, "", 0, action.Actor.HP, action.Actor.HP, "", action.TargetIDs)
+	b.activeActions--
 }
 
 // Run 执行一场自动战斗，并返回缓存的确定性结果。
@@ -314,26 +338,42 @@ func (b *Battle) Run() (Result, error) {
 		return b.cached, nil
 	}
 	outcome := pb.BattleOutcome_BATTLE_OUTCOME_DRAW
-	for action := 0; action < b.setup.Rules.MaxActions; action++ {
+	terminal := false
+	for b.timeline.Len() > 0 {
+		item := heap.Pop(&b.timeline).(*timelineItem)
+		b.tick = item.Tick
+		switch item.Phase {
+		case phaseStart:
+			if terminal || b.startedActions >= b.setup.Rules.MaxActions || !item.Actor.alive() {
+				continue
+			}
+			b.startAction(item.Actor)
+		case phaseImpact:
+			b.action = item.Action.ID
+			b.impactAction(item.Action)
+		case phaseEnd:
+			b.action = item.Action.ID
+			b.endAction(item.Action)
+		}
 		if value, done := b.outcome(); done {
-			outcome = value
+			outcome, terminal = value, true
+		}
+		if b.activeActions == 0 && (terminal || b.startedActions >= b.setup.Rules.MaxActions) {
 			break
 		}
-		actor := b.nextActor()
-		if actor == nil {
-			return Result{}, fmt.Errorf("no living battle unit available")
+	}
+	if !terminal {
+		if value, done := b.outcome(); done {
+			outcome = value
 		}
-		b.execute(actor)
 	}
-	if value, done := b.outcome(); done {
-		outcome = value
-	}
-	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_BATTLE_ENDED, "", "", "", "", 0, 0, 0, fmt.Sprintf("outcome=%d", outcome))
+	b.action = 0
+	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_BATTLE_ENDED, "", "", "", "", 0, 0, 0, fmt.Sprintf("outcome=%d", outcome), nil)
 	units := make([]*pb.BattleUnitResult, 0, len(b.units))
 	for _, unit := range b.units {
 		units = append(units, &pb.BattleUnitResult{InstanceId: unit.Config.InstanceID, Team: unit.Config.Team, Hp: unit.HP, MaxHp: unit.Config.MaxHP, Alive: unit.alive()})
 	}
-	result := Result{BattleID: b.setup.BattleID, Outcome: outcome, Tick: b.tick, Units: units, Events: append([]*pb.BattleEvent(nil), b.events...)}
+	result := Result{BattleID: b.setup.BattleID, Outcome: outcome, Tick: b.tick, TickDurationMS: b.setup.Rules.TickDurationMS, Units: units, Events: append([]*pb.BattleEvent(nil), b.events...)}
 	checksum, err := resultChecksum(result)
 	if err != nil {
 		return Result{}, err

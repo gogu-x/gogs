@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/def"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/tree"
@@ -121,7 +122,13 @@ func (a *BattleActor) begin(ctx tree.Context) {
 }
 
 func (a *BattleActor) notifyCreated() {
-	created := &pb.BattleCreatedNtf{BattleId: a.p.BattleID, Uid: a.p.UID}
+	tickDurationMS := engine.DefaultTickDurationMS
+	if a.p.Battle != nil {
+		tickDurationMS = a.p.Battle.TickDurationMS()
+	} else if a.p.Report.Result.TickDurationMS > 0 {
+		tickDurationMS = a.p.Report.Result.TickDurationMS
+	}
+	created := &pb.BattleCreatedNtf{BattleId: a.p.BattleID, Uid: a.p.UID, TickDurationMs: tickDurationMS}
 	if err := a.p.Notifier.Notify(a.p.Source, created); err != nil {
 		tlog.Log.Warn("battle battle %s: notify Created: %v", a.p.BattleID, err)
 	}

@@ -14,10 +14,12 @@ var csvBattleSkillCfg atomic.Value
 
 // BattleSkillCfg 表示 BattleSkillCfg 配置记录。
 type BattleSkillCfg struct {
-	CfgID      int32            `bson:"id"`          // 技能配置 ID
-	Cooldown   int32            `bson:"cooldown"`    // 冷却行动次数
-	TargetRule int32            `bson:"target_rule"` // 目标规则
-	Effects    []*cspb.TypIDVal `bson:"effects"`     // effects (Typ=battle_damage/battle_heal/battle_status; ID=status ID; Val=flat; Pro=coefficient permille)
+	CfgID         int32            `bson:"id"`             // 技能配置 ID
+	Cooldown      int32            `bson:"cooldown"`       // 冷却行动次数
+	TargetRule    int32            `bson:"target_rule"`    // 目标规则
+	Effects       []*cspb.TypIDVal `bson:"effects"`        // effects (Typ=battle_damage/battle_heal/battle_status; ID=status ID; Val=flat; Pro=coefficient permille)
+	WindupTicks   int32            `bson:"windup_ticks"`   // 前摇 tick 数
+	RecoveryTicks int32            `bson:"recovery_ticks"` // 后摇 tick 数
 }
 
 func loadBattleSkillCfg(dbURI, dbName, confName string) (*CsvConf, error) {

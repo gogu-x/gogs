@@ -81,66 +81,6 @@ func (x *Comm) GetSessionID() string {
 	return ""
 }
 
-type Event struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	EventTyp      int32                  `protobuf:"varint,2,opt,name=eventTyp,proto3" json:"eventTyp,omitempty"`
-	Args          map[string]int32       `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Event) Reset() {
-	*x = Event{}
-	mi := &file_cspb_comm_struct_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Event) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Event) ProtoMessage() {}
-
-func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_comm_struct_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Event.ProtoReflect.Descriptor instead.
-func (*Event) Descriptor() ([]byte, []int) {
-	return file_cspb_comm_struct_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *Event) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Event) GetEventTyp() int32 {
-	if x != nil {
-		return x.EventTyp
-	}
-	return 0
-}
-
-func (x *Event) GetArgs() map[string]int32 {
-	if x != nil {
-		return x.Args
-	}
-	return nil
-}
-
 type TypIDVal struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Typ           string                 `protobuf:"bytes,1,opt,name=typ,proto3" json:"typ,omitempty"`
@@ -153,7 +93,7 @@ type TypIDVal struct {
 
 func (x *TypIDVal) Reset() {
 	*x = TypIDVal{}
-	mi := &file_cspb_comm_struct_proto_msgTypes[2]
+	mi := &file_cspb_comm_struct_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -165,7 +105,7 @@ func (x *TypIDVal) String() string {
 func (*TypIDVal) ProtoMessage() {}
 
 func (x *TypIDVal) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_comm_struct_proto_msgTypes[2]
+	mi := &file_cspb_comm_struct_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -178,7 +118,7 @@ func (x *TypIDVal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TypIDVal.ProtoReflect.Descriptor instead.
 func (*TypIDVal) Descriptor() ([]byte, []int) {
-	return file_cspb_comm_struct_proto_rawDescGZIP(), []int{2}
+	return file_cspb_comm_struct_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *TypIDVal) GetTyp() string {
@@ -217,14 +157,7 @@ const file_cspb_comm_struct_proto_rawDesc = "" +
 	"\x04comm\x12\x10\n" +
 	"\x03uID\x18\x01 \x01(\x04R\x03uID\x12\x1a\n" +
 	"\bserverID\x18\x02 \x01(\rR\bserverID\x12\x1c\n" +
-	"\tsessionID\x18\x03 \x01(\tR\tsessionID\"\x96\x01\n" +
-	"\x05event\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
-	"\beventTyp\x18\x02 \x01(\x05R\beventTyp\x12$\n" +
-	"\x04args\x18\x03 \x03(\v2\x10.event.ArgsEntryR\x04args\x1a7\n" +
-	"\tArgsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"P\n" +
+	"\tsessionID\x18\x03 \x01(\tR\tsessionID\"P\n" +
 	"\bTypIDVal\x12\x10\n" +
 	"\x03typ\x18\x01 \x01(\tR\x03typ\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\x05R\x02id\x12\x10\n" +
@@ -243,20 +176,17 @@ func file_cspb_comm_struct_proto_rawDescGZIP() []byte {
 	return file_cspb_comm_struct_proto_rawDescData
 }
 
-var file_cspb_comm_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_cspb_comm_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_cspb_comm_struct_proto_goTypes = []any{
 	(*Comm)(nil),     // 0: comm
-	(*Event)(nil),    // 1: event
-	(*TypIDVal)(nil), // 2: TypIDVal
-	nil,              // 3: event.ArgsEntry
+	(*TypIDVal)(nil), // 1: TypIDVal
 }
 var file_cspb_comm_struct_proto_depIdxs = []int32{
-	3, // 0: event.args:type_name -> event.ArgsEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_cspb_comm_struct_proto_init() }
@@ -270,7 +200,7 @@ func file_cspb_comm_struct_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_comm_struct_proto_rawDesc), len(file_cspb_comm_struct_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

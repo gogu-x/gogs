@@ -73,7 +73,9 @@ func (g *GsAgent) Name() string {
 	return fmt.Sprintf("gateway-uid-%d-%d", g.uid, g.generation)
 }
 
-func (g *GsAgent) MailboxSize() int { return 256 }
+// MailboxSize A battle report is published as a short burst of individual events. Keep
+// enough ordered outbound frames to let the gRPC writer drain that burst.
+func (g *GsAgent) MailboxSize() int { return 2 * 1024 }
 
 func (g *GsAgent) OnInit(_ tree.Context) {
 	g.router.Register(&inboundFrame{}, g.handleInboundFrame)

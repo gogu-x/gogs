@@ -243,3 +243,16 @@ func TestOnStopIsNilSafe(t *testing.T) {
 	ns := NewActor("Gate", 1, 1, "")
 	ns.OnStop(nil)
 }
+
+func TestNatsBurstBufferConfiguration(t *testing.T) {
+	ns := NewActor("Game", 1, 1, "")
+	if got := ns.MailboxSize(); got != natsActorMailboxCapacity || got <= 128 {
+		t.Fatalf("Nats mailbox size = %d, want %d and greater than legacy capacity", got, natsActorMailboxCapacity)
+	}
+	if natsPendingMessageLimit < ns.MailboxSize() {
+		t.Fatalf("pending message limit %d is smaller than actor mailbox %d", natsPendingMessageLimit, ns.MailboxSize())
+	}
+	if natsPendingByteLimit < 1024*1024 {
+		t.Fatalf("pending byte limit is unexpectedly small: %d", natsPendingByteLimit)
+	}
+}

@@ -1,12 +1,12 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="platform" type="GoApplicationRunConfiguration" factoryName="Go Application">
-    <module name="gogs" />
-    <working_directory value="$PROJECT_DIR$/platform" />
-    <parameters value="--mongo-url mongodb://127.0.0.1:27017 --etcd 127.0.0.1:2379 --nats-url nats://127.0.0.1:4222" />
+    <module name="gotree" />
+    <working_directory value="$PROJECT_DIR$/gogs/platform" />
+    <parameters value="--server-id 1 --node-id 1 --mongo-url mongodb://43.160.238.113:27018 --mongo-username admin --mongo-password asd620522- --etcd 43.160.238.113:2379 --nats-url nats://43.160.238.113:4222" />
     <kind value="FILE" />
     <package value="github.com/gogu-x/gogs" />
     <directory value="$PROJECT_DIR$" />
-    <filePath value="$PROJECT_DIR$/platform/main.go" />
+    <filePath value="$PROJECT_DIR$/gogs/platform/main.go" />
     <method v="2" />
   </configuration>
 </component>

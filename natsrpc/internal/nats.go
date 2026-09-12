@@ -16,7 +16,12 @@ import (
 	natsgo "github.com/nats-io/nats.go"
 )
 
-const natsRequestTimeout = timer.TimerType(1)
+const (
+	natsRequestTimeout       = timer.TimerType(1)
+	natsPendingMessageLimit  = 64 * 1024
+	natsPendingByteLimit     = 64 * 1024 * 1024
+	natsActorMailboxCapacity = 8 * 1024
+)
 
 // publisher is the minimal NATS transport needed by the send path. Keeping it
 // small permits deterministic unit tests without opening a network connection.
@@ -71,6 +76,10 @@ func NewActor(typ string, serverId int, nodeId int, url string) *Nats {
 
 // Name implements tree.Actor.
 func (ns *Nats) Name() string { return def.Nats }
+
+// MailboxSize absorbs short NATS bursts (for example, a complete battle
+// report) while preserving actor ordering and backpressure.
+func (ns *Nats) MailboxSize() int { return natsActorMailboxCapacity }
 
 func (ns *Nats) OnInit(ctx tree.Context) {
 	nc, err := natsgo.Connect(ns.natsURl)
@@ -141,25 +150,47 @@ func (ns *Nats) subscribe(ctx tree.Context, sub string) {
 	if ns.conn == nil {
 		panic("natsrpc: subscribe before connection initialization")
 	}
-	ch := make(chan *natsgo.Msg, 128)
-	s, err := ns.conn.ChanSubscribe(sub, ch)
+	s, err := ns.conn.SubscribeSync(sub)
 	if err != nil {
 		log.Printf("natsrpc: subscribe %s: %v", sub, err)
 		panic(fmt.Sprintf("natsrpc: subscribe %s: %v", sub, err))
 	}
+	if err := s.SetPendingLimits(natsPendingMessageLimit, natsPendingByteLimit); err != nil {
+		_ = s.Unsubscribe()
+		log.Printf("natsrpc: set pending limits for %s: %v", sub, err)
+		panic(fmt.Sprintf("natsrpc: set pending limits for %s: %v", sub, err))
+	}
 	ns.nastSub = s
-	go func() {
-		for m := range ch {
-			msg, err := ns.codec.Unmarshal(m.Data)
-			if err != nil {
-				tlog.Log.Info("natsrpc: unmarshal frame from %s: %v", sub, err)
+	go ns.consumeSubscription(ctx, sub, s)
+	tlog.Log.Info("natsrpc: subscribed %s (pending_messages=%d pending_bytes=%d)",
+		sub, natsPendingMessageLimit, natsPendingByteLimit)
+}
+
+// consumeSubscription is the single ordered ingress path. SubscribeSync keeps
+// bursts in the NATS subscription pending queue instead of dropping as soon as
+// a small user channel fills. ctx.Send intentionally retains actor backpressure;
+// the enlarged pending queue and Nats mailbox absorb finite battle-report bursts.
+func (ns *Nats) consumeSubscription(ctx tree.Context, sub string, s *natsgo.Subscription) {
+	for {
+		m, err := s.NextMsg(time.Second)
+		if err != nil {
+			if errors.Is(err, natsgo.ErrTimeout) {
 				continue
 			}
-			if !ctx.Send(ctx.Self(), msg) {
-				tlog.Log.Info("natsrpc: drop frame from %s: actor stopped", sub)
+			if !s.IsValid() {
 				return
 			}
+			tlog.Log.Error("natsrpc: receive frame from %s: %v", sub, err)
+			continue
 		}
-	}()
-	tlog.Log.Info("natsrpc: subscribed %s", sub)
+		msg, err := ns.codec.Unmarshal(m.Data)
+		if err != nil {
+			tlog.Log.Info("natsrpc: unmarshal frame from %s: %v", sub, err)
+			continue
+		}
+		if !ctx.Send(ctx.Self(), msg) {
+			tlog.Log.Info("natsrpc: stop consuming %s: actor stopped", sub)
+			return
+		}
+	}
 }

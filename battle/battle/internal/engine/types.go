@@ -50,12 +50,17 @@ type EffectConfig struct {
 	StatusID            string
 }
 
+// DefaultTickDurationMS 是旧规则未配置 tick 时长时使用的兼容默认值。
+const DefaultTickDurationMS int32 = 100
+
 // SkillConfig 表示运行时技能配置。
 type SkillConfig struct {
-	ID         string
-	Cooldown   int
-	TargetRule pb.TargetRule
-	Effects    []EffectConfig
+	ID            string
+	Cooldown      int
+	TargetRule    pb.TargetRule
+	Effects       []EffectConfig
+	WindupTicks   int64
+	RecoveryTicks int64
 }
 
 // UnitConfig 表示 BattleActor 已从 glconf 还原的运行时单位。
@@ -76,6 +81,7 @@ type UnitConfig struct {
 type Rules struct {
 	ATBThreshold           int64
 	MaxActions             int
+	TickDurationMS         int32
 	DamageVariancePermille int64
 	CritChancePermille     int64
 	CritMultiplierPermille int64
@@ -91,12 +97,19 @@ type Setup struct {
 
 // Result 是确定性战斗的运行结果。
 type Result struct {
-	BattleID string                 `json:"battle_id"`
-	Outcome  pb.BattleOutcome       `json:"outcome"`
-	Tick     int64                  `json:"tick"`
-	Units    []*pb.BattleUnitResult `json:"units"`
-	Events   []*pb.BattleEvent      `json:"events"`
-	Checksum string                 `json:"checksum"`
+	BattleID       string                 `json:"battle_id"`
+	Outcome        pb.BattleOutcome       `json:"outcome"`
+	Tick           int64                  `json:"tick"`
+	TickDurationMS int32                  `json:"tick_duration_ms"`
+	Units          []*pb.BattleUnitResult `json:"units"`
+	Events         []*pb.BattleEvent      `json:"events"`
+	Checksum       string                 `json:"checksum"`
+}
+
+func (s *Setup) normalize() {
+	if s.Rules.TickDurationMS <= 0 {
+		s.Rules.TickDurationMS = DefaultTickDurationMS
+	}
 }
 
 func (s Setup) validate() error {
@@ -131,6 +144,12 @@ func (s Setup) validate() error {
 		}
 		if unit.BasicSkill.ID == "" {
 			return invalid("unit.basic_skill", "required")
+		}
+		allSkills := append([]SkillConfig{unit.BasicSkill}, unit.ActiveSkills...)
+		for _, skill := range allSkills {
+			if skill.WindupTicks < 0 || skill.RecoveryTicks < 0 {
+				return invalid("unit.skill.timing", "windup and recovery ticks cannot be negative")
+			}
 		}
 	}
 	if !teams[pb.BattleTeam_BATTLE_TEAM_ATTACKER] || !teams[pb.BattleTeam_BATTLE_TEAM_DEFENDER] {

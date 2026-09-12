@@ -15,7 +15,7 @@ import (
 
 // OnCreateBattle 只校验请求包络、生成 BattleID/Seed 并创建 BattleActor。
 func (s *Server) OnCreateBattle(ctx tree.Context, req *pb_battle.StartBattleReq) {
-	if req == nil || req.GetUid() == 0 || req.GetSid() == 0 || req.GetSourceNodeId() == 0 {
+	if req == nil || req.GetUID() == 0 || req.GetServerID() == 0 || req.GetSourceNodeId() == 0 {
 		ctx.Response(nil, fmt.Errorf("battle service: uid, source server and source node are required"))
 		return
 	}
@@ -33,8 +33,8 @@ func (s *Server) OnCreateBattle(ctx tree.Context, req *pb_battle.StartBattleReq)
 		BattleID:      battleID,
 		Seed:          seed,
 		Request:       req,
-		UID:           uint64(req.GetUid()),
-		Source:        battle.Source{ServerID: int(req.GetSid()), NodeID: int(req.GetSourceNodeId())},
+		UID:           req.GetUID(),
+		Source:        battle.Source{ServerID: int(req.GetServerID()), NodeID: int(req.GetSourceNodeId())},
 		ManagerPID:    s.self,
 		Mode:          battle.ModeRun,
 		Reports:       s.reports,
@@ -45,7 +45,7 @@ func (s *Server) OnCreateBattle(ctx tree.Context, req *pb_battle.StartBattleReq)
 	pid := s.system.SpawnOne(actor)
 	s.active[battleID] = pid
 	if tlog.Log != nil {
-		tlog.Log.Info("[战斗/创建] 创建BattleActor, battleID=%v seed=%v uid=%v", battleID, seed, req.GetUid())
+		tlog.Log.Info("[战斗/创建] 创建BattleActor, battleID=%v seed=%v uid=%v", battleID, seed, req.GetUID())
 	}
 	ctx.Response(&pb_battle.StartBattleAck{BattleId: battleID}, nil)
 }

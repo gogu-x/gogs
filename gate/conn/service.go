@@ -113,5 +113,5 @@ func (c *Conn) getServerListCb(_ tree.Context, ret interface{}, err error) {
 	for _, account := range resp.Accounts {
 		accounts = append(accounts, &pb_gateway.ServerAccount{ServerId: account.ServerId, Uid: account.Uid})
 	}
-	c.WriteWsMsg(&pb_gateway.ServerListAck{Code: pb_common.ErrCode_UNKNOWN, Accounts: accounts})
+	c.WriteWsMsg(&pb_gateway.ServerListAck{Code: pb_common.ErrCode_OK, Accounts: accounts})
 }

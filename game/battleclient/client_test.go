@@ -56,7 +56,7 @@ func (g *gateCapture) HandleMessage(_ tree.Context, msg interface{}) {
 }
 
 func clientRequest(uid uint64) *pb.StartBattleReq {
-	return &pb.StartBattleReq{UID: uid, BattleType: pb.BattleType_BATTLE_TYPE_PVE, BusinessId: "stage-1", AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
+	return &pb.StartBattleReq{UID: uid, BattleType: pb.BattleType_BATTLE_TYPE_TEST, AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
 }
 
 func requestState(t *testing.T, tr *tree.Tree, pid tree.PID, uid uint64) State {

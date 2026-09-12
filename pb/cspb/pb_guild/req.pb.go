@@ -23,12 +23,12 @@ const (
 
 type CreateGuildReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UID           uint64                 `protobuf:"varint,1,opt,name=uID,proto3" json:"uID,omitempty"`
-	ServerID      uint32                 `protobuf:"varint,2,opt,name=serverID,proto3" json:"serverID,omitempty"`
-	SessionID     string                 `protobuf:"bytes,3,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
-	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
-	LeaderName    string                 `protobuf:"bytes,5,opt,name=leader_name,json=leaderName,proto3" json:"leader_name,omitempty"`
-	LeaderLevel   uint32                 `protobuf:"varint,6,opt,name=leader_level,json=leaderLevel,proto3" json:"leader_level,omitempty"`
+	UID           uint64                 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32                 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string                 `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	LeaderName    string                 `protobuf:"bytes,3,opt,name=leader_name,json=leaderName,proto3" json:"leader_name,omitempty"`
+	LeaderLevel   uint32                 `protobuf:"varint,4,opt,name=leader_level,json=leaderLevel,proto3" json:"leader_level,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -107,12 +107,12 @@ func (x *CreateGuildReq) GetLeaderLevel() uint32 {
 
 type JoinGuildReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UID           uint64                 `protobuf:"varint,1,opt,name=uID,proto3" json:"uID,omitempty"`
-	ServerID      uint32                 `protobuf:"varint,2,opt,name=serverID,proto3" json:"serverID,omitempty"`
-	SessionID     string                 `protobuf:"bytes,3,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
-	GuildId       uint64                 `protobuf:"varint,4,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
-	MemberName    string                 `protobuf:"bytes,5,opt,name=member_name,json=memberName,proto3" json:"member_name,omitempty"`
-	MemberLevel   uint32                 `protobuf:"varint,6,opt,name=member_level,json=memberLevel,proto3" json:"member_level,omitempty"`
+	UID           uint64                 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32                 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string                 `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	GuildId       uint64                 `protobuf:"varint,2,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+	MemberName    string                 `protobuf:"bytes,3,opt,name=member_name,json=memberName,proto3" json:"member_name,omitempty"`
+	MemberLevel   uint32                 `protobuf:"varint,4,opt,name=member_level,json=memberLevel,proto3" json:"member_level,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -191,9 +191,9 @@ func (x *JoinGuildReq) GetMemberLevel() uint32 {
 
 type LeaveGuildReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UID           uint64                 `protobuf:"varint,1,opt,name=uID,proto3" json:"uID,omitempty"`
-	ServerID      uint32                 `protobuf:"varint,2,opt,name=serverID,proto3" json:"serverID,omitempty"`
-	SessionID     string                 `protobuf:"bytes,3,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	UID           uint64                 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32                 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string                 `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -251,10 +251,10 @@ func (x *LeaveGuildReq) GetSessionID() string {
 
 type GetGuildReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UID           uint64                 `protobuf:"varint,1,opt,name=uID,proto3" json:"uID,omitempty"`
-	ServerID      uint32                 `protobuf:"varint,2,opt,name=serverID,proto3" json:"serverID,omitempty"`
-	SessionID     string                 `protobuf:"bytes,3,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
-	GuildId       uint64                 `protobuf:"varint,4,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+	UID           uint64                 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32                 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string                 `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	GuildId       uint64                 `protobuf:"varint,1,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -323,30 +323,30 @@ const file_cspb_guild_req_proto_rawDesc = "" +
 	"\n" +
 	"\x14cspb/guild/req.proto\"\xb4\x01\n" +
 	"\x0eCreateGuildReq\x12\x10\n" +
-	"\x03uID\x18\x01 \x01(\x04R\x03uID\x12\x1a\n" +
-	"\bserverID\x18\x02 \x01(\rR\bserverID\x12\x1c\n" +
-	"\tsessionID\x18\x03 \x01(\tR\tsessionID\x12\x12\n" +
-	"\x04name\x18\x04 \x01(\tR\x04name\x12\x1f\n" +
-	"\vleader_name\x18\x05 \x01(\tR\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vleader_name\x18\x03 \x01(\tR\n" +
 	"leaderName\x12!\n" +
-	"\fleader_level\x18\x06 \x01(\rR\vleaderLevel\"\xb9\x01\n" +
+	"\fleader_level\x18\x04 \x01(\rR\vleaderLevel\"\xb9\x01\n" +
 	"\fJoinGuildReq\x12\x10\n" +
-	"\x03uID\x18\x01 \x01(\x04R\x03uID\x12\x1a\n" +
-	"\bserverID\x18\x02 \x01(\rR\bserverID\x12\x1c\n" +
-	"\tsessionID\x18\x03 \x01(\tR\tsessionID\x12\x19\n" +
-	"\bguild_id\x18\x04 \x01(\x04R\aguildId\x12\x1f\n" +
-	"\vmember_name\x18\x05 \x01(\tR\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x19\n" +
+	"\bguild_id\x18\x02 \x01(\x04R\aguildId\x12\x1f\n" +
+	"\vmember_name\x18\x03 \x01(\tR\n" +
 	"memberName\x12!\n" +
-	"\fmember_level\x18\x06 \x01(\rR\vmemberLevel\"[\n" +
+	"\fmember_level\x18\x04 \x01(\rR\vmemberLevel\"[\n" +
 	"\rLeaveGuildReq\x12\x10\n" +
-	"\x03uID\x18\x01 \x01(\x04R\x03uID\x12\x1a\n" +
-	"\bserverID\x18\x02 \x01(\rR\bserverID\x12\x1c\n" +
-	"\tsessionID\x18\x03 \x01(\tR\tsessionID\"t\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\"t\n" +
 	"\vGetGuildReq\x12\x10\n" +
-	"\x03uID\x18\x01 \x01(\x04R\x03uID\x12\x1a\n" +
-	"\bserverID\x18\x02 \x01(\rR\bserverID\x12\x1c\n" +
-	"\tsessionID\x18\x03 \x01(\tR\tsessionID\x12\x19\n" +
-	"\bguild_id\x18\x04 \x01(\x04R\aguildIdB)Z'github.com/gogu-x/gogs/pb/cspb/pb_guildb\x06proto3"
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x19\n" +
+	"\bguild_id\x18\x01 \x01(\x04R\aguildIdB)Z'github.com/gogu-x/gogs/pb/cspb/pb_guildb\x06proto3"
 
 var (
 	file_cspb_guild_req_proto_rawDescOnce sync.Once

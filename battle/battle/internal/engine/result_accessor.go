@@ -16,3 +16,6 @@ func (r Result) GetEvents() []*pb.BattleEvent { return r.Events }
 
 // GetChecksum 返回结果校验值。
 func (r Result) GetChecksum() string { return r.Checksum }
+
+// GetTickDurationMS 返回客户端播放使用的 tick 毫秒数。
+func (r Result) GetTickDurationMS() int32 { return r.TickDurationMS }

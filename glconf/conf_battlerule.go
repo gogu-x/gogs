@@ -19,6 +19,7 @@ type BattleRuleCfg struct {
 	DamageVariancePermille int64 `bson:"damage_variance_permille"` // 伤害浮动（千分比）
 	CritChancePermille     int64 `bson:"crit_chance_permille"`     // 暴击概率（千分比）
 	CritMultiplierPermille int64 `bson:"crit_multiplier_permille"` // 暴击倍率（千分比）
+	TickDurationMS         int32 `bson:"tick_duration_ms"`         // 每 tick 毫秒数
 }
 
 func loadBattleRuleCfg(dbURI, dbName, confName string) (*CsvConf, error) {

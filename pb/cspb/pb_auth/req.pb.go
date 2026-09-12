@@ -23,9 +23,9 @@ const (
 
 type LoginGameReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UID           uint64                 `protobuf:"varint,1,opt,name=uID,proto3" json:"uID,omitempty"`
-	ServerID      uint32                 `protobuf:"varint,2,opt,name=serverID,proto3" json:"serverID,omitempty"`
-	SessionID     string                 `protobuf:"bytes,3,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	UID           uint64                 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32                 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string                 `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -87,9 +87,9 @@ const file_cspb_auth_req_proto_rawDesc = "" +
 	"\n" +
 	"\x13cspb/auth/req.proto\"Z\n" +
 	"\fLoginGameReq\x12\x10\n" +
-	"\x03uID\x18\x01 \x01(\x04R\x03uID\x12\x1a\n" +
-	"\bserverID\x18\x02 \x01(\rR\bserverID\x12\x1c\n" +
-	"\tsessionID\x18\x03 \x01(\tR\tsessionIDB(Z&github.com/gogu-x/gogs/pb/cspb/pb_authb\x06proto3"
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionIDB(Z&github.com/gogu-x/gogs/pb/cspb/pb_authb\x06proto3"
 
 var (
 	file_cspb_auth_req_proto_rawDescOnce sync.Once

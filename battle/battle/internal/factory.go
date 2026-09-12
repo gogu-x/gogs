@@ -12,12 +12,14 @@ import (
 )
 
 const (
-	battleAttributeType        = "battle_attribute"
-	battleMonsterType          = "battle_monster"
-	battleDamageType           = "battle_damage"
-	battleHealType             = "battle_heal"
-	battleStatusType           = "battle_status"
-	battleAttributeMaxHP int32 = iota + 1
+	battleAttributeType             = "battle_attribute"
+	battleMonsterType               = "battle_monster"
+	battleDamageType                = "battle_damage"
+	battleHealType                  = "battle_heal"
+	battleStatusType                = "battle_status"
+	defaultSkillWindupTicks         = int64(3)
+	defaultSkillRecoveryTicks       = int64(3)
+	battleAttributeMaxHP      int32 = iota + 1
 	battleAttributeAttack
 	battleAttributeDefense
 	battleAttributeSpeed
@@ -45,6 +47,7 @@ func newBattleFromRequest(battleID string, seed uint64, request *pb.StartBattleR
 		Rules: engine.Rules{
 			ATBThreshold:           rule.ATBThreshold,
 			MaxActions:             int(rule.MaxActions),
+			TickDurationMS:         rule.TickDurationMS,
 			DamageVariancePermille: rule.DamageVariancePermille,
 			CritChancePermille:     rule.CritChancePermille,
 			CritMultiplierPermille: rule.CritMultiplierPermille,
@@ -296,7 +299,15 @@ func buildSkill(id int32) (engine.SkillConfig, error) {
 		}
 		effects = append(effects, engine.EffectConfig{Kind: kind, CoefficientPermille: int64(effect.Pro), Flat: effect.Val, StatusID: strconv.Itoa(int(effect.Id))})
 	}
-	return engine.SkillConfig{ID: strconv.Itoa(int(config.CfgID)), Cooldown: int(config.Cooldown), TargetRule: pb.TargetRule(config.TargetRule), Effects: effects}, nil
+	windupTicks := int64(config.WindupTicks)
+	if windupTicks <= 0 {
+		windupTicks = defaultSkillWindupTicks
+	}
+	recoveryTicks := int64(config.RecoveryTicks)
+	if recoveryTicks <= 0 {
+		recoveryTicks = defaultSkillRecoveryTicks
+	}
+	return engine.SkillConfig{ID: strconv.Itoa(int(config.CfgID)), Cooldown: int(config.Cooldown), TargetRule: pb.TargetRule(config.TargetRule), Effects: effects, WindupTicks: windupTicks, RecoveryTicks: recoveryTicks}, nil
 }
 
 func buildInitialStatuses(ids []int32) ([]engine.StatusConfig, error) {

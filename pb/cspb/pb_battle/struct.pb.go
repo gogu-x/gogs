@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.36.0
-// source: sspb/battle/struct.proto
+// source: cspb/battle/struct.proto
 
 package pb_battle
 
@@ -64,11 +64,11 @@ func (x BattleType) String() string {
 }
 
 func (BattleType) Descriptor() protoreflect.EnumDescriptor {
-	return file_sspb_battle_struct_proto_enumTypes[0].Descriptor()
+	return file_cspb_battle_struct_proto_enumTypes[0].Descriptor()
 }
 
 func (BattleType) Type() protoreflect.EnumType {
-	return &file_sspb_battle_struct_proto_enumTypes[0]
+	return &file_cspb_battle_struct_proto_enumTypes[0]
 }
 
 func (x BattleType) Number() protoreflect.EnumNumber {
@@ -77,7 +77,7 @@ func (x BattleType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BattleType.Descriptor instead.
 func (BattleType) EnumDescriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{0}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{0}
 }
 
 // BattleTeam 表示单位所属阵营。
@@ -114,11 +114,11 @@ func (x BattleTeam) String() string {
 }
 
 func (BattleTeam) Descriptor() protoreflect.EnumDescriptor {
-	return file_sspb_battle_struct_proto_enumTypes[1].Descriptor()
+	return file_cspb_battle_struct_proto_enumTypes[1].Descriptor()
 }
 
 func (BattleTeam) Type() protoreflect.EnumType {
-	return &file_sspb_battle_struct_proto_enumTypes[1]
+	return &file_cspb_battle_struct_proto_enumTypes[1]
 }
 
 func (x BattleTeam) Number() protoreflect.EnumNumber {
@@ -127,7 +127,7 @@ func (x BattleTeam) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BattleTeam.Descriptor instead.
 func (BattleTeam) EnumDescriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{1}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{1}
 }
 
 // BattleOutcome 表示战斗结算结果。
@@ -167,11 +167,11 @@ func (x BattleOutcome) String() string {
 }
 
 func (BattleOutcome) Descriptor() protoreflect.EnumDescriptor {
-	return file_sspb_battle_struct_proto_enumTypes[2].Descriptor()
+	return file_cspb_battle_struct_proto_enumTypes[2].Descriptor()
 }
 
 func (BattleOutcome) Type() protoreflect.EnumType {
-	return &file_sspb_battle_struct_proto_enumTypes[2]
+	return &file_cspb_battle_struct_proto_enumTypes[2]
 }
 
 func (x BattleOutcome) Number() protoreflect.EnumNumber {
@@ -180,7 +180,7 @@ func (x BattleOutcome) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BattleOutcome.Descriptor instead.
 func (BattleOutcome) EnumDescriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{2}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{2}
 }
 
 // TargetRule 表示技能目标选择规则。
@@ -223,11 +223,11 @@ func (x TargetRule) String() string {
 }
 
 func (TargetRule) Descriptor() protoreflect.EnumDescriptor {
-	return file_sspb_battle_struct_proto_enumTypes[3].Descriptor()
+	return file_cspb_battle_struct_proto_enumTypes[3].Descriptor()
 }
 
 func (TargetRule) Type() protoreflect.EnumType {
-	return &file_sspb_battle_struct_proto_enumTypes[3]
+	return &file_cspb_battle_struct_proto_enumTypes[3]
 }
 
 func (x TargetRule) Number() protoreflect.EnumNumber {
@@ -236,7 +236,7 @@ func (x TargetRule) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TargetRule.Descriptor instead.
 func (TargetRule) EnumDescriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{3}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{3}
 }
 
 // EffectType 表示技能效果类型。
@@ -276,11 +276,11 @@ func (x EffectType) String() string {
 }
 
 func (EffectType) Descriptor() protoreflect.EnumDescriptor {
-	return file_sspb_battle_struct_proto_enumTypes[4].Descriptor()
+	return file_cspb_battle_struct_proto_enumTypes[4].Descriptor()
 }
 
 func (EffectType) Type() protoreflect.EnumType {
-	return &file_sspb_battle_struct_proto_enumTypes[4]
+	return &file_cspb_battle_struct_proto_enumTypes[4]
 }
 
 func (x EffectType) Number() protoreflect.EnumNumber {
@@ -289,7 +289,7 @@ func (x EffectType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EffectType.Descriptor instead.
 func (EffectType) EnumDescriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{4}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{4}
 }
 
 // StatusType 表示状态类型。
@@ -335,11 +335,11 @@ func (x StatusType) String() string {
 }
 
 func (StatusType) Descriptor() protoreflect.EnumDescriptor {
-	return file_sspb_battle_struct_proto_enumTypes[5].Descriptor()
+	return file_cspb_battle_struct_proto_enumTypes[5].Descriptor()
 }
 
 func (StatusType) Type() protoreflect.EnumType {
-	return &file_sspb_battle_struct_proto_enumTypes[5]
+	return &file_cspb_battle_struct_proto_enumTypes[5]
 }
 
 func (x StatusType) Number() protoreflect.EnumNumber {
@@ -348,22 +348,23 @@ func (x StatusType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StatusType.Descriptor instead.
 func (StatusType) EnumDescriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{5}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{5}
 }
 
 // BattleEventType 表示战斗事件类型。
 type BattleEventType int32
 
 const (
-	BattleEventType_BATTLE_EVENT_TYPE_UNSPECIFIED    BattleEventType = 0
-	BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED BattleEventType = 1
-	BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED     BattleEventType = 2
-	BattleEventType_BATTLE_EVENT_TYPE_DAMAGE         BattleEventType = 3
-	BattleEventType_BATTLE_EVENT_TYPE_HEAL           BattleEventType = 4
-	BattleEventType_BATTLE_EVENT_TYPE_STATUS_APPLIED BattleEventType = 5
-	BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED BattleEventType = 6
-	BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED   BattleEventType = 7
-	BattleEventType_BATTLE_EVENT_TYPE_BATTLE_ENDED   BattleEventType = 8
+	BattleEventType_BATTLE_EVENT_TYPE_UNSPECIFIED      BattleEventType = 0
+	BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED   BattleEventType = 1
+	BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED       BattleEventType = 2
+	BattleEventType_BATTLE_EVENT_TYPE_DAMAGE           BattleEventType = 3
+	BattleEventType_BATTLE_EVENT_TYPE_HEAL             BattleEventType = 4
+	BattleEventType_BATTLE_EVENT_TYPE_STATUS_APPLIED   BattleEventType = 5
+	BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED   BattleEventType = 6
+	BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED     BattleEventType = 7
+	BattleEventType_BATTLE_EVENT_TYPE_BATTLE_ENDED     BattleEventType = 8
+	BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED BattleEventType = 9
 )
 
 // Enum value maps for BattleEventType.
@@ -378,17 +379,19 @@ var (
 		6: "BATTLE_EVENT_TYPE_ACTION_SKIPPED",
 		7: "BATTLE_EVENT_TYPE_ACTION_ENDED",
 		8: "BATTLE_EVENT_TYPE_BATTLE_ENDED",
+		9: "BATTLE_EVENT_TYPE_ACTION_CANCELLED",
 	}
 	BattleEventType_value = map[string]int32{
-		"BATTLE_EVENT_TYPE_UNSPECIFIED":    0,
-		"BATTLE_EVENT_TYPE_ACTION_STARTED": 1,
-		"BATTLE_EVENT_TYPE_SKILL_USED":     2,
-		"BATTLE_EVENT_TYPE_DAMAGE":         3,
-		"BATTLE_EVENT_TYPE_HEAL":           4,
-		"BATTLE_EVENT_TYPE_STATUS_APPLIED": 5,
-		"BATTLE_EVENT_TYPE_ACTION_SKIPPED": 6,
-		"BATTLE_EVENT_TYPE_ACTION_ENDED":   7,
-		"BATTLE_EVENT_TYPE_BATTLE_ENDED":   8,
+		"BATTLE_EVENT_TYPE_UNSPECIFIED":      0,
+		"BATTLE_EVENT_TYPE_ACTION_STARTED":   1,
+		"BATTLE_EVENT_TYPE_SKILL_USED":       2,
+		"BATTLE_EVENT_TYPE_DAMAGE":           3,
+		"BATTLE_EVENT_TYPE_HEAL":             4,
+		"BATTLE_EVENT_TYPE_STATUS_APPLIED":   5,
+		"BATTLE_EVENT_TYPE_ACTION_SKIPPED":   6,
+		"BATTLE_EVENT_TYPE_ACTION_ENDED":     7,
+		"BATTLE_EVENT_TYPE_BATTLE_ENDED":     8,
+		"BATTLE_EVENT_TYPE_ACTION_CANCELLED": 9,
 	}
 )
 
@@ -403,11 +406,11 @@ func (x BattleEventType) String() string {
 }
 
 func (BattleEventType) Descriptor() protoreflect.EnumDescriptor {
-	return file_sspb_battle_struct_proto_enumTypes[6].Descriptor()
+	return file_cspb_battle_struct_proto_enumTypes[6].Descriptor()
 }
 
 func (BattleEventType) Type() protoreflect.EnumType {
-	return &file_sspb_battle_struct_proto_enumTypes[6]
+	return &file_cspb_battle_struct_proto_enumTypes[6]
 }
 
 func (x BattleEventType) Number() protoreflect.EnumNumber {
@@ -416,7 +419,7 @@ func (x BattleEventType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BattleEventType.Descriptor instead.
 func (BattleEventType) EnumDescriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{6}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{6}
 }
 
 // RoleSkill 是角色携带的技能成长快照。
@@ -430,7 +433,7 @@ type RoleSkill struct {
 
 func (x *RoleSkill) Reset() {
 	*x = RoleSkill{}
-	mi := &file_sspb_battle_struct_proto_msgTypes[0]
+	mi := &file_cspb_battle_struct_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -442,7 +445,7 @@ func (x *RoleSkill) String() string {
 func (*RoleSkill) ProtoMessage() {}
 
 func (x *RoleSkill) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_struct_proto_msgTypes[0]
+	mi := &file_cspb_battle_struct_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -455,7 +458,7 @@ func (x *RoleSkill) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoleSkill.ProtoReflect.Descriptor instead.
 func (*RoleSkill) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{0}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *RoleSkill) GetSkillConfigId() int32 {
@@ -485,7 +488,7 @@ type RoleEquip struct {
 
 func (x *RoleEquip) Reset() {
 	*x = RoleEquip{}
-	mi := &file_sspb_battle_struct_proto_msgTypes[1]
+	mi := &file_cspb_battle_struct_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -497,7 +500,7 @@ func (x *RoleEquip) String() string {
 func (*RoleEquip) ProtoMessage() {}
 
 func (x *RoleEquip) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_struct_proto_msgTypes[1]
+	mi := &file_cspb_battle_struct_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -510,7 +513,7 @@ func (x *RoleEquip) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoleEquip.ProtoReflect.Descriptor instead.
 func (*RoleEquip) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{1}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *RoleEquip) GetEquipId() string {
@@ -557,7 +560,7 @@ type Role struct {
 
 func (x *Role) Reset() {
 	*x = Role{}
-	mi := &file_sspb_battle_struct_proto_msgTypes[2]
+	mi := &file_cspb_battle_struct_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -569,7 +572,7 @@ func (x *Role) String() string {
 func (*Role) ProtoMessage() {}
 
 func (x *Role) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_struct_proto_msgTypes[2]
+	mi := &file_cspb_battle_struct_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -582,7 +585,7 @@ func (x *Role) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Role.ProtoReflect.Descriptor instead.
 func (*Role) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{2}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Role) GetRoleId() string {
@@ -649,13 +652,14 @@ type BattleEvent struct {
 	HpBefore      int64                  `protobuf:"varint,10,opt,name=hp_before,json=hpBefore,proto3" json:"hp_before,omitempty"`
 	HpAfter       int64                  `protobuf:"varint,11,opt,name=hp_after,json=hpAfter,proto3" json:"hp_after,omitempty"`
 	Detail        string                 `protobuf:"bytes,12,opt,name=detail,proto3" json:"detail,omitempty"`
+	TargetIds     []string               `protobuf:"bytes,13,rep,name=target_ids,json=targetIds,proto3" json:"target_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BattleEvent) Reset() {
 	*x = BattleEvent{}
-	mi := &file_sspb_battle_struct_proto_msgTypes[3]
+	mi := &file_cspb_battle_struct_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -667,7 +671,7 @@ func (x *BattleEvent) String() string {
 func (*BattleEvent) ProtoMessage() {}
 
 func (x *BattleEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_struct_proto_msgTypes[3]
+	mi := &file_cspb_battle_struct_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -680,7 +684,7 @@ func (x *BattleEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleEvent.ProtoReflect.Descriptor instead.
 func (*BattleEvent) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{3}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *BattleEvent) GetSequence() uint64 {
@@ -767,6 +771,13 @@ func (x *BattleEvent) GetDetail() string {
 	return ""
 }
 
+func (x *BattleEvent) GetTargetIds() []string {
+	if x != nil {
+		return x.TargetIds
+	}
+	return nil
+}
+
 // BattleUnitResult 是一个单位的最终生命结果。
 type BattleUnitResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -781,7 +792,7 @@ type BattleUnitResult struct {
 
 func (x *BattleUnitResult) Reset() {
 	*x = BattleUnitResult{}
-	mi := &file_sspb_battle_struct_proto_msgTypes[4]
+	mi := &file_cspb_battle_struct_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -793,7 +804,7 @@ func (x *BattleUnitResult) String() string {
 func (*BattleUnitResult) ProtoMessage() {}
 
 func (x *BattleUnitResult) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_struct_proto_msgTypes[4]
+	mi := &file_cspb_battle_struct_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -806,7 +817,7 @@ func (x *BattleUnitResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleUnitResult.ProtoReflect.Descriptor instead.
 func (*BattleUnitResult) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{4}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *BattleUnitResult) GetInstanceId() string {
@@ -846,16 +857,17 @@ func (x *BattleUnitResult) GetAlive() bool {
 
 // BattleCreatedNtf 表示 BattleActor 已成功创建。
 type BattleCreatedNtf struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BattleId      string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
-	Uid           uint64                 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	BattleId       string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
+	Uid            uint64                 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
+	TickDurationMs int32                  `protobuf:"varint,3,opt,name=tick_duration_ms,json=tickDurationMs,proto3" json:"tick_duration_ms,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BattleCreatedNtf) Reset() {
 	*x = BattleCreatedNtf{}
-	mi := &file_sspb_battle_struct_proto_msgTypes[5]
+	mi := &file_cspb_battle_struct_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -867,7 +879,7 @@ func (x *BattleCreatedNtf) String() string {
 func (*BattleCreatedNtf) ProtoMessage() {}
 
 func (x *BattleCreatedNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_struct_proto_msgTypes[5]
+	mi := &file_cspb_battle_struct_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -880,7 +892,7 @@ func (x *BattleCreatedNtf) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleCreatedNtf.ProtoReflect.Descriptor instead.
 func (*BattleCreatedNtf) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{5}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *BattleCreatedNtf) GetBattleId() string {
@@ -897,6 +909,13 @@ func (x *BattleCreatedNtf) GetUid() uint64 {
 	return 0
 }
 
+func (x *BattleCreatedNtf) GetTickDurationMs() int32 {
+	if x != nil {
+		return x.TickDurationMs
+	}
+	return 0
+}
+
 // BattleActionNtf 表示一条战斗事件推送。
 type BattleActionNtf struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -909,7 +928,7 @@ type BattleActionNtf struct {
 
 func (x *BattleActionNtf) Reset() {
 	*x = BattleActionNtf{}
-	mi := &file_sspb_battle_struct_proto_msgTypes[6]
+	mi := &file_cspb_battle_struct_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -921,7 +940,7 @@ func (x *BattleActionNtf) String() string {
 func (*BattleActionNtf) ProtoMessage() {}
 
 func (x *BattleActionNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_struct_proto_msgTypes[6]
+	mi := &file_cspb_battle_struct_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -934,7 +953,7 @@ func (x *BattleActionNtf) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleActionNtf.ProtoReflect.Descriptor instead.
 func (*BattleActionNtf) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{6}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *BattleActionNtf) GetBattleId() string {
@@ -972,7 +991,7 @@ type BattleFinishedNtf struct {
 
 func (x *BattleFinishedNtf) Reset() {
 	*x = BattleFinishedNtf{}
-	mi := &file_sspb_battle_struct_proto_msgTypes[7]
+	mi := &file_cspb_battle_struct_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -984,7 +1003,7 @@ func (x *BattleFinishedNtf) String() string {
 func (*BattleFinishedNtf) ProtoMessage() {}
 
 func (x *BattleFinishedNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_struct_proto_msgTypes[7]
+	mi := &file_cspb_battle_struct_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -997,7 +1016,7 @@ func (x *BattleFinishedNtf) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleFinishedNtf.ProtoReflect.Descriptor instead.
 func (*BattleFinishedNtf) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{7}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *BattleFinishedNtf) GetBattleId() string {
@@ -1046,7 +1065,7 @@ type BattleResultConfirmedNtf struct {
 
 func (x *BattleResultConfirmedNtf) Reset() {
 	*x = BattleResultConfirmedNtf{}
-	mi := &file_sspb_battle_struct_proto_msgTypes[8]
+	mi := &file_cspb_battle_struct_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1058,7 +1077,7 @@ func (x *BattleResultConfirmedNtf) String() string {
 func (*BattleResultConfirmedNtf) ProtoMessage() {}
 
 func (x *BattleResultConfirmedNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_struct_proto_msgTypes[8]
+	mi := &file_cspb_battle_struct_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1071,7 +1090,7 @@ func (x *BattleResultConfirmedNtf) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleResultConfirmedNtf.ProtoReflect.Descriptor instead.
 func (*BattleResultConfirmedNtf) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_struct_proto_rawDescGZIP(), []int{8}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *BattleResultConfirmedNtf) GetBattleId() string {
@@ -1088,11 +1107,11 @@ func (x *BattleResultConfirmedNtf) GetUid() uint64 {
 	return 0
 }
 
-var File_sspb_battle_struct_proto protoreflect.FileDescriptor
+var File_cspb_battle_struct_proto protoreflect.FileDescriptor
 
-const file_sspb_battle_struct_proto_rawDesc = "" +
+const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\n" +
-	"\x18sspb/battle/struct.proto\"I\n" +
+	"\x18cspb/battle/struct.proto\"I\n" +
 	"\tRoleSkill\x12&\n" +
 	"\x0fskill_config_id\x18\x01 \x01(\x05R\rskillConfigId\x12\x14\n" +
 	"\x05level\x18\x02 \x01(\x05R\x05level\"\x87\x01\n" +
@@ -1110,7 +1129,7 @@ const file_sspb_battle_struct_proto_rawDesc = "" +
 	"\x06skills\x18\x06 \x03(\v2\n" +
 	".RoleSkillR\x06skills\x12\"\n" +
 	"\x06equips\x18\a \x03(\v2\n" +
-	".RoleEquipR\x06equips\"\xd3\x02\n" +
+	".RoleEquipR\x06equips\"\xf2\x02\n" +
 	"\vBattleEvent\x12\x1a\n" +
 	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\x04R\x06action\x12\x12\n" +
@@ -1124,17 +1143,20 @@ const file_sspb_battle_struct_proto_rawDesc = "" +
 	"\thp_before\x18\n" +
 	" \x01(\x03R\bhpBefore\x12\x19\n" +
 	"\bhp_after\x18\v \x01(\x03R\ahpAfter\x12\x16\n" +
-	"\x06detail\x18\f \x01(\tR\x06detail\"\x91\x01\n" +
+	"\x06detail\x18\f \x01(\tR\x06detail\x12\x1d\n" +
+	"\n" +
+	"target_ids\x18\r \x03(\tR\ttargetIds\"\x91\x01\n" +
 	"\x10BattleUnitResult\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x1f\n" +
 	"\x04team\x18\x02 \x01(\x0e2\v.BattleTeamR\x04team\x12\x0e\n" +
 	"\x02hp\x18\x03 \x01(\x03R\x02hp\x12\x15\n" +
 	"\x06max_hp\x18\x04 \x01(\x03R\x05maxHp\x12\x14\n" +
-	"\x05alive\x18\x05 \x01(\bR\x05alive\"A\n" +
+	"\x05alive\x18\x05 \x01(\bR\x05alive\"k\n" +
 	"\x10BattleCreatedNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid\"d\n" +
+	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12(\n" +
+	"\x10tick_duration_ms\x18\x03 \x01(\x05R\x0etickDurationMs\"d\n" +
 	"\x0fBattleActionNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12\"\n" +
@@ -1186,7 +1208,7 @@ const file_sspb_battle_struct_proto_rawDesc = "" +
 	"\x13STATUS_TYPE_SILENCE\x10\x02\x12\x13\n" +
 	"\x0fSTATUS_TYPE_DOT\x10\x03\x12\x13\n" +
 	"\x0fSTATUS_TYPE_HOT\x10\x04\x12\"\n" +
-	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\xca\x02\n" +
+	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\xf2\x02\n" +
 	"\x0fBattleEventType\x12!\n" +
 	"\x1dBATTLE_EVENT_TYPE_UNSPECIFIED\x10\x00\x12$\n" +
 	" BATTLE_EVENT_TYPE_ACTION_STARTED\x10\x01\x12 \n" +
@@ -1196,23 +1218,24 @@ const file_sspb_battle_struct_proto_rawDesc = "" +
 	" BATTLE_EVENT_TYPE_STATUS_APPLIED\x10\x05\x12$\n" +
 	" BATTLE_EVENT_TYPE_ACTION_SKIPPED\x10\x06\x12\"\n" +
 	"\x1eBATTLE_EVENT_TYPE_ACTION_ENDED\x10\a\x12\"\n" +
-	"\x1eBATTLE_EVENT_TYPE_BATTLE_ENDED\x10\bB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
+	"\x1eBATTLE_EVENT_TYPE_BATTLE_ENDED\x10\b\x12&\n" +
+	"\"BATTLE_EVENT_TYPE_ACTION_CANCELLED\x10\tB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
 
 var (
-	file_sspb_battle_struct_proto_rawDescOnce sync.Once
-	file_sspb_battle_struct_proto_rawDescData []byte
+	file_cspb_battle_struct_proto_rawDescOnce sync.Once
+	file_cspb_battle_struct_proto_rawDescData []byte
 )
 
-func file_sspb_battle_struct_proto_rawDescGZIP() []byte {
-	file_sspb_battle_struct_proto_rawDescOnce.Do(func() {
-		file_sspb_battle_struct_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_sspb_battle_struct_proto_rawDesc), len(file_sspb_battle_struct_proto_rawDesc)))
+func file_cspb_battle_struct_proto_rawDescGZIP() []byte {
+	file_cspb_battle_struct_proto_rawDescOnce.Do(func() {
+		file_cspb_battle_struct_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_cspb_battle_struct_proto_rawDesc), len(file_cspb_battle_struct_proto_rawDesc)))
 	})
-	return file_sspb_battle_struct_proto_rawDescData
+	return file_cspb_battle_struct_proto_rawDescData
 }
 
-var file_sspb_battle_struct_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_sspb_battle_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-var file_sspb_battle_struct_proto_goTypes = []any{
+var file_cspb_battle_struct_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
+var file_cspb_battle_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_cspb_battle_struct_proto_goTypes = []any{
 	(BattleType)(0),                  // 0: BattleType
 	(BattleTeam)(0),                  // 1: BattleTeam
 	(BattleOutcome)(0),               // 2: BattleOutcome
@@ -1230,7 +1253,7 @@ var file_sspb_battle_struct_proto_goTypes = []any{
 	(*BattleFinishedNtf)(nil),        // 14: BattleFinishedNtf
 	(*BattleResultConfirmedNtf)(nil), // 15: BattleResultConfirmedNtf
 }
-var file_sspb_battle_struct_proto_depIdxs = []int32{
+var file_cspb_battle_struct_proto_depIdxs = []int32{
 	7,  // 0: Role.skills:type_name -> RoleSkill
 	8,  // 1: Role.equips:type_name -> RoleEquip
 	6,  // 2: BattleEvent.type:type_name -> BattleEventType
@@ -1245,27 +1268,27 @@ var file_sspb_battle_struct_proto_depIdxs = []int32{
 	0,  // [0:7] is the sub-list for field type_name
 }
 
-func init() { file_sspb_battle_struct_proto_init() }
-func file_sspb_battle_struct_proto_init() {
-	if File_sspb_battle_struct_proto != nil {
+func init() { file_cspb_battle_struct_proto_init() }
+func file_cspb_battle_struct_proto_init() {
+	if File_cspb_battle_struct_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sspb_battle_struct_proto_rawDesc), len(file_sspb_battle_struct_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_battle_struct_proto_rawDesc), len(file_cspb_battle_struct_proto_rawDesc)),
 			NumEnums:      7,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_sspb_battle_struct_proto_goTypes,
-		DependencyIndexes: file_sspb_battle_struct_proto_depIdxs,
-		EnumInfos:         file_sspb_battle_struct_proto_enumTypes,
-		MessageInfos:      file_sspb_battle_struct_proto_msgTypes,
+		GoTypes:           file_cspb_battle_struct_proto_goTypes,
+		DependencyIndexes: file_cspb_battle_struct_proto_depIdxs,
+		EnumInfos:         file_cspb_battle_struct_proto_enumTypes,
+		MessageInfos:      file_cspb_battle_struct_proto_msgTypes,
 	}.Build()
-	File_sspb_battle_struct_proto = out.File
-	file_sspb_battle_struct_proto_goTypes = nil
-	file_sspb_battle_struct_proto_depIdxs = nil
+	File_cspb_battle_struct_proto = out.File
+	file_cspb_battle_struct_proto_goTypes = nil
+	file_cspb_battle_struct_proto_depIdxs = nil
 }

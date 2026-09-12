@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.36.0
-// source: sspb/battle/req.proto
+// source: cspb/battle/req.proto
 
 package pb_battle
 
@@ -21,24 +21,26 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// StartBattleReq 创建一场自动战斗。公共请求头由生成工具注入。
+// StartBattleReq 请求开始一场战斗。UID/serverID/sessionID 公共头由生成工具注入；
+// attacker_roles/defender_roles/source_node_id 由 Game 权威覆盖，客户端值不可信。
 type StartBattleReq struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
-	SourceNodeId         uint32                 `protobuf:"varint,1,opt,name=source_node_id,json=sourceNodeId,proto3" json:"source_node_id,omitempty"`
-	BattleType           BattleType             `protobuf:"varint,2,opt,name=battle_type,json=battleType,proto3,enum=BattleType" json:"battle_type,omitempty"`
-	BusinessId           string                 `protobuf:"bytes,3,opt,name=business_id,json=businessId,proto3" json:"business_id,omitempty"`
-	AttackerRoles        []*Role                `protobuf:"bytes,4,rep,name=attacker_roles,json=attackerRoles,proto3" json:"attacker_roles,omitempty"`
-	DefenderRoles        []*Role                `protobuf:"bytes,5,rep,name=defender_roles,json=defenderRoles,proto3" json:"defender_roles,omitempty"`
-	MonsterGroupConfigId int32                  `protobuf:"varint,6,opt,name=monster_group_config_id,json=monsterGroupConfigId,proto3" json:"monster_group_config_id,omitempty"`
-	Uid                  int64                  `protobuf:"varint,7,opt,name=uid,proto3" json:"uid,omitempty"`
-	Sid                  int32                  `protobuf:"varint,8,opt,name=sid,proto3" json:"sid,omitempty"`
+	UID                  uint64                 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID             uint32                 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID            string                 `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	BattleType           BattleType             `protobuf:"varint,1,opt,name=battle_type,json=battleType,proto3,enum=BattleType" json:"battle_type,omitempty"`
+	BusinessId           string                 `protobuf:"bytes,2,opt,name=business_id,json=businessId,proto3" json:"business_id,omitempty"`
+	AttackerRoles        []*Role                `protobuf:"bytes,3,rep,name=attacker_roles,json=attackerRoles,proto3" json:"attacker_roles,omitempty"`
+	DefenderRoles        []*Role                `protobuf:"bytes,4,rep,name=defender_roles,json=defenderRoles,proto3" json:"defender_roles,omitempty"`
+	MonsterGroupConfigId int32                  `protobuf:"varint,5,opt,name=monster_group_config_id,json=monsterGroupConfigId,proto3" json:"monster_group_config_id,omitempty"`
+	SourceNodeId         uint32                 `protobuf:"varint,6,opt,name=source_node_id,json=sourceNodeId,proto3" json:"source_node_id,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBattleReq) Reset() {
 	*x = StartBattleReq{}
-	mi := &file_sspb_battle_req_proto_msgTypes[0]
+	mi := &file_cspb_battle_req_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -50,7 +52,7 @@ func (x *StartBattleReq) String() string {
 func (*StartBattleReq) ProtoMessage() {}
 
 func (x *StartBattleReq) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_battle_req_proto_msgTypes[0]
+	mi := &file_cspb_battle_req_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -63,14 +65,28 @@ func (x *StartBattleReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartBattleReq.ProtoReflect.Descriptor instead.
 func (*StartBattleReq) Descriptor() ([]byte, []int) {
-	return file_sspb_battle_req_proto_rawDescGZIP(), []int{0}
+	return file_cspb_battle_req_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *StartBattleReq) GetSourceNodeId() uint32 {
+func (x *StartBattleReq) GetUID() uint64 {
 	if x != nil {
-		return x.SourceNodeId
+		return x.UID
 	}
 	return 0
+}
+
+func (x *StartBattleReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *StartBattleReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
 }
 
 func (x *StartBattleReq) GetBattleType() BattleType {
@@ -108,56 +124,50 @@ func (x *StartBattleReq) GetMonsterGroupConfigId() int32 {
 	return 0
 }
 
-func (x *StartBattleReq) GetUid() int64 {
+func (x *StartBattleReq) GetSourceNodeId() uint32 {
 	if x != nil {
-		return x.Uid
+		return x.SourceNodeId
 	}
 	return 0
 }
 
-func (x *StartBattleReq) GetSid() int32 {
-	if x != nil {
-		return x.Sid
-	}
-	return 0
-}
+var File_cspb_battle_req_proto protoreflect.FileDescriptor
 
-var File_sspb_battle_req_proto protoreflect.FileDescriptor
-
-const file_sspb_battle_req_proto_rawDesc = "" +
+const file_cspb_battle_req_proto_rawDesc = "" +
 	"\n" +
-	"\x15sspb/battle/req.proto\x1a\x18sspb/battle/struct.proto\"\xbc\x02\n" +
-	"\x0eStartBattleReq\x12$\n" +
-	"\x0esource_node_id\x18\x01 \x01(\rR\fsourceNodeId\x12,\n" +
-	"\vbattle_type\x18\x02 \x01(\x0e2\v.BattleTypeR\n" +
+	"\x15cspb/battle/req.proto\x1a\x18cspb/battle/struct.proto\"\xe4\x02\n" +
+	"\x0eStartBattleReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12,\n" +
+	"\vbattle_type\x18\x01 \x01(\x0e2\v.BattleTypeR\n" +
 	"battleType\x12\x1f\n" +
-	"\vbusiness_id\x18\x03 \x01(\tR\n" +
+	"\vbusiness_id\x18\x02 \x01(\tR\n" +
 	"businessId\x12,\n" +
-	"\x0eattacker_roles\x18\x04 \x03(\v2\x05.RoleR\rattackerRoles\x12,\n" +
-	"\x0edefender_roles\x18\x05 \x03(\v2\x05.RoleR\rdefenderRoles\x125\n" +
-	"\x17monster_group_config_id\x18\x06 \x01(\x05R\x14monsterGroupConfigId\x12\x10\n" +
-	"\x03uid\x18\a \x01(\x03R\x03uid\x12\x10\n" +
-	"\x03sid\x18\b \x01(\x05R\x03sidB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
+	"\x0eattacker_roles\x18\x03 \x03(\v2\x05.RoleR\rattackerRoles\x12,\n" +
+	"\x0edefender_roles\x18\x04 \x03(\v2\x05.RoleR\rdefenderRoles\x125\n" +
+	"\x17monster_group_config_id\x18\x05 \x01(\x05R\x14monsterGroupConfigId\x12$\n" +
+	"\x0esource_node_id\x18\x06 \x01(\rR\fsourceNodeIdB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
 
 var (
-	file_sspb_battle_req_proto_rawDescOnce sync.Once
-	file_sspb_battle_req_proto_rawDescData []byte
+	file_cspb_battle_req_proto_rawDescOnce sync.Once
+	file_cspb_battle_req_proto_rawDescData []byte
 )
 
-func file_sspb_battle_req_proto_rawDescGZIP() []byte {
-	file_sspb_battle_req_proto_rawDescOnce.Do(func() {
-		file_sspb_battle_req_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_sspb_battle_req_proto_rawDesc), len(file_sspb_battle_req_proto_rawDesc)))
+func file_cspb_battle_req_proto_rawDescGZIP() []byte {
+	file_cspb_battle_req_proto_rawDescOnce.Do(func() {
+		file_cspb_battle_req_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_cspb_battle_req_proto_rawDesc), len(file_cspb_battle_req_proto_rawDesc)))
 	})
-	return file_sspb_battle_req_proto_rawDescData
+	return file_cspb_battle_req_proto_rawDescData
 }
 
-var file_sspb_battle_req_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_sspb_battle_req_proto_goTypes = []any{
+var file_cspb_battle_req_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_cspb_battle_req_proto_goTypes = []any{
 	(*StartBattleReq)(nil), // 0: StartBattleReq
 	(BattleType)(0),        // 1: BattleType
 	(*Role)(nil),           // 2: Role
 }
-var file_sspb_battle_req_proto_depIdxs = []int32{
+var file_cspb_battle_req_proto_depIdxs = []int32{
 	1, // 0: StartBattleReq.battle_type:type_name -> BattleType
 	2, // 1: StartBattleReq.attacker_roles:type_name -> Role
 	2, // 2: StartBattleReq.defender_roles:type_name -> Role
@@ -168,27 +178,27 @@ var file_sspb_battle_req_proto_depIdxs = []int32{
 	0, // [0:3] is the sub-list for field type_name
 }
 
-func init() { file_sspb_battle_req_proto_init() }
-func file_sspb_battle_req_proto_init() {
-	if File_sspb_battle_req_proto != nil {
+func init() { file_cspb_battle_req_proto_init() }
+func file_cspb_battle_req_proto_init() {
+	if File_cspb_battle_req_proto != nil {
 		return
 	}
-	file_sspb_battle_struct_proto_init()
+	file_cspb_battle_struct_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sspb_battle_req_proto_rawDesc), len(file_sspb_battle_req_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_battle_req_proto_rawDesc), len(file_cspb_battle_req_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_sspb_battle_req_proto_goTypes,
-		DependencyIndexes: file_sspb_battle_req_proto_depIdxs,
-		MessageInfos:      file_sspb_battle_req_proto_msgTypes,
+		GoTypes:           file_cspb_battle_req_proto_goTypes,
+		DependencyIndexes: file_cspb_battle_req_proto_depIdxs,
+		MessageInfos:      file_cspb_battle_req_proto_msgTypes,
 	}.Build()
-	File_sspb_battle_req_proto = out.File
-	file_sspb_battle_req_proto_goTypes = nil
-	file_sspb_battle_req_proto_depIdxs = nil
+	File_cspb_battle_req_proto = out.File
+	file_cspb_battle_req_proto_goTypes = nil
+	file_cspb_battle_req_proto_depIdxs = nil
 }
