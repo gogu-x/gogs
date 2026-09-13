@@ -9,5 +9,5 @@ RUN CGO_ENABLED=0 go build -o /gate ./gate
 # ---- runtime ----
 FROM alpine:3.20
 COPY --from=builder /gate /gate
-EXPOSE 8080
+EXPOSE 8001
 ENTRYPOINT ["/gate"]

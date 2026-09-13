@@ -42,8 +42,9 @@ func newBattleFromRequest(battleID string, seed uint64, request *pb.StartBattleR
 		return nil, err
 	}
 	return engine.NewBattle(engine.Setup{
-		BattleID: battleID,
-		Seed:     seed,
+		BattleID:   battleID,
+		BattleType: battleType,
+		Seed:       seed,
 		Rules: engine.Rules{
 			ATBThreshold:           rule.ATBThreshold,
 			MaxActions:             int(rule.MaxActions),
@@ -61,7 +62,7 @@ func validateBattleRequest(request *pb.StartBattleReq) error {
 	defenderRoles := request.GetDefenderRoles()
 	monsterGroupID := request.GetMonsterGroupConfigId()
 	switch request.GetBattleType() {
-	case pb.BattleType_BATTLE_TYPE_PVE:
+	case pb.BattleType_BATTLE_TYPE_TOWER:
 		fallthrough
 	case pb.BattleType_BATTLE_TYPE_BOSS:
 		fallthrough

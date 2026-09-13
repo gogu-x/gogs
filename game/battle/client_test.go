@@ -1,4 +1,4 @@
-package battleclient
+package battle
 
 import (
 	"errors"

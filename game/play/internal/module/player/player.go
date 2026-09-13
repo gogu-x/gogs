@@ -5,6 +5,7 @@ import (
 	"github.com/gogu-x/gogs/game/play/internal/module/player/bag"
 	"github.com/gogu-x/gogs/game/play/internal/module/player/cardgroup"
 	"github.com/gogu-x/gogs/game/play/internal/module/player/shop"
+	"github.com/gogu-x/gogs/game/play/internal/module/player/tower"
 )
 
 type Player struct {
@@ -17,6 +18,7 @@ type Player struct {
 	BagMgr       *bag.Mgr       `bson:"bag"`
 	CardGroupMgr *cardgroup.Mgr `bson:"card_group"`
 	ShopMgr      *shop.Mgr      `bson:"shop"`
+	TowerMgr     *tower.Mgr     `bson:"tower"`
 }
 
 func NewPlayerData(uid uint64) *Player {
@@ -27,5 +29,6 @@ func NewPlayerData(uid uint64) *Player {
 		BagMgr:       &bag.Mgr{},
 		CardGroupMgr: cardgroup.New(),
 		ShopMgr:      &shop.Mgr{},
+		TowerMgr:     tower.NewTowerMgr(),
 	}
 }

@@ -1,100 +1,192 @@
+name: gotree
+
 services:
+  mongodb:
+    image: mongo:7.0.25
+    command: ["mongod", "--auth", "--bind_ip_all"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 }).ok' | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.6.11
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd:2380
+      - --initial-cluster=etcd=http://etcd:2380
+    volumes:
+      - etcd_data:/etcd-data
+    healthcheck:
+      test: ["CMD-SHELL", "ETCDCTL_API=3 etcdctl endpoint health --endpoints=http://127.0.0.1:2379"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.10.27-alpine
+    command: ["--jetstream"]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 4222"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+
+  platform:
+    build:
+      context: .
+      dockerfile: platform.Dockerfile
+    image: gotree/platform:${APP_IMAGE_TAG:-local}
+    command:
+      - --server-id
+      - "1"
+      - --node-id
+      - "1"
+      - --mongo-url
+      - mongodb://mongodb:27017
+      - --mongo-username
+      - ${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME in .env}
+      - --mongo-password
+      - ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}
+      - --nats-url
+      - nats://nats:4222
+      - --platform-addr
+      - :7000
+      - --platform-webhook-addr
+      - :7001
+      - --jwt-secret
+      - ${JWT_SECRET:?set JWT_SECRET in .env}
+    ports:
+      - "${PLATFORM_WEBHOOK_PORT:-7001}:7001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+
+  gate:
+    build:
+      context: .
+      dockerfile: gate.Dockerfile
+    image: gotree/gate:${APP_IMAGE_TAG:-local}
+    command:
+      - --gate-id
+      - "1"
+      - --node-id
+      - "1"
+      - --gate-base-port
+      - "8080"
+      - --etcd
+      - etcd:2379
+      - --nats-url
+      - nats://nats:4222
+      - --platform-grpc-addr
+      - platform:7000
+    ports:
+      - "${GATE_PORT:-8081}:8081"
+    depends_on:
+      etcd:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      platform:
+        condition: service_started
+    restart: unless-stopped
+
+  game-1:
+    build:
+      context: .
+      dockerfile: game.Dockerfile
+    image: gotree/game:${APP_IMAGE_TAG:-local}
+    command:
+      - --server-id
+      - "1"
+      - --node-id
+      - "1"
+      - --grpc-host
+      - game-1
+      - --game-base-port
+      - "9900"
+      - --etcd
+      - etcd:2379
+      - --mongo-url
+      - mongodb://mongodb:27017
+      - --mongo-username
+      - ${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME in .env}
+      - --mongo-password
+      - ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}
+      - --gconf-db-uri
+      - mongodb://${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME in .env}:${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}@mongodb:27017/?authSource=admin
+      - --gconf-db
+      - ${GCONF_DB:-gs_conf_dev}
+      - --nats-url
+      - nats://nats:4222
+      - --platform-grpc-addr
+      - platform:7000
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      etcd:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      platform:
+        condition: service_started
+    restart: unless-stopped
+
   battle-1:
     build:
       context: .
       dockerfile: battle.Dockerfile
-    command: ["--server-id", "1", "--node-id", "1", "--battle-host", "battle-1", "--mongo-url", "mongodb://mongodb:27017", "--mongo-username", "${MONGO_ROOT_USERNAME}", "--mongo-password", "${MONGO_ROOT_PASSWORD}", "--etcd", "etcd:2379", "--nats-url", "nats://nats:4222"]
-    ports:
-      - "10901:10901"
+    image: gotree/battle:${APP_IMAGE_TAG:-local}
+    command:
+      - --server-id
+      - "1"
+      - --node-id
+      - "1"
+      - --battle-host
+      - battle-1
+      - --battle-base-port
+      - "10900"
+      - --etcd
+      - etcd:2379
+      - --mongo-url
+      - mongodb://mongodb:27017
+      - --mongo-username
+      - ${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME in .env}
+      - --mongo-password
+      - ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}
+      - --gconf-db-uri
+      - mongodb://${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME in .env}:${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}@mongodb:27017/?authSource=admin
+      - --gconf-db
+      - ${GCONF_DB:-gs_conf_dev}
+      - --nats-url
+      - nats://nats:4222
     depends_on:
-      - etcd
-      - mongodb
-      - nats
-    restart: unless-stopped
-
-#  gate:
-#    build:
-#      context: .
-#      dockerfile: gate.Dockerfile
-#    environment:
-#      - ETCD_ENDPOINTS=etcd:2379
-#    ports:
-#      - "8080:8080"
-#    depends_on:
-#      - etcd
-#    restart: unless-stopped
-#
-#  game-1:
-#    build:
-#      context: .
-#      dockerfile: game.Dockerfile
-#    command: ["--server-id", "1"]
-#    environment:
-#      - ETCD_ENDPOINTS=etcd:2379
-#      - GRPC_HOST=game-1
-#      - MONGO_URL=mongodb://mongodb:27017
-#      - NATS_URL=nats://nats:4222
-#    ports:
-#      - "9001:9001"
-#    depends_on:
-#      - etcd
-#      - mongodb
-#      - nats
-#    restart: unless-stopped
-#
-#  game-2:
-#    build:
-#      context: .
-#      dockerfile: game.Dockerfile
-#    command: ["--server-id", "2"]
-#    environment:
-#      - ETCD_ENDPOINTS=etcd:2379
-#      - GRPC_HOST=game-2
-#      - MONGO_URL=mongodb://mongodb:27017
-#      - NATS_URL=nats://nats:4222
-#    ports:
-#      - "9002:9002"
-#    depends_on:
-#      - etcd
-#      - mongodb
-#      - nats
-#    restart: unless-stopped
-
-  etcd:
-      image: quay.io/coreos/etcd:v3.6.11
-      command:
-        - /usr/local/bin/etcd
-        - --name=etcd
-        - --data-dir=/etcd-data
-        - --listen-client-urls=http://0.0.0.0:2379
-        - --advertise-client-urls=http://etcd:2379
-        - --listen-peer-urls=http://0.0.0.0:2380
-        - --initial-advertise-peer-urls=http://etcd:2380
-        - --initial-cluster=etcd=http://etcd:2380
-      ports:
-        - "127.0.0.1:2379:2379"
-      volumes:
-        - etcd_data:/etcd-data
-      restart: unless-stopped
-
-  mongodb:
-    image: mongo:7
-    command: ["mongod", "--auth"]
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    environment:
-       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
-       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-    restart: unless-stopped
-
-  nats:
-    image: nats:2.10-alpine
-    ports:
-      - "4222:4222"
-      - "8222:8222"
-    command: ["--jetstream"]
+      mongodb:
+        condition: service_healthy
+      etcd:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

@@ -21,7 +21,7 @@ func installFactoryConfigs(t *testing.T) {
 		[]*glconf.BattleMonsterCfg{{CfgID: 1, MaxHP: 80, Attack: 12, Defense: 4, Speed: 6, BasicSkillID: 1}},
 		[]*glconf.BattleMonsterGroupCfg{{CfgID: 1, Members: []*cspb.TypIDVal{{Typ: battleMonsterType, Id: 1, Val: 1}}}},
 		[]*glconf.BattleRuleCfg{
-			{BattleType: int32(pb.BattleType_BATTLE_TYPE_PVE), ATBThreshold: 1000, MaxActions: 20, CritMultiplierPermille: 1500},
+			{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 1000, MaxActions: 20, CritMultiplierPermille: 1500},
 			{BattleType: int32(pb.BattleType_BATTLE_TYPE_PVP), ATBThreshold: 1000, MaxActions: 20, CritMultiplierPermille: 1500},
 		},
 	)
@@ -37,10 +37,10 @@ func battleRole(id string, configID int32) *pb.Role {
 	return &pb.Role{RoleId: id, RoleConfigId: configID, Level: 1}
 }
 
-func TestNewBattleFromRequestPVE(t *testing.T) {
+func TestNewBattleFromRequestTower(t *testing.T) {
 	installFactoryConfigs(t)
-	request := &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_PVE, AttackerRoles: []*pb.Role{battleRole("a1", 1), battleRole("a2", 2)}, MonsterGroupConfigId: 1}
-	battle, err := newBattleFromRequest("battle-pve", 7, request)
+	request := &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{battleRole("a1", 1), battleRole("a2", 2)}, MonsterGroupConfigId: 1}
+	battle, err := newBattleFromRequest("battle-tower", 7, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestNewBattleFromRequestPVE(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.GetBattleID() != "battle-pve" || len(result.GetUnits()) != 3 || len(result.GetEvents()) == 0 {
+	if result.GetBattleID() != "battle-tower" || len(result.GetUnits()) != 3 || len(result.GetEvents()) == 0 {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -72,8 +72,8 @@ func TestValidateBattleRequestTable(t *testing.T) {
 		request *pb.StartBattleReq
 		wantErr string
 	}{
-		{name: "pve missing group", request: &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_PVE, AttackerRoles: []*pb.Role{battleRole("a", 1)}}, wantErr: "requires monster group"},
-		{name: "pve has defender", request: &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_PVE, AttackerRoles: []*pb.Role{battleRole("a", 1)}, DefenderRoles: []*pb.Role{battleRole("d", 2)}, MonsterGroupConfigId: 1}, wantErr: "forbids defender"},
+		{name: "tower missing group", request: &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{battleRole("a", 1)}}, wantErr: "requires monster group"},
+		{name: "tower has defender", request: &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{battleRole("a", 1)}, DefenderRoles: []*pb.Role{battleRole("d", 2)}, MonsterGroupConfigId: 1}, wantErr: "forbids defender"},
 		{name: "pvp multiple attackers", request: &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_PVP, AttackerRoles: []*pb.Role{battleRole("a", 1), battleRole("a2", 2)}, DefenderRoles: []*pb.Role{battleRole("d", 2)}}, wantErr: "exactly one"},
 		{name: "pvp has group", request: &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_PVP, AttackerRoles: []*pb.Role{battleRole("a", 1)}, DefenderRoles: []*pb.Role{battleRole("d", 2)}, MonsterGroupConfigId: 1}, wantErr: "forbids monster"},
 	}

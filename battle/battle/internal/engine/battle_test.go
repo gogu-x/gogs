@@ -38,6 +38,139 @@ func TestBattleDeterministicResult(t *testing.T) {
 	}
 }
 
+// TestBattleAdvanceMatchesRun 是流式推送改造的等价性守卫：按 tick 分批推进（NextTick/Advance/Flush）
+// 必须与一次性 Run 产生完全相同的事件流与校验和。任何 tick 相位、事件顺序或终止时机的漂移
+// 都会被这里捕获。
+func TestBattleAdvanceMatchesRun(t *testing.T) {
+	setup := testSetup()
+	batch, err := NewBattle(setup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var streamed []*pb.BattleEvent
+	batches := 0
+	for {
+		next, ok := batch.NextTick()
+		if !ok {
+			break
+		}
+		if next <= 0 {
+			t.Fatalf("NextTick 返回了非正 tick: %d", next)
+		}
+		// Advance 只返回当前 tick 的事件，不得越界到后续 tick。
+		events := batch.Advance()
+		for _, event := range events {
+			if event.Tick != next {
+				t.Fatalf("Advance 越过了 tick 边界: 期望 %d, 实际 %d", next, event.Tick)
+			}
+		}
+		streamed = append(streamed, events...)
+		batches++
+	}
+	batchResult, err := batch.Finalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Finalize 会产生收尾的 BattleEnded 事件，必须能通过 Flush 取到。
+	streamed = append(streamed, batch.Flush()...)
+
+	oneShot, err := NewBattle(setup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oneShotResult, err := oneShot.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if batchResult.Checksum != oneShotResult.Checksum {
+		t.Fatalf("checksum 不一致: advance=%s run=%s", batchResult.Checksum, oneShotResult.Checksum)
+	}
+	if !reflect.DeepEqual(batchResult.Events, oneShotResult.Events) {
+		t.Fatalf("结果事件流不一致:\nadvance=%#v\nrun=%#v", batchResult.Events, oneShotResult.Events)
+	}
+	if !reflect.DeepEqual(streamed, oneShotResult.Events) {
+		t.Fatalf("分批推送的事件与完整事件流不一致:\nstreamed=%#v\nrun=%#v", streamed, oneShotResult.Events)
+	}
+	if batches < 2 {
+		t.Fatalf("期望产生多个 tick 批次,实际只有 %d 个", batches)
+	}
+	t.Logf("按 tick 分批: batches=%d events=%d", batches, len(streamed))
+}
+
+// TestSkillUsedCarriesMotionWindow 锁定客户端契约：SKILL_USED 事件必须自带
+// start/impact/end 三个 tick，且与随后真正到达的 DAMAGE / ACTION_ENDED 完全一致。
+// 客户端据此可以在收到单条事件时立刻起播攻击动作，不必等待动作结束的 ACTION_ENDED。
+func TestSkillUsedCarriesMotionWindow(t *testing.T) {
+	setup := testSetup()
+	setup.Rules.MaxActions = 4
+	setup.Units[0].Speed = 100
+	setup.Units[1].Speed = 100
+	setup.Units[0].BasicSkill.WindupTicks = 3
+	setup.Units[0].BasicSkill.RecoveryTicks = 2
+	setup.Units[1].BasicSkill.WindupTicks = 3
+	setup.Units[1].BasicSkill.RecoveryTicks = 2
+
+	battle, err := NewBattle(setup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := battle.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checked := 0
+	for _, event := range result.Events {
+		if event.Type != pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED {
+			continue
+		}
+		if event.StartTick <= 0 || event.ImpactTick <= 0 || event.EndTick <= 0 {
+			t.Fatalf("action %d 的 SKILL_USED 未携带完整窗口: %#v", event.Action, event)
+		}
+		if event.StartTick != event.Tick {
+			t.Fatalf("action %d: start_tick=%d 与 tick=%d 不一致", event.Action, event.StartTick, event.Tick)
+		}
+		if !(event.StartTick < event.ImpactTick && event.ImpactTick < event.EndTick) {
+			t.Fatalf("action %d: 窗口顺序非法 %d/%d/%d", event.Action, event.StartTick, event.ImpactTick, event.EndTick)
+		}
+		if end := eventOfType(result.Events, event.Action, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED); end == nil {
+			t.Fatalf("action %d: 缺少 ACTION_ENDED", event.Action)
+		} else if end.Tick != event.EndTick {
+			t.Fatalf("action %d: end.Tick=%d 与 end_tick=%d 不一致", event.Action, end.Tick, event.EndTick)
+		}
+		// 被取消的动作没有 DAMAGE，但窗口本身仍须指向 impact tick。
+		if damage := eventOfType(result.Events, event.Action, pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE); damage != nil && damage.Tick != event.ImpactTick {
+			t.Fatalf("action %d: damage.Tick=%d 与 impact_tick=%d 不一致", event.Action, damage.Tick, event.ImpactTick)
+		}
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("没有任何 SKILL_USED 事件被检查")
+	}
+}
+
+// TestBattleFinalizeIsIdempotent 锁定 Finalize 的幂等语义：重复调用返回同一结果，
+// 且不会重复追加 BattleEnded 事件。
+func TestBattleFinalizeIsIdempotent(t *testing.T) {
+	battle, err := NewBattle(testSetup())
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := battle.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := battle.Finalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Checksum != second.Checksum || len(first.Events) != len(second.Events) {
+		t.Fatalf("Finalize 不幂等: first=%d events second=%d events", len(first.Events), len(second.Events))
+	}
+}
+
 func TestBattleRequiresBothTeams(t *testing.T) {
 	setup := testSetup()
 	setup.Units = setup.Units[:1]

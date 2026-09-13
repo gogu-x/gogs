@@ -1,4 +1,4 @@
-package battleclient
+package battle
 
 import (
 	"fmt"
@@ -216,8 +216,44 @@ func (c *Client) finished(ctx tree.Context, msg *pb.BattleFinishedNtf) {
 		r.Checksum = msg.Checksum
 		r.Status = Finished
 		c.push(ctx, msg.Uid, msg)
+
+		// 推给 play 做结算。
+		//
+		// 跨 Actor 只能走消息：play 的包是 internal，这里既 import 不了也调不了它的
+		// Emit；而 play 内部的 comm.Event 只在它自己的 goroutine 里广播。所以链路是
+		//     本 Actor --Send--> play --Emit--> 任务/成就/活动 等订阅方
+		// 这也顺带把"谁来结算"和"谁关心结算"解耦了：订阅方不需要知道结果是从哪个
+		// Actor 投进来的。
+		//
+		// 必须放在这个去重块里面：重复的 Finished 不能重复结算。
+		// 用 Send 而不是 Request：结算失败也不该拖着 battle 侧不回收。
+		// 注意 Confirm 是发给 battle 进程的，和这里的投递是两码事，不要混。
+		if playPID, ok := ctx.Lookup(def.PLAY); ok {
+			ctx.Send(playPID, c.buildSettlement(msg))
+		}
 	}
+
 	_ = c.sender.Confirm(r.Node, &pb.BattleResultConfirmedNtf{BattleId: msg.BattleId, Uid: msg.Uid})
+}
+
+// buildSettlement 把 battle 的结果通知转成结算输入。
+//
+// 目前参战者只有发起人一个人（同服版本）。跨服队对战时这里要换成真实的参战名单，
+// 并由某个跨服角色负责扇出 —— 但 play 侧的结算逻辑只认 Settlement，不会因为
+// 这件事改动。
+func (c *Client) buildSettlement(msg *pb.BattleFinishedNtf) *Settlement {
+	return &Settlement{
+		BattleID:   msg.GetBattleId(),
+		BattleType: msg.GetBattleType(),
+		Outcome:    msg.GetOutcome(),
+		Units:      msg.GetUnits(),
+		Checksum:   msg.GetChecksum(),
+		Participants: []Participant{{
+			UID:      msg.GetUid(),
+			ServerID: c.gameServerID,
+			NodeID:   c.gameNodeID,
+		}},
+	}
 }
 
 func (c *Client) reset(ctx tree.Context, msg *Reset) {

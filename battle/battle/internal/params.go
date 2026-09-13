@@ -33,10 +33,16 @@ type Params struct {
 	RetryDelay    time.Duration      // Finished 重试延迟
 	RetryAttempts int                // Finished 最大重试次数
 	Battle        *engine.Battle     // 仅重投或测试时可预置的引擎
+	// PaceTickDuration 覆盖每个 tick 的真实墙钟时长。
+	// 0 表示用引擎的 TickDurationMS；负数表示不节流（一次推完），仅供测试使用。
+	PaceTickDuration time.Duration
 }
 
 // RetireBattle 请求 Actor 主动退出。
 type RetireBattle struct{}
+
+// battleTick 是节拍器的到期消息，由时间轮投递回 Actor 自己的邮箱。
+type battleTick struct{}
 
 // ActorStopped 表示 BattleActor 已结束，可由 Manager 清理 active 登记。
 type ActorStopped struct {

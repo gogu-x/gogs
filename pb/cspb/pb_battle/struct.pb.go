@@ -26,7 +26,7 @@ type BattleType int32
 
 const (
 	BattleType_BATTLE_TYPE_UNSPECIFIED BattleType = 0
-	BattleType_BATTLE_TYPE_PVE         BattleType = 1
+	BattleType_BATTLE_TYPE_TOWER       BattleType = 1
 	BattleType_BATTLE_TYPE_PVP         BattleType = 2
 	BattleType_BATTLE_TYPE_BOSS        BattleType = 3
 	BattleType_BATTLE_TYPE_STORY       BattleType = 4
@@ -37,7 +37,7 @@ const (
 var (
 	BattleType_name = map[int32]string{
 		0: "BATTLE_TYPE_UNSPECIFIED",
-		1: "BATTLE_TYPE_PVE",
+		1: "BATTLE_TYPE_TOWER",
 		2: "BATTLE_TYPE_PVP",
 		3: "BATTLE_TYPE_BOSS",
 		4: "BATTLE_TYPE_STORY",
@@ -45,7 +45,7 @@ var (
 	}
 	BattleType_value = map[string]int32{
 		"BATTLE_TYPE_UNSPECIFIED": 0,
-		"BATTLE_TYPE_PVE":         1,
+		"BATTLE_TYPE_TOWER":       1,
 		"BATTLE_TYPE_PVP":         2,
 		"BATTLE_TYPE_BOSS":        3,
 		"BATTLE_TYPE_STORY":       4,
@@ -639,20 +639,26 @@ func (x *Role) GetEquips() []*RoleEquip {
 
 // BattleEvent 是一条确定性战斗事件。
 type BattleEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Sequence      uint64                 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
-	Action        uint64                 `protobuf:"varint,2,opt,name=action,proto3" json:"action,omitempty"`
-	Tick          int64                  `protobuf:"varint,3,opt,name=tick,proto3" json:"tick,omitempty"`
-	Type          BattleEventType        `protobuf:"varint,4,opt,name=type,proto3,enum=BattleEventType" json:"type,omitempty"`
-	ActorId       string                 `protobuf:"bytes,5,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
-	TargetId      string                 `protobuf:"bytes,6,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
-	SkillId       string                 `protobuf:"bytes,7,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
-	StatusId      string                 `protobuf:"bytes,8,opt,name=status_id,json=statusId,proto3" json:"status_id,omitempty"`
-	Amount        int64                  `protobuf:"varint,9,opt,name=amount,proto3" json:"amount,omitempty"`
-	HpBefore      int64                  `protobuf:"varint,10,opt,name=hp_before,json=hpBefore,proto3" json:"hp_before,omitempty"`
-	HpAfter       int64                  `protobuf:"varint,11,opt,name=hp_after,json=hpAfter,proto3" json:"hp_after,omitempty"`
-	Detail        string                 `protobuf:"bytes,12,opt,name=detail,proto3" json:"detail,omitempty"`
-	TargetIds     []string               `protobuf:"bytes,13,rep,name=target_ids,json=targetIds,proto3" json:"target_ids,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Sequence  uint64                 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	Action    uint64                 `protobuf:"varint,2,opt,name=action,proto3" json:"action,omitempty"`
+	Tick      int64                  `protobuf:"varint,3,opt,name=tick,proto3" json:"tick,omitempty"`
+	Type      BattleEventType        `protobuf:"varint,4,opt,name=type,proto3,enum=BattleEventType" json:"type,omitempty"`
+	ActorId   string                 `protobuf:"bytes,5,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
+	TargetId  string                 `protobuf:"bytes,6,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
+	SkillId   string                 `protobuf:"bytes,7,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	StatusId  string                 `protobuf:"bytes,8,opt,name=status_id,json=statusId,proto3" json:"status_id,omitempty"`
+	Amount    int64                  `protobuf:"varint,9,opt,name=amount,proto3" json:"amount,omitempty"`
+	HpBefore  int64                  `protobuf:"varint,10,opt,name=hp_before,json=hpBefore,proto3" json:"hp_before,omitempty"`
+	HpAfter   int64                  `protobuf:"varint,11,opt,name=hp_after,json=hpAfter,proto3" json:"hp_after,omitempty"`
+	Detail    string                 `protobuf:"bytes,12,opt,name=detail,proto3" json:"detail,omitempty"`
+	TargetIds []string               `protobuf:"bytes,13,rep,name=target_ids,json=targetIds,proto3" json:"target_ids,omitempty"`
+	// 动作窗口的三个 tick，仅 SKILL_USED 事件填充。
+	// 服务端在发出 SKILL_USED 时就已经算出了 impact/end，把它们随事件一起下发，
+	// 客户端收到单条事件即可开始播放攻击动作，无需等待动作结束时的 ACTION_ENDED。
+	StartTick     int64 `protobuf:"varint,14,opt,name=start_tick,json=startTick,proto3" json:"start_tick,omitempty"`
+	ImpactTick    int64 `protobuf:"varint,15,opt,name=impact_tick,json=impactTick,proto3" json:"impact_tick,omitempty"`
+	EndTick       int64 `protobuf:"varint,16,opt,name=end_tick,json=endTick,proto3" json:"end_tick,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -778,6 +784,27 @@ func (x *BattleEvent) GetTargetIds() []string {
 	return nil
 }
 
+func (x *BattleEvent) GetStartTick() int64 {
+	if x != nil {
+		return x.StartTick
+	}
+	return 0
+}
+
+func (x *BattleEvent) GetImpactTick() int64 {
+	if x != nil {
+		return x.ImpactTick
+	}
+	return 0
+}
+
+func (x *BattleEvent) GetEndTick() int64 {
+	if x != nil {
+		return x.EndTick
+	}
+	return 0
+}
+
 // BattleUnitResult 是一个单位的最终生命结果。
 type BattleUnitResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -861,8 +888,11 @@ type BattleCreatedNtf struct {
 	BattleId       string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
 	Uid            uint64                 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
 	TickDurationMs int32                  `protobuf:"varint,3,opt,name=tick_duration_ms,json=tickDurationMs,proto3" json:"tick_duration_ms,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 参战单位名单。战斗创建时即已确定，随创建通知一并下发，
+	// 客户端可在进入战斗页的第一时间就把双方单位摆好，而不是等某个单位先行动。
+	Units         []*BattleUnitResult `protobuf:"bytes,4,rep,name=units,proto3" json:"units,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BattleCreatedNtf) Reset() {
@@ -914,6 +944,13 @@ func (x *BattleCreatedNtf) GetTickDurationMs() int32 {
 		return x.TickDurationMs
 	}
 	return 0
+}
+
+func (x *BattleCreatedNtf) GetUnits() []*BattleUnitResult {
+	if x != nil {
+		return x.Units
+	}
+	return nil
 }
 
 // BattleActionNtf 表示一条战斗事件推送。
@@ -979,12 +1016,15 @@ func (x *BattleActionNtf) GetEvent() *BattleEvent {
 
 // BattleFinishedNtf 表示已完成的战斗结果。
 type BattleFinishedNtf struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BattleId      string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
-	Uid           uint64                 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	Outcome       BattleOutcome          `protobuf:"varint,3,opt,name=outcome,proto3,enum=BattleOutcome" json:"outcome,omitempty"`
-	Units         []*BattleUnitResult    `protobuf:"bytes,4,rep,name=units,proto3" json:"units,omitempty"`
-	Checksum      string                 `protobuf:"bytes,5,opt,name=checksum,proto3" json:"checksum,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	BattleId string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
+	Uid      uint64                 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
+	Outcome  BattleOutcome          `protobuf:"varint,3,opt,name=outcome,proto3,enum=BattleOutcome" json:"outcome,omitempty"`
+	Units    []*BattleUnitResult    `protobuf:"bytes,4,rep,name=units,proto3" json:"units,omitempty"`
+	Checksum string                 `protobuf:"bytes,5,opt,name=checksum,proto3" json:"checksum,omitempty"`
+	// 战斗类型。Game 结算要按类型分发（爬塔/副本/BOSS 给的东西不一样），
+	// 光靠 outcome 和单位状态判断不出这是哪一种。
+	BattleType    BattleType `protobuf:"varint,6,opt,name=battle_type,json=battleType,proto3,enum=BattleType" json:"battle_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1052,6 +1092,13 @@ func (x *BattleFinishedNtf) GetChecksum() string {
 		return x.Checksum
 	}
 	return ""
+}
+
+func (x *BattleFinishedNtf) GetBattleType() BattleType {
+	if x != nil {
+		return x.BattleType
+	}
+	return BattleType_BATTLE_TYPE_UNSPECIFIED
 }
 
 // BattleResultConfirmedNtf 确认 Game 已消费结算结果。
@@ -1129,7 +1176,7 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x06skills\x18\x06 \x03(\v2\n" +
 	".RoleSkillR\x06skills\x12\"\n" +
 	"\x06equips\x18\a \x03(\v2\n" +
-	".RoleEquipR\x06equips\"\xf2\x02\n" +
+	".RoleEquipR\x06equips\"\xcd\x03\n" +
 	"\vBattleEvent\x12\x1a\n" +
 	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\x04R\x06action\x12\x12\n" +
@@ -1145,35 +1192,43 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\bhp_after\x18\v \x01(\x03R\ahpAfter\x12\x16\n" +
 	"\x06detail\x18\f \x01(\tR\x06detail\x12\x1d\n" +
 	"\n" +
-	"target_ids\x18\r \x03(\tR\ttargetIds\"\x91\x01\n" +
+	"target_ids\x18\r \x03(\tR\ttargetIds\x12\x1d\n" +
+	"\n" +
+	"start_tick\x18\x0e \x01(\x03R\tstartTick\x12\x1f\n" +
+	"\vimpact_tick\x18\x0f \x01(\x03R\n" +
+	"impactTick\x12\x19\n" +
+	"\bend_tick\x18\x10 \x01(\x03R\aendTick\"\x91\x01\n" +
 	"\x10BattleUnitResult\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x1f\n" +
 	"\x04team\x18\x02 \x01(\x0e2\v.BattleTeamR\x04team\x12\x0e\n" +
 	"\x02hp\x18\x03 \x01(\x03R\x02hp\x12\x15\n" +
 	"\x06max_hp\x18\x04 \x01(\x03R\x05maxHp\x12\x14\n" +
-	"\x05alive\x18\x05 \x01(\bR\x05alive\"k\n" +
+	"\x05alive\x18\x05 \x01(\bR\x05alive\"\x94\x01\n" +
 	"\x10BattleCreatedNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12(\n" +
-	"\x10tick_duration_ms\x18\x03 \x01(\x05R\x0etickDurationMs\"d\n" +
+	"\x10tick_duration_ms\x18\x03 \x01(\x05R\x0etickDurationMs\x12'\n" +
+	"\x05units\x18\x04 \x03(\v2\x11.BattleUnitResultR\x05units\"d\n" +
 	"\x0fBattleActionNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12\"\n" +
-	"\x05event\x18\x03 \x01(\v2\f.BattleEventR\x05event\"\xb1\x01\n" +
+	"\x05event\x18\x03 \x01(\v2\f.BattleEventR\x05event\"\xdf\x01\n" +
 	"\x11BattleFinishedNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12(\n" +
 	"\aoutcome\x18\x03 \x01(\x0e2\x0e.BattleOutcomeR\aoutcome\x12'\n" +
 	"\x05units\x18\x04 \x03(\v2\x11.BattleUnitResultR\x05units\x12\x1a\n" +
-	"\bchecksum\x18\x05 \x01(\tR\bchecksum\"I\n" +
+	"\bchecksum\x18\x05 \x01(\tR\bchecksum\x12,\n" +
+	"\vbattle_type\x18\x06 \x01(\x0e2\v.BattleTypeR\n" +
+	"battleType\"I\n" +
 	"\x18BattleResultConfirmedNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid*\x96\x01\n" +
+	"\x03uid\x18\x02 \x01(\x04R\x03uid*\x98\x01\n" +
 	"\n" +
 	"BattleType\x12\x1b\n" +
-	"\x17BATTLE_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
-	"\x0fBATTLE_TYPE_PVE\x10\x01\x12\x13\n" +
+	"\x17BATTLE_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11BATTLE_TYPE_TOWER\x10\x01\x12\x13\n" +
 	"\x0fBATTLE_TYPE_PVP\x10\x02\x12\x14\n" +
 	"\x10BATTLE_TYPE_BOSS\x10\x03\x12\x15\n" +
 	"\x11BATTLE_TYPE_STORY\x10\x04\x12\x14\n" +
@@ -1258,14 +1313,16 @@ var file_cspb_battle_struct_proto_depIdxs = []int32{
 	8,  // 1: Role.equips:type_name -> RoleEquip
 	6,  // 2: BattleEvent.type:type_name -> BattleEventType
 	1,  // 3: BattleUnitResult.team:type_name -> BattleTeam
-	10, // 4: BattleActionNtf.event:type_name -> BattleEvent
-	2,  // 5: BattleFinishedNtf.outcome:type_name -> BattleOutcome
-	11, // 6: BattleFinishedNtf.units:type_name -> BattleUnitResult
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	11, // 4: BattleCreatedNtf.units:type_name -> BattleUnitResult
+	10, // 5: BattleActionNtf.event:type_name -> BattleEvent
+	2,  // 6: BattleFinishedNtf.outcome:type_name -> BattleOutcome
+	11, // 7: BattleFinishedNtf.units:type_name -> BattleUnitResult
+	0,  // 8: BattleFinishedNtf.battle_type:type_name -> BattleType
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_cspb_battle_struct_proto_init() }

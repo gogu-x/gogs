@@ -90,14 +90,18 @@ type Rules struct {
 // Setup 是 Engine 的完整纯运行时输入。
 type Setup struct {
 	BattleID string
-	Seed     uint64
-	Rules    Rules
-	Units    []UnitConfig
+	// BattleType 只做透传：引擎的模拟与战斗类型无关，但结果里必须带上它 ——
+	// Game 结算要按类型分发，战报重投也要能知道原来打的是什么。
+	BattleType pb.BattleType
+	Seed       uint64
+	Rules      Rules
+	Units      []UnitConfig
 }
 
 // Result 是确定性战斗的运行结果。
 type Result struct {
 	BattleID       string                 `json:"battle_id"`
+	BattleType     pb.BattleType          `json:"battle_type"`
 	Outcome        pb.BattleOutcome       `json:"outcome"`
 	Tick           int64                  `json:"tick"`
 	TickDurationMS int32                  `json:"tick_duration_ms"`

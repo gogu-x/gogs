@@ -1,0 +1,14 @@
+.git
+.gitignore
+.idea
+.kiro
+.claude
+.run
+.agent_notes
+config.json
+.env
+*.exe
+*.exe~
+*.test
+**/__pycache__
+**/*.pyc

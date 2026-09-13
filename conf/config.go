@@ -100,6 +100,7 @@ func ConnectionFlags() []cli.Flag {
 		&cli.StringFlag{Name: "platform-addr", Usage: "platform gRPC listen address"},
 		&cli.StringFlag{Name: "platform-grpc-addr", Usage: "platform gRPC connection address"},
 		&cli.StringFlag{Name: "platform-webhook-addr", Usage: "platform webhook listen address"},
+		&cli.StringFlag{Name: "jwt-secret", Usage: "JWT signing secret"},
 		&cli.StringFlag{Name: "log_path", Usage: "log path"},
 		&cli.StringFlag{Name: "gconf-db", Usage: "gconf-db"},
 		&cli.StringFlag{Name: "gconf-db-uri", Usage: "gconf-db-uri"},
@@ -157,6 +158,9 @@ func LoadAndApply(c *cli.Command) error {
 	}
 	if c.IsSet("platform-webhook-addr") {
 		PlatformWebhookAddr = c.String("platform-webhook-addr")
+	}
+	if c.IsSet("jwt-secret") {
+		JWTSecret = c.String("jwt-secret")
 	}
 	if c.IsSet("gate-id") {
 		GateID = c.Int("gate-id")
