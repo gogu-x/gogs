@@ -3,7 +3,6 @@ package grpc
 import (
 	"time"
 
-	actor "github.com/gogu-x/bigTree"
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/pb/pfpb/pb_pf"
 	"github.com/gogu-x/gogs/platform/service"
@@ -35,7 +34,7 @@ func (a *Platform) onDeliver(ctx tree.Context, msg interface{}) {
 func DeliverByOrderID(orderID string) error {
 	pid, ok := tree.Default().Lookup(def.PF)
 	if !ok {
-		return actor.ErrActorNotFound
+		return nil
 	}
 	_, err := tree.Default().Request(pid, &deliverReq{orderID}).AwaitTimeout(5 * time.Second)
 	return err

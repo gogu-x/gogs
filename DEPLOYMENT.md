@@ -12,16 +12,31 @@
 
 1. 在服务器安装 Docker Engine（含 Compose v2），并把本目录中的 `.env.example` 复制为 `.env`。
 2. 将 `.env` 中的 `MONGO_ROOT_PASSWORD`、`JWT_SECRET` 替换为高强度随机值；不要将 `.env` 提交到 Git。
-3. **在启动 game/battle 前**将 `../glconf` 内的配置表导入 `${GCONF_DB}`。项目现有工具可执行：
+3. 启动基础依赖并导入 `../glconf` 配置表到内部 MongoDB：
 
    ```bash
-   python3 tools/import-conf.py \
-     "mongodb://<user>:<password>@<mongo-host>:27017/?authSource=admin" \
-     "gs_conf_dev" ../glconf
+   docker compose --env-file .env up -d mongodb etcd nats
+
+### Docker 构建主机无法使用 Go 基础镜像时
+
+若服务器 Docker 的内容存储损坏，无法拉取 `golang` 镜像，可在 Windows 构建机从 `gogs` 目录执行下列命令，生成静态 Linux/amd64 二进制到仓库根的 `deploy/bin`：
+
+```powershell
+New-Item -ItemType Directory -Force ..\deploy\bin
+$env:GOOS = 'linux'; $env:GOARCH = 'amd64'; $env:CGO_ENABLED = '0'
+go build -trimpath -ldflags='-s -w' -o ..\deploy\bin\battle ./battle
+go build -trimpath -ldflags='-s -w' -o ..\deploy\bin\game ./game
+go build -trimpath -ldflags='-s -w' -o ..\deploy\bin\gate ./gate
+go build -trimpath -ldflags='-s -w' -o ..\deploy\bin\platform ./platform
+```
+
+当前 Compose 使用 `runtime.Dockerfile`（`FROM scratch`）封装这些静态二进制，不需要服务器拉取 Go 或 Alpine 基础镜像。
+
+   docker compose --env-file .env --profile seed run --rm config-import
    ```
 
-   该导入会以仓库内容替换目标数据库中的同名配置集合，生产数据库操作前请先备份。
-4. 构建并启动：
+   `config-import` 为一次性容器，会以仓库内容替换**当前 Compose 项目内部 MongoDB**的同名配置集合。生产数据操作前请先备份。
+4. 构建并启动业务服务：
 
    ```bash
    docker compose --env-file .env build
