@@ -29,6 +29,7 @@ func (c *Conn) onWsMsg(ctx tree.Context, msg interface{}) {
 		tlog.Log.Info("ConnActor[%d]: unmarshal error: %v", c.connID, err)
 		return
 	}
+	tlog.Log.Info("gate conn onWsMsg: %v", inner)
 	msgType := reflect.TypeOf(inner)
 	if hookHandler, ok := c.hook[msgType]; ok {
 		hookHandler(ctx, inner)

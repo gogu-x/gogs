@@ -26,7 +26,7 @@ func (c *Conn) onLogin(ctx tree.Context, msg interface{}) {
 func (c *Conn) authLoginCb(ctx tree.Context, ret interface{}, err error) {
 	if err != nil {
 		c.state = StateAnon
-		tlog.Log.Info("ConnActor[%d]: uid=%d AuthLoginReq err: %s", c.connID, c.uid, err.Error())
+		tlog.Log.Warn("ConnActor[%d]: uid=%d AuthLoginReq err: %s", c.connID, c.uid, err.Error())
 		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_UNKNOWN, Msg: err.Error()})
 		return
 	}
@@ -59,11 +59,13 @@ func (c *Conn) authLoginCb(ctx tree.Context, ret interface{}, err error) {
 func (c *Conn) LoginAck(_ tree.Context, msg interface{}) {
 	req := msg.(*pb_auth.LoginGameAck)
 	if req.GetCode() != pb_common.ErrCode_OK {
+		tlog.Log.Warn("LoginAck code err: %s", req.GetCode())
 		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_LOGIN_IN_PROGRESS})
 		return
 	}
 	c.state = StateAuthed
 	c.uid = req.GetUid()
+	tlog.Log.Info("LoginAck succeeded: uid=%d", c.uid)
 	c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_OK})
 }
 
@@ -82,6 +84,7 @@ func (c *Conn) onRegister(ctx tree.Context, msg interface{}) {
 func (c *Conn) regCb(ctx tree.Context, ret interface{}, err error) {
 
 	if err != nil {
+		tlog.Log.Warn("ConnActor[%d]: regCb: %v", c.connID, err)
 		c.state = StateAnon
 		c.WriteWsMsg(&pb_gateway.RegisterAck{Code: pb_common.ErrCode_UNKNOWN, Msg: err.Error()})
 		return
@@ -104,6 +107,7 @@ func (c *Conn) onGetServerList(ctx tree.Context, msg interface{}) {
 
 func (c *Conn) getServerListCb(_ tree.Context, ret interface{}, err error) {
 	if err != nil {
+		tlog.Log.Warn("ConnActor[%d]: getServerListCb: %v", c.connID, err)
 		c.WriteWsMsg(&pb_gateway.ServerListAck{Code: pb_common.ErrCode_UNKNOWN})
 		return
 	}
@@ -113,5 +117,6 @@ func (c *Conn) getServerListCb(_ tree.Context, ret interface{}, err error) {
 	for _, account := range resp.Accounts {
 		accounts = append(accounts, &pb_gateway.ServerAccount{ServerId: account.ServerId, Uid: account.Uid})
 	}
+	tlog.Log.Info("ConnActor[%d]: getServerListCb: accounts=%v", c.connID, accounts)
 	c.WriteWsMsg(&pb_gateway.ServerListAck{Code: pb_common.ErrCode_OK, Accounts: accounts})
 }
