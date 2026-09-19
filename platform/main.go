@@ -7,6 +7,7 @@ import (
 
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/db/mongorpc"
 	"github.com/gogu-x/tree/tlog"
 	"github.com/urfave/cli/v3"
 
@@ -14,7 +15,6 @@ import (
 	_ "github.com/gogu-x/gogs/pb"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
 	"github.com/gogu-x/gogs/platform/webhook"
-	"github.com/gogu-x/gogs/rpc/mongorpc"
 )
 
 func main() {

@@ -15,8 +15,8 @@ import (
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb"
-	"github.com/gogu-x/gogs/rpc/mongorpc"
 	"github.com/gogu-x/tree/cluster"
+	"github.com/gogu-x/tree/db/mongorpc"
 	"github.com/gogu-x/tree/tlog"
 
 	"github.com/gogu-x/tree"

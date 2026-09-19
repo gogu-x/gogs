@@ -8,9 +8,9 @@ import (
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/gate/ws"
 	"github.com/gogu-x/gogs/natsrpc"
+	"github.com/gogu-x/gogs/rpc/platformrpc"
 
 	_ "github.com/gogu-x/gogs/pb"
-	"github.com/gogu-x/gogs/rpc/platformrpc"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/cluster"
 	"github.com/gogu-x/tree/tlog"
