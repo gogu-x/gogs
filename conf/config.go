@@ -12,19 +12,15 @@ var (
 	EtcdEndpoints = []string{"43.160.212.55:2379"}
 
 	// GateBasePort gate WebSocket 基础端口，实际端口 = GateBasePort + GateID
-	GateBasePort = 8080
+	GateBasePort = 8000
 
 	// GameBasePort game gRPC 基础端口，实际端口 = GameBasePort + ServerID
-	GameBasePort = 9900
+	GameBasePort = 9000
 
-	// BattleBasePort/Host 用于 Battle 服务发现地址（战斗消息仍通过 NATS）。
-	BattleBasePort = 10900
-	BattleHost     = "127.0.0.1"
+	// BattleBasePort /Host 用于 Battle 服务发现地址（战斗消息仍通过 NATS）。
+	BattleBasePort = 7200
 
-	// BattleConfigPath 可选的 JSON 引擎配置；为空时使用内置开发配置。
-	BattleConfigPath = ""
-	BattleRetryCount = 3
-	BattleRetryDelay = 1000
+	BattleHost = "127.0.0.1"
 
 	// LogLevel 日志级别
 	LogLevel = "debug"
@@ -125,15 +121,6 @@ func LoadAndApply(c *cli.Command) error {
 	}
 	if c.IsSet("battle-host") {
 		BattleHost = c.String("battle-host")
-	}
-	if c.IsSet("battle-config") {
-		BattleConfigPath = c.String("battle-config")
-	}
-	if c.IsSet("battle-retry-count") {
-		BattleRetryCount = c.Int("battle-retry-count")
-	}
-	if c.IsSet("battle-retry-delay-ms") {
-		BattleRetryDelay = c.Int("battle-retry-delay-ms")
 	}
 	if c.IsSet("grpc-host") {
 		GrpcHost = c.String("grpc-host")
