@@ -48,7 +48,7 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 	g.router.Register(&ipb.UnbanUID{}, g.onUnbanUID)
 
 	lis, err := net.Listen("tcp", conf.GameAddr())
-	if err != nil {
+	if err != nil || lis == nil {
 		tlog.Log.Info("GateActor: listen error: %v", err)
 	}
 

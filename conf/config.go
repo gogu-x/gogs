@@ -15,7 +15,7 @@ var (
 	GateBasePort = 8000
 
 	// GameBasePort game gRPC 基础端口，实际端口 = GameBasePort + ServerID
-	GameBasePort = 9000
+	GameBasePort = 6000
 
 	// BattleBasePort /Host 用于 Battle 服务发现地址（战斗消息仍通过 NATS）。
 	BattleBasePort = 7200

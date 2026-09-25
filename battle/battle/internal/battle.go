@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gogu-x/gogs/battle/battle/internal/configcompiler"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/def"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
@@ -85,13 +86,19 @@ func (a *BattleActor) HandleMessage(ctx tree.Context, msg interface{}) {
 // ModeRedeliver 顺序保证：Created → 全部 Action → Finished（战报已在库中，直接快推）。
 func (a *BattleActor) begin(ctx tree.Context) {
 	if a.p.Mode == ModeRun && a.p.Battle == nil {
-		battle, err := newBattleFromRequest(a.p.BattleID, a.p.Seed, a.p.Request)
+		compiler := a.p.Compiler
+		if compiler == nil {
+			compiler = configcompiler.NewDefault()
+		}
+		setup, err := compiler.Compile(a.p.BattleID, a.p.Seed, a.p.Request)
+		if err == nil {
+			a.p.Battle, err = engine.NewBattle(setup)
+		}
 		if err != nil {
 			tlog.Log.Error("[战斗/创建] 读取配置并创建引擎失败, battleID=%v uid=%v err=%v", a.p.BattleID, a.p.UID, err)
 			a.finish(ctx)
 			return
 		}
-		a.p.Battle = battle
 	}
 	a.notifyCreated()
 

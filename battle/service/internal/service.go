@@ -14,14 +14,16 @@ type Server struct {
 	self     tree.PID
 	system   *tree.Tree
 	active   map[string]tree.PID
+	compiler *battle.ConfigCompiler
 	reports  battle.Repository
 	notifier battle.Notifier
 }
 
 func New() *Server {
 	return &Server{
-		active:  make(map[string]tree.PID),
-		reports: battle.NewMemoryRepository(),
+		active:   make(map[string]tree.PID),
+		compiler: battle.NewDefaultConfigCompiler(),
+		reports:  battle.NewMemoryRepository(),
 		notifier: battle.NotifyFunc(func(source battle.Source, message proto.Message) error {
 			return natsrpc.Cast(natsrpc.Game, def.BattleClient, source.ServerID, source.NodeID, message)
 		}),

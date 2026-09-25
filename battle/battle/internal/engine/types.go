@@ -3,51 +3,34 @@ package engine
 import (
 	"fmt"
 
+	"github.com/gogu-x/gogs/battle/battle/internal/effectkind"
+	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
-// EffectKind 表示运行时技能效果类型。
-type EffectKind uint8
-
-const (
-	EffectDamage EffectKind = iota + 1
-	EffectHeal
-	EffectApplyStatus
-)
-
-// StatusKind 表示运行时状态类型。
-type StatusKind uint8
-
-const (
-	StatusStun StatusKind = iota + 1
-	StatusSilence
-	StatusDOT
-	StatusHOT
-	StatusAttributeModifier
-)
-
-// AttributeModifier 表示状态的属性修正。
+// AttributeModifier contains flat changes contributed by active statuses.
 type AttributeModifier struct {
 	AttackFlat  int64
 	DefenseFlat int64
 	SpeedFlat   int64
 }
 
-// StatusConfig 表示运行时状态配置。
+// StatusConfig contains the resolved runtime data for one status.
 type StatusConfig struct {
 	ID            string
-	Kind          StatusKind
+	Kind          statuskind.Kind
 	DurationTurns int
 	Potency       int64
 	Modifier      AttributeModifier
 }
 
-// EffectConfig 表示运行时技能效果。
+// EffectConfig contains the resolved runtime data for one skill effect.
 type EffectConfig struct {
-	Kind                EffectKind
+	Kind                effectkind.Kind
 	CoefficientPermille int64
 	Flat                int64
 	StatusID            string
+	Status              *StatusConfig
 }
 
 // DefaultTickDurationMS 是旧规则未配置 tick 时长时使用的兼容默认值。
@@ -96,6 +79,7 @@ type Setup struct {
 	Seed       uint64
 	Rules      Rules
 	Units      []UnitConfig
+	Strategies Strategies
 }
 
 // Result 是确定性战斗的运行结果。

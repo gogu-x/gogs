@@ -2,17 +2,122 @@ package engine
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
+	"github.com/gogu-x/gogs/battle/battle/internal/effectkind"
+	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
 func testSetup() Setup {
-	basic := SkillConfig{ID: "basic", TargetRule: pb.TargetRule_TARGET_RULE_ENEMY_SINGLE, Effects: []EffectConfig{{Kind: EffectDamage, CoefficientPermille: 1000}}}
+	basic := SkillConfig{ID: "basic", TargetRule: pb.TargetRule_TARGET_RULE_ENEMY_SINGLE, Effects: []EffectConfig{{Kind: effectkind.Damage, CoefficientPermille: 1000}}}
 	return Setup{BattleID: "battle-1", Seed: 42, Rules: Rules{ATBThreshold: 1000, MaxActions: 20, CritMultiplierPermille: 1500}, Units: []UnitConfig{
 		{InstanceID: "a", Team: pb.BattleTeam_BATTLE_TEAM_ATTACKER, MaxHP: 100, Attack: 30, Defense: 10, Speed: 100, BasicSkill: basic},
 		{InstanceID: "d", Team: pb.BattleTeam_BATTLE_TEAM_DEFENDER, MaxHP: 100, Attack: 20, Defense: 10, Speed: 50, BasicSkill: basic},
-	}}
+	}, Strategies: testStrategies()}
+}
+
+func testStrategies() Strategies {
+	return Strategies{Targets: testTargets{}, Skills: testSkills{}, Effects: testEffects{}, Damage: testDamage{}, Statuses: testStatuses{}}
+}
+
+type testTargets struct{}
+
+func (testTargets) Select(query TargetQuery) []string {
+	candidates := make([]UnitView, 0, len(query.Units))
+	for _, unit := range query.Units {
+		if !unit.Alive {
+			continue
+		}
+		if query.Rule == pb.TargetRule_TARGET_RULE_SELF && unit.ID == query.Actor.ID {
+			return []string{unit.ID}
+		}
+		if query.Rule == pb.TargetRule_TARGET_RULE_ENEMY_SINGLE || query.Rule == pb.TargetRule_TARGET_RULE_ENEMY_ALL {
+			if unit.Team != query.Actor.Team {
+				candidates = append(candidates, unit)
+			}
+		}
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].Position != candidates[j].Position {
+			return candidates[i].Position < candidates[j].Position
+		}
+		return candidates[i].ID < candidates[j].ID
+	})
+	if query.Rule == pb.TargetRule_TARGET_RULE_ENEMY_SINGLE && len(candidates) > 1 {
+		candidates = candidates[:1]
+	}
+	ids := make([]string, 0, len(candidates))
+	for _, unit := range candidates {
+		ids = append(ids, unit.ID)
+	}
+	return ids
+}
+
+type testSkills struct{}
+
+func (testSkills) Execute(context SkillExecutionContext) ([]EffectResolution, error) {
+	results := make([]EffectResolution, 0, len(context.Skill.Effects))
+	for _, effect := range context.Skill.Effects {
+		result, err := context.Effects.Resolve(EffectContext{Actor: context.Actor, Target: context.Target, Skill: context.Skill, Effect: effect, Rules: context.Rules, Damage: context.Damage, RNG: context.RNG})
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
+type testEffects struct{}
+
+func (testEffects) Resolve(context EffectContext) (EffectResolution, error) {
+	result := context.Damage.Calculate(DamageInput{Attack: context.Actor.Attack, Defense: context.Target.Defense, CoefficientPermille: context.Effect.CoefficientPermille, Flat: context.Effect.Flat}, context.RNG)
+	return EffectResolution{Kind: effectkind.Damage, Amount: result.Amount}, nil
+}
+
+func (testEffects) Apply(context EffectApplyContext, result EffectResolution) error {
+	before := context.Target.HP()
+	amount := min(result.Amount, before)
+	context.Target.SetHP(before - amount)
+	context.Emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, "", amount, before, context.Target.HP(), "")
+	return nil
+}
+
+type testDamage struct{}
+
+func (testDamage) Calculate(input DamageInput, _ *RNG) DamageResult {
+	amount := (input.Attack-input.Defense)*input.CoefficientPermille/1000 + input.Flat
+	if amount < 1 {
+		amount = 1
+	}
+	return DamageResult{Amount: amount}
+}
+
+type testStatuses struct{}
+
+func (testStatuses) Has(statuses []StatusInstance, kind statuskind.Kind) bool {
+	for _, status := range statuses {
+		if status.Remaining > 0 && status.Config.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+func (testStatuses) Modifier([]StatusInstance) AttributeModifier { return AttributeModifier{} }
+func (testStatuses) Apply(statuses []StatusInstance, config StatusConfig) ([]StatusInstance, error) {
+	return append(statuses, StatusInstance{Config: config, Remaining: config.DurationTurns}), nil
+}
+func (testStatuses) Tick(StatusInstance) StatusTickResult { return StatusTickResult{} }
+func (testStatuses) Expire(statuses []StatusInstance) []StatusInstance {
+	kept := statuses[:0]
+	for _, status := range statuses {
+		status.Remaining--
+		if status.Remaining > 0 {
+			kept = append(kept, status)
+		}
+	}
+	return kept
 }
 
 func TestBattleDeterministicResult(t *testing.T) {

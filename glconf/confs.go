@@ -26,6 +26,7 @@ func InitGameCfg() {
 	confs = append(confs, &confMeta{source: BattleSkillCfgKey, loader: loadBattleSkillCfg})
 	confs = append(confs, &confMeta{source: BattleStatusCfgKey, loader: loadBattleStatusCfg})
 	confs = append(confs, &confMeta{source: D2DailyGiftCfgKey, loader: loadD2DailyGiftCfg})
+	confs = append(confs, &confMeta{source: PlayerInitRoleCfgKey, loader: loadPlayerInitRoleCfg})
 }
 
 // LoadAllConfs 从 MongoDB 加载全部配置表。

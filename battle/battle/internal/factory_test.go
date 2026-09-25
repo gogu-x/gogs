@@ -16,10 +16,10 @@ func installFactoryConfigs(t *testing.T) {
 			{CfgID: 1, MaxHP: 100, Attack: 20, Defense: 5, Speed: 10, DefaultPosition: 1, BasicSkillID: 1},
 			{CfgID: 2, MaxHP: 120, Attack: 15, Defense: 8, Speed: 8, DefaultPosition: 2, BasicSkillID: 1},
 		},
-		[]*glconf.BattleSkillCfg{{CfgID: 1, TargetRule: int32(pb.TargetRule_TARGET_RULE_ENEMY_SINGLE), Effects: []*cspb.TypIDVal{{Typ: battleDamageType, Pro: 1000}}}},
-		[]*glconf.BattleEquipCfg{{CfgID: 1, Modifier: []*cspb.TypIDVal{{Typ: battleAttributeType, Id: battleAttributeAttack, Val: 5}}}},
+		[]*glconf.BattleSkillCfg{{CfgID: 1, TargetRule: int32(pb.TargetRule_TARGET_RULE_ENEMY_SINGLE), WindupTicks: 3, RecoveryTicks: 3, Effects: []*cspb.TypIDVal{{Typ: "battle_damage", Pro: 1000}}}},
+		[]*glconf.BattleEquipCfg{{CfgID: 1, Modifier: []*cspb.TypIDVal{{Typ: "battle_attribute", Id: 2, Val: 5}}}},
 		[]*glconf.BattleMonsterCfg{{CfgID: 1, MaxHP: 80, Attack: 12, Defense: 4, Speed: 6, BasicSkillID: 1}},
-		[]*glconf.BattleMonsterGroupCfg{{CfgID: 1, Members: []*cspb.TypIDVal{{Typ: battleMonsterType, Id: 1, Val: 1}}}},
+		[]*glconf.BattleMonsterGroupCfg{{CfgID: 1, Members: []*cspb.TypIDVal{{Typ: "battle_monster", Id: 1, Val: 1}}}},
 		[]*glconf.BattleRuleCfg{
 			{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 1000, MaxActions: 20, CritMultiplierPermille: 1500},
 			{BattleType: int32(pb.BattleType_BATTLE_TYPE_PVP), ATBThreshold: 1000, MaxActions: 20, CritMultiplierPermille: 1500},
@@ -28,7 +28,7 @@ func installFactoryConfigs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := glconf.SetBattleStatusConfigsForTest([]*glconf.BattleStatusCfg{{CfgID: 1, Kind: int32(5), DurationTurns: 2, Modifier: []*cspb.TypIDVal{{Typ: battleAttributeType, Id: battleAttributeAttack, Val: 3}}}}); err != nil {
+	if err := glconf.SetBattleStatusConfigsForTest([]*glconf.BattleStatusCfg{{CfgID: 1, Kind: int32(5), DurationTurns: 2, Modifier: []*cspb.TypIDVal{{Typ: "battle_attribute", Id: 2, Val: 3}}}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -100,14 +100,13 @@ func TestBuildRoleUnitUsesConfiguredInitialStatus(t *testing.T) {
 	}
 }
 
-func TestBuildSkillUsesVisibleTimingDefaults(t *testing.T) {
+func TestBuildSkillUsesConfiguredTiming(t *testing.T) {
 	installFactoryConfigs(t)
 	skill, err := buildSkill(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if skill.WindupTicks != defaultSkillWindupTicks || skill.RecoveryTicks != defaultSkillRecoveryTicks {
-		t.Fatalf("skill timing = %d/%d, want %d/%d", skill.WindupTicks, skill.RecoveryTicks,
-			defaultSkillWindupTicks, defaultSkillRecoveryTicks)
+	if skill.WindupTicks != 3 || skill.RecoveryTicks != 3 {
+		t.Fatalf("skill timing = %d/%d, want configured values 3/3", skill.WindupTicks, skill.RecoveryTicks)
 	}
 }

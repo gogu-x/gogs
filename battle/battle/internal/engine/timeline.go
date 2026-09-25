@@ -2,6 +2,13 @@ package engine
 
 import "container/heap"
 
+func unitLess(left, right *unit) bool {
+	if left.Config.Position != right.Config.Position {
+		return left.Config.Position < right.Config.Position
+	}
+	return left.Config.InstanceID < right.Config.InstanceID
+}
+
 type timelinePhase uint8
 
 const (

@@ -8,20 +8,22 @@ import (
 	"github.com/gogu-x/gogs/game/battle"
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/game/play/internal/module/player"
+	"github.com/gogu-x/gogs/game/play/internal/module/player/role"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
-	"google.golang.org/protobuf/proto"
 )
 
-// OnCreateBattle 把客户端的“开始战斗”意图转换为服务端权威战斗快照。
-// 当前玩家数据尚未持有角色/装备/技能养成信息，因此最小演示固定使用配置 1；
-// 后续只需替换 buildDemoRequest，BattleClient 和 Unity 事件表现无需改动。
+// OnCreateBattle 从玩家各个数据模块读取权威数据，组装战斗请求并发送给战斗服务。
 func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 	uid := ctx.PlayerID()
-	request := buildDemoRequest(ctx.Player, req)
+	request, err := buildBattleRequest(ctx.Player, req)
+	if err != nil {
+		ctx.CastPlayerIdMsg(uid, &pb_battle.StartBattleAck{Error: err.Error()})
+		return
+	}
 
 	ok := ctx.CastCall(def.BattleClient, &battle.Begin{Request: request}, func(callbackCtx tree.Context, value interface{}, err error) {
 		ack := &pb_battle.StartBattleAck{}
@@ -38,25 +40,60 @@ func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 	}
 }
 
-func buildDemoRequest(player *player.Player, incoming *pb_battle.StartBattleReq) *pb_battle.StartBattleReq {
-	request := &pb_battle.StartBattleReq{}
-	if incoming != nil {
-		request = proto.Clone(incoming).(*pb_battle.StartBattleReq)
+func buildBattleRequest(player *player.Player, incoming *pb_battle.StartBattleReq) (*pb_battle.StartBattleReq, error) {
+	if player == nil || player.UID == 0 {
+		return nil, fmt.Errorf("battle request requires a valid player")
 	}
-	request.UID = player.UID
-	request.ServerID = uint32(conf.ServerID)
-	request.SourceNodeId = uint32(conf.NodeId)
-	request.BattleType = pb_battle.BattleType_BATTLE_TYPE_TOWER
-	request.BusinessId = fmt.Sprintf("client-demo-%d", player.UID)
+	if player.TowerMgr == nil {
+		return nil, fmt.Errorf("player %d has no tower state", player.UID)
+	}
+	if incoming == nil {
+		return nil, fmt.Errorf("battle request is required")
+	}
+	character, ok := player.RoleMgr.BattleCharacter()
+	if !ok {
+		return nil, fmt.Errorf("player %d has no configured character", player.UID)
+	}
+	characterMessage, err := battleRoleMessage(player, character)
+	if err != nil {
+		return nil, err
+	}
 
-	request.AttackerRoles = []*pb_battle.Role{{
-		RoleId:       fmt.Sprintf("player-%d", player.UID),
-		RoleConfigId: 1,
-		Level:        1,
-	}}
-	request.DefenderRoles = nil
-	request.MonsterGroupConfigId = player.TowerMgr.Layer
-	return request
+	return &pb_battle.StartBattleReq{
+		UID:                  player.UID,
+		ServerID:             uint32(conf.ServerID),
+		SourceNodeId:         uint32(conf.NodeId),
+		BattleType:           pb_battle.BattleType_BATTLE_TYPE_TOWER,
+		BusinessId:           fmt.Sprintf("tower-%d-%d", player.UID, player.TowerMgr.Layer),
+		AttackerRoles:        []*pb_battle.Role{characterMessage},
+		MonsterGroupConfigId: player.TowerMgr.Layer,
+	}, nil
+}
+
+func battleRoleMessage(player *player.Player, selectedRole *role.Role) (*pb_battle.Role, error) {
+	message := &pb_battle.Role{
+		RoleId:       selectedRole.ID,
+		RoleConfigId: selectedRole.ConfigID,
+		Level:        selectedRole.Level,
+		Star:         selectedRole.Star,
+		Breakthrough: selectedRole.Breakthrough,
+		Skills:       make([]*pb_battle.RoleSkill, 0, len(selectedRole.Skills)),
+		Equips:       make([]*pb_battle.RoleEquip, 0, len(selectedRole.EquipmentIDs)),
+	}
+	for _, skill := range selectedRole.Skills {
+		message.Skills = append(message.Skills, &pb_battle.RoleSkill{SkillConfigId: skill.ConfigID, Level: skill.Level})
+	}
+	for _, equipmentID := range selectedRole.EquipmentIDs {
+		equip, ok := player.EquipmentMgr.Get(equipmentID)
+		if !ok {
+			return nil, fmt.Errorf("role %q references missing equipment %q", selectedRole.ID, equipmentID)
+		}
+		message.Equips = append(message.Equips, &pb_battle.RoleEquip{
+			EquipId: equip.ID, EquipConfigId: equip.ConfigID,
+			Level: equip.Level, RefineLevel: equip.RefineLevel,
+		})
+	}
+	return message, nil
 }
 
 func pushAck(ctx tree.Context, uid uint64, ack *pb_battle.StartBattleAck) {

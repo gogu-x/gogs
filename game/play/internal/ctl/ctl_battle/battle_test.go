@@ -7,6 +7,8 @@ import (
 	"github.com/gogu-x/gogs/game/battle"
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/game/play/internal/module/player"
+	"github.com/gogu-x/gogs/game/play/internal/module/player/equipment"
+	"github.com/gogu-x/gogs/game/play/internal/module/player/role"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/tree/tlog"
 )
@@ -18,25 +20,31 @@ func testCtx() *core.Context {
 	return &core.Context{Play: &core.Play{}}
 }
 
-// TestBuildDemoRequestOverridesClientSnapshot 锁定服务端权威：客户端传来的
-// UID / 服务器信息 / 参战阵容 / 怪物组一律被覆盖，且不改动入参。
-func TestBuildDemoRequestOverridesClientSnapshot(t *testing.T) {
+// TestBuildBattleRequestCopiesLoadout 检查请求不携带参战角色时，Game 仍会从玩家模块
+// 读取唯一角色、角色养成和装备数据，并覆盖请求中的玩家身份信息。
+func TestBuildBattleRequestCopiesLoadout(t *testing.T) {
 	oldServerID, oldNodeID := conf.ServerID, conf.NodeId
 	conf.ServerID, conf.NodeId = 3, 4
 	t.Cleanup(func() { conf.ServerID, conf.NodeId = oldServerID, oldNodeID })
 
 	p := player.NewPlayerData(99)
+	p.RoleMgr.Character = &role.Role{
+		ID: "role-99", ConfigID: 1, Level: 8, Star: 2, Breakthrough: 1,
+		Skills: []role.Skill{{ConfigID: 11, Level: 3}}, EquipmentIDs: []string{"equip-1"},
+	}
+	p.EquipmentMgr.Items["equip-1"] = &equipment.Item{ID: "equip-1", ConfigID: 7, Level: 3, RefineLevel: 2}
 	incoming := &pb.StartBattleReq{
 		UID:                  123,
 		ServerID:             456,
 		SourceNodeId:         789,
 		BattleType:           pb.BattleType_BATTLE_TYPE_PVP,
-		AttackerRoles:        []*pb.Role{{RoleId: "forged", RoleConfigId: 999}},
-		DefenderRoles:        []*pb.Role{{RoleId: "forged-defender", RoleConfigId: 999}},
 		MonsterGroupConfigId: 999,
 	}
 
-	request := buildDemoRequest(p, incoming)
+	request, err := buildBattleRequest(p, incoming)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if request.GetUID() != 99 || request.GetServerID() != 3 || request.GetSourceNodeId() != 4 {
 		t.Fatalf("source header = uid:%d server:%d node:%d",
@@ -51,20 +59,29 @@ func TestBuildDemoRequestOverridesClientSnapshot(t *testing.T) {
 			request.GetMonsterGroupConfigId(), p.TowerMgr.Layer)
 	}
 	if len(request.GetAttackerRoles()) != 1 ||
-		request.GetAttackerRoles()[0].GetRoleId() != "player-99" ||
-		request.GetAttackerRoles()[0].GetRoleConfigId() != 1 {
+		request.GetAttackerRoles()[0].GetRoleId() != "role-99" ||
+		request.GetAttackerRoles()[0].GetRoleConfigId() != 1 ||
+		request.GetAttackerRoles()[0].GetLevel() != 8 ||
+		request.GetAttackerRoles()[0].GetStar() != 2 ||
+		request.GetAttackerRoles()[0].GetBreakthrough() != 1 ||
+		len(request.GetAttackerRoles()[0].GetSkills()) != 1 ||
+		request.GetAttackerRoles()[0].GetSkills()[0].GetLevel() != 3 ||
+		len(request.GetAttackerRoles()[0].GetEquips()) != 1 ||
+		request.GetAttackerRoles()[0].GetEquips()[0].GetEquipConfigId() != 7 ||
+		request.GetAttackerRoles()[0].GetEquips()[0].GetLevel() != 3 ||
+		request.GetAttackerRoles()[0].GetEquips()[0].GetRefineLevel() != 2 {
 		t.Fatalf("attacker roles = %#v", request.GetAttackerRoles())
 	}
 	if len(request.GetDefenderRoles()) != 0 {
 		t.Fatalf("defender roles = %#v", request.GetDefenderRoles())
 	}
-	if request.GetBusinessId() != "client-demo-99" {
+	if request.GetBusinessId() != "tower-99-1" {
 		t.Fatalf("business id = %q", request.GetBusinessId())
 	}
 
-	// buildDemoRequest 必须克隆入参，不能就地改写调用方的请求。
+	// buildBattleRequest 必须克隆入参，不能就地改写调用方的请求。
 	if incoming.GetUID() != 123 || incoming.GetBattleType() != pb.BattleType_BATTLE_TYPE_PVP ||
-		len(incoming.GetAttackerRoles()) != 1 || incoming.GetAttackerRoles()[0].GetRoleId() != "forged" {
+		len(incoming.GetAttackerRoles()) != 0 || incoming.GetMonsterGroupConfigId() != 999 {
 		t.Fatalf("incoming request was mutated: %#v", incoming)
 	}
 }

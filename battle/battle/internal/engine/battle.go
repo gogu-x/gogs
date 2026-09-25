@@ -3,15 +3,12 @@ package engine
 import (
 	"container/heap"
 	"fmt"
-	"sort"
 
+	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
-type activeStatus struct {
-	Config    StatusConfig
-	Remaining int
-}
+type activeStatus = StatusInstance
 
 type unit struct {
 	Config    UnitConfig
@@ -22,37 +19,12 @@ type unit struct {
 
 func (u *unit) alive() bool { return u.HP > 0 }
 
-func (u *unit) hasStatus(kind StatusKind) bool {
-	for _, status := range u.Statuses {
-		if status.Remaining > 0 && status.Config.Kind == kind {
-			return true
-		}
-	}
-	return false
-}
-
-func (u *unit) modifier() AttributeModifier {
-	var modifier AttributeModifier
-	for _, status := range u.Statuses {
-		if status.Remaining > 0 {
-			modifier.AttackFlat += status.Config.Modifier.AttackFlat
-			modifier.DefenseFlat += status.Config.Modifier.DefenseFlat
-			modifier.SpeedFlat += status.Config.Modifier.SpeedFlat
-		}
-	}
-	return modifier
-}
-
-func (u *unit) attack() int64  { return max(0, u.Config.Attack+u.modifier().AttackFlat) }
-func (u *unit) defense() int64 { return max(0, u.Config.Defense+u.modifier().DefenseFlat) }
-func (u *unit) speed() int64   { return max(1, u.Config.Speed+u.modifier().SpeedFlat) }
-
 // Battle 是不依赖外部服务的确定性战斗实例。
 // 全部可变状态都在本结构体上，因此可以按 tick 挂起推进（Advance）而不丢状态。
 type Battle struct {
 	setup          Setup
 	rng            *RNG
-	pipeline       DamagePipeline
+	strategies     Strategies
 	units          []*unit
 	timeline       timelineQueue
 	tick           int64
@@ -75,7 +47,10 @@ func NewBattle(setup Setup) (*Battle, error) {
 	if err := setup.validate(); err != nil {
 		return nil, err
 	}
-	battle := &Battle{setup: setup, rng: NewRNG(setup.Seed), pipeline: NewDamagePipeline()}
+	if err := setup.Strategies.validate(); err != nil {
+		return nil, err
+	}
+	battle := &Battle{setup: setup, rng: NewRNG(setup.Seed), strategies: setup.Strategies}
 	for _, config := range setup.Units {
 		statuses := make([]activeStatus, 0, len(config.InitialStatus))
 		for _, status := range config.InitialStatus {
@@ -132,7 +107,27 @@ func (b *Battle) outcome() (pb.BattleOutcome, bool) {
 }
 
 func (b *Battle) attackInterval(actor *unit) int64 {
-	return max(1, (b.setup.Rules.ATBThreshold+actor.speed()-1)/actor.speed())
+	speed := b.unitSpeed(actor)
+	return max(1, (b.setup.Rules.ATBThreshold+speed-1)/speed)
+}
+
+func (b *Battle) unitView(u *unit) UnitView {
+	return UnitView{ID: u.Config.InstanceID, Team: u.Config.Team, Position: u.Config.Position, HP: u.HP, MaxHP: u.Config.MaxHP,
+		Attack: b.unitAttack(u), Defense: b.unitDefense(u), Alive: u.alive()}
+}
+
+func (b *Battle) unitAttack(u *unit) int64 {
+	return max(0, u.Config.Attack+b.unitModifier(u).AttackFlat)
+}
+func (b *Battle) unitDefense(u *unit) int64 {
+	return max(0, u.Config.Defense+b.unitModifier(u).DefenseFlat)
+}
+func (b *Battle) unitSpeed(u *unit) int64 { return max(1, u.Config.Speed+b.unitModifier(u).SpeedFlat) }
+func (b *Battle) unitModifier(u *unit) AttributeModifier {
+	return b.strategies.Statuses.Modifier(u.Statuses)
+}
+func (b *Battle) hasStatus(u *unit, kind statuskind.Kind) bool {
+	return b.strategies.Statuses.Has(u.Statuses, kind)
 }
 
 func (b *Battle) tickCooldowns(actor *unit) {
@@ -151,31 +146,25 @@ func (b *Battle) tickPeriodic(actor *unit) {
 			return
 		}
 		before := actor.HP
-		switch status.Config.Kind {
-		case StatusDOT:
-			amount := min(status.Config.Potency, actor.HP)
-			actor.HP -= amount
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID, amount, before, actor.HP, "dot", nil)
-		case StatusHOT:
-			actor.HP = min(actor.Config.MaxHP, actor.HP+status.Config.Potency)
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID, actor.HP-before, before, actor.HP, "hot", nil)
+		result := b.strategies.Statuses.Tick(status)
+		if result.Damage > 0 {
+			result.Damage = min(result.Damage, actor.HP)
+			actor.HP -= result.Damage
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID, result.Damage, before, actor.HP, result.Event, nil)
+		}
+		if result.Heal > 0 {
+			actor.HP = min(actor.Config.MaxHP, actor.HP+result.Heal)
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID, actor.HP-before, before, actor.HP, result.Event, nil)
 		}
 	}
 }
 
 func (b *Battle) expireStatuses(actor *unit) {
-	kept := actor.Statuses[:0]
-	for _, status := range actor.Statuses {
-		status.Remaining--
-		if status.Remaining > 0 {
-			kept = append(kept, status)
-		}
-	}
-	actor.Statuses = kept
+	actor.Statuses = b.strategies.Statuses.Expire(actor.Statuses)
 }
 
 func (b *Battle) chooseSkill(actor *unit) SkillConfig {
-	if !actor.hasStatus(StatusSilence) {
+	if !b.hasStatus(actor, statuskind.Silence) {
 		for _, skill := range actor.Config.ActiveSkills {
 			if actor.Cooldowns[skill.ID] == 0 {
 				return skill
@@ -185,48 +174,21 @@ func (b *Battle) chooseSkill(actor *unit) SkillConfig {
 	return actor.Config.BasicSkill
 }
 
-func unitLess(left, right *unit) bool {
-	if left.Config.Position != right.Config.Position {
-		return left.Config.Position < right.Config.Position
-	}
-	return left.Config.InstanceID < right.Config.InstanceID
-}
-
 func (b *Battle) targets(actor *unit, rule pb.TargetRule) []*unit {
-	var targets []*unit
-	switch rule {
-	case pb.TargetRule_TARGET_RULE_SELF:
-		if actor.alive() {
-			targets = append(targets, actor)
-		}
-	case pb.TargetRule_TARGET_RULE_ENEMY_SINGLE, pb.TargetRule_TARGET_RULE_ENEMY_ALL:
-		for _, candidate := range b.units {
-			if candidate.alive() && candidate.Config.Team != actor.Config.Team {
-				targets = append(targets, candidate)
-			}
-		}
-		sort.Slice(targets, func(i, j int) bool { return unitLess(targets[i], targets[j]) })
-		if rule == pb.TargetRule_TARGET_RULE_ENEMY_SINGLE && len(targets) > 1 {
-			return targets[:1]
-		}
-	case pb.TargetRule_TARGET_RULE_ALLY_LOWEST_HP:
-		for _, candidate := range b.units {
-			if candidate.alive() && candidate.Config.Team == actor.Config.Team {
-				targets = append(targets, candidate)
-			}
-		}
-		sort.Slice(targets, func(i, j int) bool {
-			left, right := targets[i], targets[j]
-			if left.HP*right.Config.MaxHP != right.HP*left.Config.MaxHP {
-				return left.HP*right.Config.MaxHP < right.HP*left.Config.MaxHP
-			}
-			return unitLess(left, right)
-		})
-		if len(targets) > 1 {
-			return targets[:1]
+	views := make([]UnitView, 0, len(b.units))
+	byID := make(map[string]*unit, len(b.units))
+	for _, candidate := range b.units {
+		views = append(views, b.unitView(candidate))
+		byID[candidate.Config.InstanceID] = candidate
+	}
+	ids := b.strategies.Targets.Select(TargetQuery{Actor: b.unitView(actor), Units: views, Rule: rule})
+	selected := make([]*unit, 0, len(ids))
+	for _, id := range ids {
+		if candidate := byID[id]; candidate != nil && candidate.alive() {
+			selected = append(selected, candidate)
 		}
 	}
-	return targets
+	return selected
 }
 
 func targetIDs(targets []*unit) []string {
@@ -244,38 +206,13 @@ func firstTarget(ids []string) string {
 	return ids[0]
 }
 
-func (b *Battle) applyEffect(actor, target *unit, skill SkillConfig, effect EffectConfig) {
-	if !target.alive() {
-		return
-	}
-	switch effect.Kind {
-	case EffectDamage:
-		context := b.pipeline.Calculate(DamageContext{Attack: actor.attack(), Defense: target.defense(), CoefficientPermille: effect.CoefficientPermille, Flat: effect.Flat, VariancePermille: b.setup.Rules.DamageVariancePermille, CritChancePermille: b.setup.Rules.CritChancePermille, CritMultiplierPermille: b.setup.Rules.CritMultiplierPermille}, b.rng)
-		before := target.HP
-		amount := min(context.Amount, target.HP)
-		target.HP -= amount
-		detail := ""
-		if context.Critical {
-			detail = "critical"
-		}
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", amount, before, target.HP, detail, nil)
-	case EffectHeal:
-		amount := max(0, actor.attack()*effect.CoefficientPermille/1000+effect.Flat)
-		before := target.HP
-		target.HP = min(target.Config.MaxHP, target.HP+amount)
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", target.HP-before, before, target.HP, "", nil)
-	case EffectApplyStatus:
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_STATUS_APPLIED, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, effect.StatusID, 0, target.HP, target.HP, "unsupported status config", nil)
-	}
-}
-
 func (b *Battle) startAction(actor *unit) {
 	b.nextAction++
 	b.startedActions++
 	b.action = b.nextAction
 	b.tickCooldowns(actor)
 	skill := b.chooseSkill(actor)
-	stunned := actor.hasStatus(StatusStun)
+	stunned := b.hasStatus(actor, statuskind.Stun)
 	var targets []*unit
 	if !stunned {
 		targets = b.targets(actor, skill.TargetRule)
@@ -332,11 +269,43 @@ func (b *Battle) impactAction(action *scheduledAction) {
 			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, target.Config.InstanceID, action.Skill.ID, "", 0, target.HP, target.HP, "target_dead", []string{target.Config.InstanceID})
 			continue
 		}
-		for _, effect := range action.Skill.Effects {
-			b.applyEffect(actor, target, action.Skill, effect)
+		results, err := b.strategies.Skills.Execute(SkillExecutionContext{
+			Actor: b.unitView(actor), Target: b.unitView(target), Skill: action.Skill,
+			Rules: b.setup.Rules, Effects: b.strategies.Effects, Damage: b.strategies.Damage, RNG: b.rng,
+		})
+		if err != nil {
+			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, target.Config.InstanceID, action.Skill.ID, "", 0, target.HP, target.HP, err.Error(), nil)
+			continue
+		}
+		for _, result := range results {
+			b.applyResolution(actor, target, action.Skill, result)
 		}
 	}
 }
+
+func (b *Battle) applyResolution(actor, target *unit, skill SkillConfig, resolution EffectResolution) {
+	if !target.alive() {
+		return
+	}
+	err := b.strategies.Effects.Apply(EffectApplyContext{
+		ActorID: actor.Config.InstanceID, SkillID: skill.ID, Target: effectTarget{unit: target}, Statuses: b.strategies.Statuses,
+		Emit: func(kind pb.BattleEventType, statusID string, amount, before, after int64, detail string) {
+			b.emit(kind, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, statusID, amount, before, after, detail, nil)
+		},
+	}, resolution)
+	if err != nil {
+		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", 0, target.HP, target.HP, err.Error(), nil)
+	}
+}
+
+type effectTarget struct{ unit *unit }
+
+func (t effectTarget) ID() string                         { return t.unit.Config.InstanceID }
+func (t effectTarget) HP() int64                          { return t.unit.HP }
+func (t effectTarget) MaxHP() int64                       { return t.unit.Config.MaxHP }
+func (t effectTarget) SetHP(value int64)                  { t.unit.HP = value }
+func (t effectTarget) Statuses() []StatusInstance         { return t.unit.Statuses }
+func (t effectTarget) SetStatuses(value []StatusInstance) { t.unit.Statuses = value }
 
 func (b *Battle) endAction(action *scheduledAction) {
 	b.expireStatuses(action.Actor)
