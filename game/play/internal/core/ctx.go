@@ -78,8 +78,8 @@ func (c *Context) CastCall(
 	return true
 }
 
-// CastPlayerIdMsg 通过网关向指定在线玩家推送消息，玩家不在线返回 false。
-func (c *Context) CastPlayerIdMsg(uid uint64, msg proto.Message) bool {
+// CastPlayerMsg 通过网关向指定在线玩家推送消息，玩家不在线返回 false。
+func (c *Context) CastPlayerMsg(uid uint64, msg proto.Message) bool {
 	p := c.Play.PlayerMgr.Get(uid)
 	if p == nil {
 		return false

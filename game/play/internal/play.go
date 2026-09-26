@@ -8,15 +8,14 @@ import (
 )
 
 // NewPlay 构造 Play Actor，并注入装配逻辑。
-//
 // Boot 由 core.Play.OnInit 在公共能力就绪之后调用，此时
-// PlayerMgr / Event / TimeWheel 均已可用。
 func NewPlay() *core.Play {
 	py := &core.Play{}
 	py.Boot = func(p *core.Play) {
 		InitTimers(p)
 		InitEvent(p)
 		InitRoutes(p)
+		RegDbLoader(p)
 	}
 	return py
 }

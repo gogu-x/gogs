@@ -8,6 +8,7 @@ import (
 	pb_auth "github.com/gogu-x/gogs/pb/cspb/pb_auth"
 	pb_battle "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	pb_chat "github.com/gogu-x/gogs/pb/cspb/pb_chat"
+	pb_equipment "github.com/gogu-x/gogs/pb/cspb/pb_equipment"
 	pb_gateway "github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	pb_guild "github.com/gogu-x/gogs/pb/cspb/pb_guild"
 	pb_pf "github.com/gogu-x/gogs/pb/pfpb/pb_pf"
@@ -34,6 +35,10 @@ func init() {
 		&pb_battle.BattleResultConfirmedNtf{},
 		&pb_chat.ChatAck{},
 		&pb_chat.ChatReq{},
+		&pb_equipment.GetRoleEquipmentReq{},
+		&pb_equipment.GetRoleEquipmentAck{},
+		&pb_equipment.ChangeRoleEquipmentReq{},
+		&pb_equipment.ChangeRoleEquipmentAck{},
 		&pb_gateway.LoginAck{},
 		&pb_gateway.RegisterAck{},
 		&pb_gateway.ServerListAck{},

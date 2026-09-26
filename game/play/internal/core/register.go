@@ -20,13 +20,18 @@ func RegisterPlayerMsg[Req any](
 ) {
 	py.Router().Register(prototype, func(ctx tree.Context, msg interface{}) {
 		request, ok := msg.(uidRequest)
-		if !ok || request.GetUID() == 0 {
+		if !ok {
 			ctx.Response(nil, fmt.Errorf("play: %T missing uid", msg))
 			return
 		}
-		p := py.PlayerMgr.Get(request.GetUID())
-		if p == nil {
-			ctx.Response(nil, fmt.Errorf("play: uid=%d not online", request.GetUID()))
+		uid := request.GetUID()
+		if uid == 0 {
+			ctx.Response(nil, fmt.Errorf("play: %T missing uid", msg))
+			return
+		}
+		p := py.PlayerMgr.Get(uid)
+		if p == nil || !py.PlayerMgr.IsOnline(uid) {
+			ctx.Response(nil, fmt.Errorf("play: uid=%d not online", uid))
 			return
 		}
 		requestCtx := &Context{

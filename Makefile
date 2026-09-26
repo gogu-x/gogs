@@ -18,4 +18,14 @@ conf-data:
 
 c: conf-code conf-data
 
-build: c proto register
+.PHONY: deepcopy-tool deepcopy
+
+DEEPCOPY_GEN_BIN := tools\deepcopy-gen.exe
+
+deepcopy-tool:
+	go build -o $(DEEPCOPY_GEN_BIN) ./tools/deepcopy-gen
+
+deepcopy: deepcopy-tool
+	$(DEEPCOPY_GEN_BIN)
+
+build: c proto register deepcopy

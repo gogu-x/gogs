@@ -1,5 +1,6 @@
 package cardgroup
 
+// +deepcopy-gen=true
 type Mgr struct {
 	Cards map[uint64]int64 `bson:"cards"`
 }

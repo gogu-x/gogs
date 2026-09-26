@@ -17,7 +17,7 @@ type PlayerInitRoleCfg struct {
 	RoleConfigID int32 `bson:"role_config_id"` // 关联的角色战斗配置 ID
 	Level        int32 `bson:"level"`          // 初始等级
 	Star         int32 `bson:"star"`           // 初始星级
-	Breakthrough int32 `bson:"breakthrough"`   // 初始境界等级
+	Breakthrough int32 `bson:"breakthrough"`   // 初始突破/境界等级
 }
 
 func loadPlayerInitRoleCfg(dbURI, dbName, confName string) (*CsvConf, error) {

@@ -7,13 +7,16 @@
 package core
 
 import (
+	"errors"
 	"time"
 
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/play/internal/module/player"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/comm"
+	"github.com/gogu-x/tree/db/mongorpc"
 	"github.com/gogu-x/tree/timer"
+	"github.com/gogu-x/tree/tlog"
 )
 
 // timeWheelChanLen 是时间轮到期队列的缓冲大小。
@@ -23,32 +26,53 @@ const timeWheelChanLen = 16
 //
 // 所有字段只在 Play 自己的 Actor goroutine 内访问，无需加锁。
 type Play struct {
-	PlayerMgr *player.PlayerMgr
-	Event     *comm.Event
-	TimeWheel *timer.TimeWheel
-
-	router tree.Router
-	// Boot 在公共能力就绪之后、开服事件触发之前被调用，由上层装配时注入，
-	Boot func(*Play)
+	PlayerMgr     *player.PlayerMgr // PlayerMgr 保存本节点已经加载的玩家。
+	Event         *comm.Event       // Event 分发 Play 模块内的业务事件。
+	TimeWheel     *timer.TimeWheel  // TimeWheel 调度 Play 模块的定时任务。
+	router        tree.Router       //消息路由
+	shuttingDown  bool
+	Lifecycle     *mongorpc.Lifecycle
+	systemContext tree.Context
+	Boot          func(*Play)
 }
+
+// FlushPlayers 请求 Play 在关服前存盘所有玩家。
+type FlushPlayers struct{}
 
 func (py *Play) Name() string { return def.PLAY }
 
 func (py *Play) OnInit(ctx tree.Context) {
+	py.systemContext = ctx
 	py.PlayerMgr = player.NewPlayerMgr()
 	py.Event = comm.NewEvent()
 	py.TimeWheel = timer.NewTimeWheel(timeWheelChanLen, ctx.Self(), ctx.System())
-
-	// 装配必须在能力就绪之后：Boot 内的注册逻辑会直接使用 Event / TimeWheel。
 	if py.Boot != nil {
 		py.Boot(py)
 	}
 	py.Emit(ServerStart, comm.NewArg())
 }
 
+// SystemContext 返回 Actor 初始化时的系统上下文，供定时任务使用。
+func (py *Play) SystemContext() tree.Context { return py.systemContext }
+
 func (py *Play) HandleMessage(ctx tree.Context, msg interface{}) {
+	if py.shuttingDown {
+		if _, flushRequest := msg.(*FlushPlayers); flushRequest {
+			py.router.Route(ctx, msg)
+			return
+		}
+		tlog.Log.Error("[core/Play.HandleMessage] 关服存盘期间拒绝消息, type=%T", msg)
+		ctx.Response(nil, errors.New("play actor is flushing player data for shutdown"))
+		return
+	}
 	py.router.Route(ctx, msg)
 }
+
+// BeginShutdown 停止接收会修改玩家内存状态的新消息。
+func (py *Play) BeginShutdown() { py.shuttingDown = true }
+
+// IsShuttingDown reports whether Play has stopped accepting business messages.
+func (py *Play) IsShuttingDown() bool { return py.shuttingDown }
 
 func (py *Play) OnStop(_ tree.Context) {
 	if py.TimeWheel != nil {
@@ -100,4 +124,8 @@ func (py *Play) After(timerType timer.TimerType, d time.Duration, data interface
 // Cron 按 cron 表达式挂一条周期任务。
 func (py *Play) Cron(timerType timer.TimerType, expr *timer.CronExpr, data interface{}) *timer.WheelCron {
 	return py.TimeWheel.Cron(timerType, expr, data)
+}
+
+func (py *Play) GetPlayerMgr() *player.PlayerMgr {
+	return py.PlayerMgr
 }

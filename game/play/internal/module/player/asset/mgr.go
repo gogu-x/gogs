@@ -1,5 +1,6 @@
 package asset
 
+// +deepcopy-gen=true
 type Mgr struct {
 	Assets map[uint64]int64 `bson:"assets"`
 }

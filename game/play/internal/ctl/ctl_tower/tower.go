@@ -27,9 +27,6 @@ func OnTowerBattleResults(play *core.Play, arg *comm.Arg) {
 		return
 	}
 	uid := results.Participants[0].UID
-	player := play.PlayerMgr.Get(uid)
-	if player == nil {
-		return
-	}
+	player := play.GetPlayerMgr().Get(uid)
 	player.TowerMgr.Layer += 1
 }

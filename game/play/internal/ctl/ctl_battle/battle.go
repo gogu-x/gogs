@@ -21,7 +21,7 @@ func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 	uid := ctx.PlayerID()
 	request, err := buildBattleRequest(ctx.Player, req)
 	if err != nil {
-		ctx.CastPlayerIdMsg(uid, &pb_battle.StartBattleAck{Error: err.Error()})
+		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Error: err.Error()})
 		return
 	}
 
@@ -36,7 +36,7 @@ func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 		pushAck(callbackCtx, uid, ack)
 	})
 	if !ok {
-		ctx.CastPlayerIdMsg(uid, &pb_battle.StartBattleAck{Error: "battle client is unavailable"})
+		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Error: "battle client is unavailable"})
 	}
 }
 
