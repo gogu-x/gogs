@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
@@ -63,9 +61,7 @@ func main() {
 				tlog.Log.Error("load confs error: %v", err)
 				return err
 			}
-			shutdown := make(chan os.Signal, 1)
-			signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
-			tree.Spawn(
+			tree.Default().Spawn(
 				play.NewPlay(),
 				battle.New(nil, nil, conf.ServerID, conf.NodeId),
 				gate.NewGate(),
@@ -74,10 +70,7 @@ func main() {
 				mongorpc.NewActor(def.Mongo, db),
 				natsrpc.NewNats(natsrpc.Game, conf.ServerID, conf.NodeId, conf.NatsURL),
 			)
-			<-shutdown
-			signal.Stop(shutdown)
-			tree.Default().Shutdown()
-
+			tree.Default().Start()
 			return nil
 		},
 	}

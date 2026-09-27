@@ -47,7 +47,7 @@ func main() {
 				return err
 			}
 
-			tree.Spawn(
+			tree.Default().Spawn(
 				mongorpc.NewActor(def.Mongo, db),
 				service.New(),
 				natsrpc.NewNats(natsrpc.Battle, conf.ServerID, conf.NodeId, conf.NatsURL),
