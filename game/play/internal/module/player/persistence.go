@@ -54,16 +54,12 @@ func (mgr *PlayerMgr) AfterSave(_ tree.Context, data interface{}) error {
 	return nil
 }
 
-func (mgr *PlayerMgr) MackDirty() bool {
-	dirty := false
-	mgr.RangePlayer(func(p *Player) bool {
-		if p.Dirty {
-			dirty = true
-			return false
-		}
-		return true
-	})
-	return dirty
+func (mgr *PlayerMgr) MackDirty(data interface{}) bool {
+	p, ok := data.(*Player)
+	if !ok || p == nil {
+		return false
+	}
+	return p.Dirty
 }
 
 func (mgr *PlayerMgr) GetTickerType() timer.TimerType {

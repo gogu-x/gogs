@@ -48,6 +48,7 @@ func NewPlayerData(uid uint64) *Player {
 	}
 	player.initDefaultCharacter()
 	player.initStarterEquipment()
+	player.Dirty = true
 	return player
 }
 

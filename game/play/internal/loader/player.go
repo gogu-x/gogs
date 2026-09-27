@@ -11,13 +11,13 @@ import (
 )
 
 // OnLoadPlayer 登录时加载玩家数据
-func OnLoadPlayer(p *core.Play, uid uint64, callback func(*core.Play, *player.Player, error)) bool {
+func OnLoadPlayer(p *core.Play, uid uint64, callback func(*core.Play, *player.Player, error)) {
 	if p == nil {
-		return false
+		return
 	}
 	if playerInfo := p.GetPlayerMgr().Get(uid); playerInfo != nil {
 		callback(p, playerInfo, nil)
-		return true
+		return
 	}
 
 	if p.Lifecycle.LoadOne(p.SystemContext(), (*player.Player)(nil), uid, func(callbackCtx tree.Context, value interface{}, err error) {
@@ -36,7 +36,7 @@ func OnLoadPlayer(p *core.Play, uid uint64, callback func(*core.Play, *player.Pl
 		}
 		callback(p, loaded, nil)
 	}) {
-		return true
+		return
 	}
-	return true
+	return
 }
