@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/timer"
 	"github.com/gogu-x/tree/tlog"
 )
 
@@ -63,4 +64,8 @@ func (mgr *PlayerMgr) MackDirty() bool {
 		return true
 	})
 	return dirty
+}
+
+func (mgr *PlayerMgr) GetTickerType() timer.TimerType {
+	return timer.TimerType(1000001)
 }

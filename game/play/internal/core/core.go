@@ -31,7 +31,7 @@ type Play struct {
 	TimeWheel     *timer.TimeWheel  // TimeWheel 调度 Play 模块的定时任务。
 	router        tree.Router       //消息路由
 	shuttingDown  bool
-	Lifecycle     *mongorpc.Lifecycle
+	Lifecycle     *mongorpc.Lifecycle // Lifecycle 管理已注册模型的通用存盘周期。
 	systemContext tree.Context
 	Boot          func(*Play)
 }
@@ -68,13 +68,21 @@ func (py *Play) HandleMessage(ctx tree.Context, msg interface{}) {
 	py.router.Route(ctx, msg)
 }
 
-// BeginShutdown 停止接收会修改玩家内存状态的新消息。
-func (py *Play) BeginShutdown() { py.shuttingDown = true }
+// BeginShutdown 停止接收会修改玩家内存状态的新消息和自动存盘定时器。
+func (py *Play) BeginShutdown() {
+	py.shuttingDown = true
+	if py.Lifecycle != nil {
+		py.Lifecycle.Stop()
+	}
+}
 
 // IsShuttingDown reports whether Play has stopped accepting business messages.
 func (py *Play) IsShuttingDown() bool { return py.shuttingDown }
 
 func (py *Play) OnStop(_ tree.Context) {
+	if py.Lifecycle != nil {
+		py.Lifecycle.Stop()
+	}
 	if py.TimeWheel != nil {
 		py.TimeWheel.Stop()
 	}

@@ -12,10 +12,9 @@ import (
 func NewPlay() *core.Play {
 	py := &core.Play{}
 	py.Boot = func(p *core.Play) {
-		InitTimers(p)
+		RegDbLoader(p)
 		InitEvent(p)
 		InitRoutes(p)
-		RegDbLoader(p)
 	}
 	return py
 }
