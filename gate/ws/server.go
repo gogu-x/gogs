@@ -10,6 +10,7 @@ import (
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gogu-x/tree/comm"
+	"google.golang.org/grpc"
 
 	"github.com/gorilla/websocket"
 )
@@ -22,10 +23,11 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	addr    string
-	clients map[uint64]struct{}
-	router  tree.Router
-	idGen   *comm.IDGenerator
+	addr            string
+	Clients         map[uint64]struct{}
+	router          tree.Router
+	idGen           *comm.IDGenerator
+	GameGrpcPoolMgr map[uint32]*grpc.ClientConn
 }
 
 // New 创建 GateServer，gateID 用作 connID 生成器的节点位，
@@ -35,7 +37,12 @@ func New(addr string, gateID int64) *Server {
 	if err != nil {
 		panic(err)
 	}
-	return &Server{addr: addr, clients: make(map[uint64]struct{}), idGen: idGen}
+	return &Server{
+		addr:            addr,
+		Clients:         make(map[uint64]struct{}),
+		idGen:           idGen,
+		GameGrpcPoolMgr: make(map[uint32]*grpc.ClientConn),
+	}
 }
 
 func (s *Server) Name() string { return constant.ActorGateServer }

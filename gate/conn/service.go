@@ -45,14 +45,13 @@ func (c *Conn) authLoginCb(ctx tree.Context, ret interface{}, err error) {
 		ServerID: AuthAck.ServerId,
 	}
 	// 起来game gate流
-	if err := c.OpenSteam(ctx.Self()); err != nil {
+	err = c.OpenSteam(ctx, req)
+	if err != nil {
 		c.state = StateAnon
 		tlog.Log.Info("ConnActor[%d]: open game stream: %v", c.connID, err)
 		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_UNKNOWN, Msg: "game server unavailable"})
 		return
 	}
-	c.sendGameSteam(ctx, req)
-	tlog.Log.Info("ConnActor[%d]: uid=%d login forwarded -> server=%d node=%s", c.connID, c.uid, c.serverID, c.nodeID)
 }
 
 // LoginAck 游戏登录回调信息

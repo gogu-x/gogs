@@ -41,6 +41,7 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 		s.actorPID,
 		&openSession{stream: stream, msg: msg},
 	).AwaitTimeout(5 * time.Second)
+
 	if err != nil {
 		return status.Errorf(codes.PermissionDenied, "open gateway session: %v", err)
 	}

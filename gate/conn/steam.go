@@ -2,16 +2,15 @@ package conn
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 
+	"github.com/gogu-x/gogs/gate/constant"
+	"github.com/gogu-x/gogs/pb/cspb/pb_auth"
 	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
-	"github.com/gogu-x/tree/cluster"
-	"google.golang.org/grpc"
+	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
@@ -20,24 +19,29 @@ type streamClosed struct{ err error }
 // OpenSteam opens the per-WebSocket bidirectional stream to the selected Game
 // server. The only gRPC receive goroutine sends replies back to the Conn actor
 // mailbox, which remains the sole WebSocket writer.
-func (c *Conn) OpenSteam(self tree.PID) error {
-	addr, err := cluster.GetAddr(c.serverID)
-	if err != nil {
-		return fmt.Errorf("get game address for server %d: %w", c.serverID, err)
+func (c *Conn) OpenSteam(tctx tree.Context, msg *pb_auth.LoginGameReq) error {
+	pid, ok := tree.Lookup(constant.ActorGateServer)
+	if !ok {
+		return status.Errorf(codes.NotFound, "no actor")
 	}
-	grpcConn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return fmt.Errorf("dial game %s: %w", addr, err)
+	req := &constant.GetServerGrpcClientReq{
+		ServerId: c.serverID,
 	}
-	stream, err := pb_gateway.NewGatewayClient(grpcConn).Stream(context.Background())
-	if err != nil {
-		_ = grpcConn.Close()
-		return fmt.Errorf("open game stream: %w", err)
-	}
+	tree.RequestCallback(pid, req, tctx.Self(), func(ctx tree.Context, i interface{}, err error) {
+		if err != nil {
+			return
+		}
+		ack := i.(*constant.GetServerGrpcClientAck)
+		stream, err := pb_gateway.NewGatewayClient(ack.Grpc).Stream(context.Background())
 
-	c.grpcConn = grpcConn
-	c.stream = stream
-	go c.receiveStream(self, stream)
+		c.stream = stream
+
+		c.sendGameSteam(ctx, msg)
+		tlog.Log.Info("ConnActor[%d]: uid=%d login forwarded -> server=%d node=%s", c.connID, c.uid, c.serverID, c.nodeID)
+
+		go c.receiveStream(tctx.Self(), stream)
+	})
+
 	return nil
 }
 

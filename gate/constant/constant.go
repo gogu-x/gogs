@@ -3,9 +3,8 @@ package constant
 import "fmt"
 
 const (
-	ActorNats       = "NATS"
 	ActorRegistry   = "registry"
-	ActorGateServer = "gate-server"
+	ActorGateServer = "gate-ws"
 )
 
 func ConnName(connID uint64) string { return fmt.Sprintf("conn-%d", connID) }

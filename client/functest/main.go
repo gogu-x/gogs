@@ -24,9 +24,9 @@ import (
 )
 
 var (
-	addrs       = flag.String("addrs", "ws://127.0.0.1:8081/ws", "gate websocket addresses (comma-separated)")
+	addrs       = flag.String("addrs", "ws://127.0.0.1:8001/ws", "gate websocket addresses (comma-separated)")
 	serverID    = flag.Int("server-id", 1, "game server id")
-	users       = flag.Int("users", 10000, "total user count")
+	users       = flag.Int("users", 500, "total user count")
 	concurrency = flag.Int("c", 100, "max concurrent connections")
 	dialRate    = flag.Int("dial-rate", 1000, "max new dials per second")
 	timeout     = flag.Duration("timeout", 10*time.Second, "per-message read timeout")

@@ -8,7 +8,6 @@ import (
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gorilla/websocket"
-	"google.golang.org/grpc"
 )
 
 type WsMsg struct{ Data []byte }
@@ -43,7 +42,6 @@ type Conn struct {
 	state    connState
 	hook     map[reflect.Type]hookHandler
 	stream   pb_gateway.Gateway_StreamClient
-	grpcConn *grpc.ClientConn
 	router   tree.Router
 	codec    codec.Codec
 }
@@ -89,10 +87,6 @@ func (c *Conn) OnStop(ctx tree.Context) {
 	if c.stream != nil {
 		_ = c.stream.CloseSend()
 		c.stream = nil
-	}
-	if c.grpcConn != nil {
-		_ = c.grpcConn.Close()
-		c.grpcConn = nil
 	}
 	if c.conn != nil {
 		_ = c.conn.Close()

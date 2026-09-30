@@ -41,6 +41,9 @@ type FlushPlayers struct{}
 
 func (py *Play) Name() string { return def.PLAY }
 
+// MailboxSize must hold bursty server pushes such as a complete battle report.
+func (py *Play) MailboxSize() int { return 20 * 1024 }
+
 func (py *Play) OnInit(ctx tree.Context) {
 	py.systemContext = ctx
 	py.PlayerMgr = player.NewPlayerMgr()
@@ -80,6 +83,7 @@ func (py *Play) BeginShutdown() {
 func (py *Play) IsShuttingDown() bool { return py.shuttingDown }
 
 func (py *Play) OnStop(_ tree.Context) {
+	tlog.Log.Info("play stop")
 	if py.Lifecycle != nil {
 		py.Lifecycle.Stop()
 	}

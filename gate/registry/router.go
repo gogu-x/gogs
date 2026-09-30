@@ -16,13 +16,6 @@ func (r *Actor) onInstanceEvent(ctx actor.Context, msg interface{}) {
 }
 
 func (r *Actor) onCheckDelete(_ actor.Context, msg interface{}) {
-	//m := msg.(*pb_gateway.CheckDeleteMsg)
-	//if !r.pending[m.ServerId] || r.active[m.ServerId] != m.NodeId {
-	//	return
-	//}
-	//delete(r.active, m.ServerId)
-	//delete(r.pending, m.ServerId)
-	//log.Printf("RegistryActor: server=%s inst=%s confirmed down", m.ServerId, m.NodeId)
 }
 
 func (r *Actor) handleEvent(_ actor.Context, ev *cluster.InstanceEvent) {
