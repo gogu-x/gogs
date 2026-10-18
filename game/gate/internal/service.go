@@ -54,7 +54,7 @@ func (state *playerActorState) TakePending() []interface{} {
 	return pending
 }
 
-// GateActor owns gateway streams, the UID-to-PlayerActor directory, and queued-message retries.
+// GateActor 管理网关会话、玩家角色目录和消息重试。
 type GateActor struct {
 	grpcServer        *grpc.Server
 	router            tree.Router
@@ -74,7 +74,7 @@ type GateActor struct {
 	shutdownErr       error
 }
 
-// NewGateActor constructs the gateway and player-Actor directory.
+// NewGateActor 创建网关角色及玩家角色目录。
 func NewGateActor() *GateActor {
 	return &GateActor{
 		sessions:     make(map[uint64]session),
@@ -86,7 +86,7 @@ func NewGateActor() *GateActor {
 
 func (g *GateActor) Name() string { return def.GameGate }
 
-// MailboxSize must hold bursty server pushes such as a complete battle report.
+// MailboxSize 返回网关消息队列容量，用于容纳集中到达的服务器推送。
 func (g *GateActor) MailboxSize() int { return 8 * 1024 }
 
 func (g *GateActor) OnInit(ctx tree.Context) {
@@ -99,7 +99,6 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 	g.router.Register(&ipb.PlayerActorStopped{}, g.onPlayerActorStopped)
 	g.router.Register(&ipb.PlayerLoadFailed{}, g.onPlayerLoadFailed)
 	g.router.Register(&sspb.Event{}, g.onServerEvent)
-	g.router.Register(&ipb.SaveAllPlayers{}, g.onSaveAllPlayers)
 	g.router.Register(&ipb.BanUID{}, g.onBanUID)
 	g.router.Register(&ipb.UnbanUID{}, g.onUnbanUID)
 
@@ -213,8 +212,9 @@ func (g *GateActor) onServerOpened(ctx tree.Context, message *sspb.Event) {
 	ctx.Response(nil, nil)
 }
 
+// onServerClosing 将关服事件交给网关生命周期协调流程。
 func (g *GateActor) onServerClosing(ctx tree.Context, message *sspb.Event) {
-	g.onSaveAllPlayers(ctx, message)
+	g.beginServerShutdown(ctx, message)
 }
 
 func (g *GateActor) spawnPlayerActor(ctx tree.Context, uid uint64, messages []interface{}) tree.PID {
@@ -537,14 +537,15 @@ func (g *GateActor) onPlayerActorStopped(ctx tree.Context, msg interface{}) {
 	}
 }
 
-func (g *GateActor) onSaveAllPlayers(ctx tree.Context, message interface{}) {
+// beginServerShutdown 停止网关接入，并协调玩家角色完成关服流程。
+func (g *GateActor) beginServerShutdown(ctx tree.Context, message *sspb.Event) {
 	if g.shuttingDown {
-		ctx.Response(nil, fmt.Errorf("player shutdown save is already in progress"))
+		ctx.Response(nil, fmt.Errorf("server shutdown is already in progress"))
 		return
 	}
 	serverClosingEvent := gameevent.NewServerClosing()
-	if eventMessage, ok := message.(*sspb.Event); ok && gameevent.IsServerClosing(eventMessage) {
-		serverClosingEvent = eventMessage
+	if gameevent.IsServerClosing(message) {
+		serverClosingEvent = message
 	}
 	g.shuttingDown = true
 	g.shutdownWaiter = ctx.RequestEnvelope()
@@ -585,49 +586,52 @@ func (g *GateActor) onSaveAllPlayers(ctx tree.Context, message interface{}) {
 			ctx.Send(state.pid, gameevent.Clone(serverClosingEvent))
 			g.shutdownRemaining++
 			ctx.RequestCallback(state.pid, &ipb.StopPlayerActor{UID: uid, Shutdown: true}, func(callbackCtx tree.Context, _ interface{}, err error) {
-				g.onShutdownSaveComplete(callbackCtx, uid, err)
+				g.onPlayerShutdownComplete(callbackCtx, uid, err)
 			})
 		}
 		if state.activityPID.ID != 0 {
 			g.shutdownRemaining++
 			ctx.RequestCallback(state.activityPID, gameevent.Clone(serverClosingEvent), func(callbackCtx tree.Context, _ interface{}, err error) {
-				g.onShutdownActivitySaveComplete(callbackCtx, uid, err)
+				g.onPlayerActivityShutdownComplete(callbackCtx, uid, err)
 			})
 		}
 	}
 	if g.shutdownRemaining == 0 {
-		g.finishShutdownSave()
+		g.finishServerShutdown()
 	}
-	tlog.Log.Info("[gate/GateActor.onSaveAllPlayers] 已停止网关接入并等待玩家存盘, count=%v", g.shutdownRemaining)
+	tlog.Log.Info("[gate/GateActor.beginServerShutdown] 已停止网关接入并等待玩家角色完成关服, count=%v", g.shutdownRemaining)
 }
 
-func (g *GateActor) onShutdownSaveComplete(_ tree.Context, uid uint64, err error) {
+// onPlayerShutdownComplete 记录玩家角色的关服结果并更新等待数量。
+func (g *GateActor) onPlayerShutdownComplete(_ tree.Context, uid uint64, err error) {
 	if err != nil && g.shutdownErr == nil {
 		g.shutdownErr = err
-		tlog.Log.Error("[gate/GateActor.onShutdownSaveComplete] 玩家关服存盘失败, pid=%v err=%v", uid, err)
+		tlog.Log.Error("[gate/GateActor.onPlayerShutdownComplete] 玩家角色关服处理失败, pid=%v err=%v", uid, err)
 	}
 	if g.shutdownRemaining > 0 {
 		g.shutdownRemaining--
 	}
 	if g.shutdownRemaining == 0 {
-		g.finishShutdownSave()
+		g.finishServerShutdown()
 	}
 }
 
-func (g *GateActor) onShutdownActivitySaveComplete(_ tree.Context, uid uint64, err error) {
+// onPlayerActivityShutdownComplete 记录玩家活动角色的关服结果并更新等待数量。
+func (g *GateActor) onPlayerActivityShutdownComplete(_ tree.Context, uid uint64, err error) {
 	if err != nil && g.shutdownErr == nil {
 		g.shutdownErr = err
-		tlog.Log.Error("[gate/GateActor.onShutdownActivitySaveComplete] 玩家活动关服存盘失败, pid=%v err=%v", uid, err)
+		tlog.Log.Error("[gate/GateActor.onPlayerActivityShutdownComplete] 玩家活动角色关服处理失败, pid=%v err=%v", uid, err)
 	}
 	if g.shutdownRemaining > 0 {
 		g.shutdownRemaining--
 	}
 	if g.shutdownRemaining == 0 {
-		g.finishShutdownSave()
+		g.finishServerShutdown()
 	}
 }
 
-func (g *GateActor) finishShutdownSave() {
+// finishServerShutdown 在所有玩家角色完成关服后回复生命周期请求。
+func (g *GateActor) finishServerShutdown() {
 	waiter := g.shutdownWaiter
 	g.shutdownWaiter = nil
 	if waiter != nil {

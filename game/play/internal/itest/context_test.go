@@ -8,6 +8,7 @@ import (
 	"github.com/gogu-x/tree/comm"
 )
 
+// testEvent 是事件监听测试使用的事件名称。
 const testEvent = comm.EventName("testEvent")
 
 // TestPlayerEventRunsOnOwningActor 验证玩家事件在该玩家角色内同步执行。
@@ -39,6 +40,7 @@ func TestPlayerEventRunsOnOwningActor(t *testing.T) {
 
 // TestNestedEmitPreservesActorState 验证嵌套事件仍由同一个玩家角色串行处理。
 func TestNestedEmitPreservesActorState(t *testing.T) {
+	// innerEvent 是嵌套事件测试使用的事件名称。
 	const innerEvent = comm.EventName("innerEvent")
 	result := make(chan uint64, 1)
 	tr, pid := spawnPlayerActor(t, func(actor *core.PlayerActor) {

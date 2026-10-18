@@ -106,9 +106,6 @@ type StopAcceptingPlayer struct {
 	UID uint64 // 玩家唯一 ID。
 }
 
-// SaveAllPlayers asks the gateway to stop ingress and wait for player snapshots to persist.
-type SaveAllPlayers struct{}
-
 // SaveAllGuilds asks the Guild Actor to persist every dirty guild aggregate.
 type SaveAllGuilds struct{}
 

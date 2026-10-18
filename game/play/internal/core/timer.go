@@ -8,10 +8,14 @@ import (
 )
 
 const (
+	// playerAutoSaveTimerType 是玩家周期存盘定时器的类型。
 	playerAutoSaveTimerType = timer.TimerType(1000009)
-	playerIdleTimerType     = timer.TimerType(1000010)
-	playerAutoSaveInterval  = time.Minute
-	playerOfflineRetention  = time.Hour
+	// playerIdleTimerType 是玩家离线回收定时器的类型。
+	playerIdleTimerType = timer.TimerType(1000010)
+	// playerAutoSaveInterval 是玩家周期存盘的间隔。
+	playerAutoSaveInterval = time.Minute * 5
+	// playerOfflineRetention 是玩家离线后保留角色的时长。
+	playerOfflineRetention = time.Hour
 )
 
 type playerAutoSaveTick struct{}

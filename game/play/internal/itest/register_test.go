@@ -12,6 +12,7 @@ import (
 
 var errNoPlayer = errors.New("PlayerActor 数据未加载")
 
+// testUID 是集成测试使用的玩家编号。
 const testUID = uint64(42)
 
 // testReq 满足 uidRequest，用于驱动 RegisterPlayerMsg。

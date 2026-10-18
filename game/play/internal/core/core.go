@@ -21,7 +21,9 @@ import (
 )
 
 const (
-	playerMailboxSize  = 512
+	// playerMailboxSize 表示玩家角色消息队列的容量。
+	playerMailboxSize = 512
+	// maxPendingMessages 表示玩家数据加载期间可暂存消息的上限。
 	maxPendingMessages = 512
 )
 
