@@ -512,9 +512,8 @@ func (actor *PlayerActor) onSaveComplete(ctx tree.Context, snapshot *player.Play
 		actor.onSaveFailed(ctx, err)
 		return
 	}
-	if err == nil {
-		err = model.AfterSave(ctx, snapshot)
-	}
+	err = model.AfterSave(ctx, snapshot)
+
 	if err != nil {
 		tlog.Log.Error("[play/PlayerActor.onSaveComplete] 存盘后更新脏标记失败, pid=%v err=%v", uid, err)
 		actor.onSaveFailed(ctx, err)
