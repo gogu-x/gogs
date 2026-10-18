@@ -8,7 +8,4 @@ import (
 
 func InitRoutes(r *tree.Router, s *Mgr) {
 	util.Register(r, &pb_activity.GetActivityListReq{}, s.GetList)
-	util.Register(r, &pb_activity.JoinActivityReq{}, s.Join)
-	util.Register(r, &pb_activity.GetProgressReq{}, s.GetProgress)
-	util.Register(r, &pb_activity.ClaimRewardReq{}, s.ClaimReward)
 }

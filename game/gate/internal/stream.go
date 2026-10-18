@@ -35,7 +35,7 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 	if err != nil {
 		return err
 	}
-	tlog.Log.Info("gateStream GateActor: receive msg: %s", msg)
+	tlog.Log.Debug("[gate/gatewayService.Stream] 收到初始网关消息, type=%T", msg)
 
 	result, err := s.system.Request(
 		s.actorPID,
@@ -73,7 +73,7 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 		if err != nil {
 			return err
 		}
-		tlog.Log.Info("gateStream GateActor: receive msg: %v", msg)
+		tlog.Log.Debug("[gate/gatewayService.Stream] 收到网关消息, type=%T", msg)
 		if !s.system.TrySend(opened.pid, &inboundFrame{msg: msg}) {
 			return status.Error(codes.ResourceExhausted, "gateway connection is overloaded")
 		}

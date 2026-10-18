@@ -1,98 +1,103 @@
 package core
 
 import (
-	"time"
-
 	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/game/play/internal/module/player"
+	"github.com/gogu-x/gogs/game/play/internal/player"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/comm"
-	"github.com/gogu-x/tree/timer"
 	"google.golang.org/protobuf/proto"
 )
 
-// Context 是一次请求的上下文。
+// Context 是单玩家角色同步处理一条消息时使用的请求上下文。
 //
-// 生命周期严格限于当前这条消息：TreeCtx 携带本条消息的 sender / request / values，
-// 一旦 *Context 逃逸到定时器回调、事件参数或异步 goroutine 中，Response 会失效，
-// 或错误地回复到一个已经完成的请求上。因此禁止保存 *Context，
-// 需要跨消息传递时只传 uid 等值类型。
+// 底层上下文只在本条消息的处理过程中有效，不得保存到异步回调或玩家角色状态中。
 type Context struct {
-	// Play 是本节点的运行期状态与公共能力。
-	Play *Play
-	// TreeCtx 是本条消息独有的 Actor context。
-	TreeCtx tree.Context
-	// Req 是原始请求消息。
-	Req interface{}
-	// Player 是本次请求的玩家，由 RegisterPlayerMsg 预先校验并注入；
-	Player *player.Player
+	Actor   *PlayerActor // 当前处理消息的玩家 Actor。
+	TreeCtx tree.Context // 当前消息对应的 Tree Context。
 }
 
-// 公共能力访问器：直接读字段，无额外分配。
+// GetPlayer 返回当前请求绑定的玩家数据。
+func (ctx *Context) GetPlayer() *player.Player {
+	if ctx == nil || ctx.Actor == nil {
+		return nil
+	}
+	return ctx.Actor.GetPlayer()
+}
 
-func (c *Context) Players() *player.PlayerMgr          { return c.Play.PlayerMgr }
-func (c *Context) Event() *comm.Event                  { return c.Play.Event }
-func (c *Context) TimeWheel() *timer.TimeWheel         { return c.Play.TimeWheel }
-func (c *Context) Tree() tree.Context                  { return c.TreeCtx }
-func (c *Context) GetPlayer(uid uint64) *player.Player { return c.Play.PlayerMgr.Get(uid) }
-
-// PlayerID 返回本次请求的玩家 ID；无玩家上下文时返回 0。
-func (c *Context) PlayerID() uint64 {
-	if c.Player == nil {
+// PlayerID 返回当前请求的玩家编号；无玩家数据时返回 0。
+func (ctx *Context) PlayerID() uint64 {
+	currentPlayer := ctx.GetPlayer()
+	if currentPlayer == nil {
 		return 0
 	}
-	return c.Player.UID
+	return currentPlayer.GetUID()
 }
 
-// Response 回复本条请求。若本条消息不是通过 Request 发来的，则为空操作。
-func (c *Context) Response(value interface{}, err error) {
-	c.TreeCtx.Response(value, err)
+// Response 回复当前请求；普通网关消息没有请求信封时不执行任何操作。
+func (ctx *Context) Response(value interface{}, err error) {
+	if ctx != nil && ctx.TreeCtx != nil {
+		ctx.TreeCtx.Response(value, err)
+	}
 }
 
-// Cast 按名字查找 Actor 并投递普通消息，目标不存在返回 false。
-func (c *Context) Cast(name string, msg interface{}) bool {
-	pid, ok := c.TreeCtx.Lookup(name)
+// Cast 按角色名称投递普通消息。
+func (ctx *Context) Cast(name string, msg interface{}) bool {
+	if ctx == nil || ctx.TreeCtx == nil {
+		return false
+	}
+	pid, ok := ctx.TreeCtx.Lookup(name)
 	if !ok {
 		return false
 	}
-	return c.TreeCtx.Send(pid, msg)
+	return ctx.TreeCtx.Send(pid, msg)
 }
 
-// CastPID 向指定 PID 投递普通消息。
-func (c *Context) CastPID(pid tree.PID, msg interface{}) bool {
-	return c.TreeCtx.Send(pid, msg)
+// CastPID 向指定进程编号投递普通消息。
+func (ctx *Context) CastPID(pid tree.PID, msg interface{}) bool {
+	return ctx != nil && ctx.TreeCtx != nil && ctx.TreeCtx.Send(pid, msg)
 }
 
-// CastCall 投递一个带回调的请求，回调在本 Actor 的 goroutine 内执行。
-func (c *Context) CastCall(
+// CastCall 投递带异步回调的请求，回调在当前玩家角色所属协程中执行。
+func (ctx *Context) CastCall(
 	name string,
 	msg interface{},
-	cb func(tree.Context, interface{}, error),
+	callback func(tree.Context, interface{}, error),
 ) bool {
-	pid, ok := c.TreeCtx.Lookup(name)
+	if ctx == nil || ctx.TreeCtx == nil {
+		return false
+	}
+	pid, ok := ctx.TreeCtx.Lookup(name)
 	if !ok {
 		return false
 	}
-	c.TreeCtx.RequestCallback(pid, msg, cb)
+	ctx.TreeCtx.RequestCallback(pid, msg, callback)
 	return true
 }
 
-// CastPlayerMsg 通过网关向指定在线玩家推送消息，玩家不在线返回 false。
-func (c *Context) CastPlayerMsg(uid uint64, msg proto.Message) bool {
-	p := c.Play.PlayerMgr.Get(uid)
-	if p == nil {
+// CastPlayerMsg 通过网关向在线玩家推送协议消息。
+func (ctx *Context) CastPlayerMsg(uid uint64, msg proto.Message) bool {
+	if ctx == nil || ctx.TreeCtx == nil || uid == 0 || msg == nil {
 		return false
 	}
-	return c.Cast(def.GameGate, &ipb.PushToMsg{UID: p.UID, Msg: msg})
+	gatePID, ok := ctx.TreeCtx.Lookup(def.GameGate)
+	if !ok {
+		return false
+	}
+	return ctx.TreeCtx.Send(gatePID, &ipb.PushToMsg{UID: uid, Msg: msg})
 }
 
-// Emit 同步触发事件
-func (c *Context) Emit(name comm.EventName, arg *comm.Arg) int {
-	return c.Play.Emit(name, arg)
+// Emit 同步触发当前玩家角色的业务事件。
+func (ctx *Context) Emit(name comm.EventName, arg *comm.Arg) int {
+	if ctx == nil || ctx.Actor == nil {
+		return 0
+	}
+	return ctx.Actor.Emit(name, arg)
 }
 
-// After 挂一条一次性延时任务
-func (c *Context) After(timerType timer.TimerType, d time.Duration, data interface{}) *timer.WheelTimer {
-	return c.Play.TimeWheel.After(timerType, d, data)
+// MarkDirty 标记当前玩家数据需要存盘。
+func (ctx *Context) MarkDirty() {
+	if currentPlayer := ctx.GetPlayer(); currentPlayer != nil {
+		currentPlayer.MarkDirty()
+	}
 }

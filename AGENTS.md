@@ -2,7 +2,7 @@
 
 ## Go 后端代码
 
-- 修改或新增本仓库任何 Go 代码前，先阅读并遵守 [`.agent_notes/gen_code_rules_enforcement.md`](.agent_notes/gen_code_rules_enforcement.md) 中的全部规范。该文件是代码规范的唯一详细规则来源，包含 17 条编码要求、代码生成标记要求和提交结果前的自查要求。
+- 修改或新增本仓库任何 Go 代码前，先阅读并遵守 [`.agent_notes/gen_code_rules_enforcement.md`](.agent_notes/gen_code_rules_enforcement.md) 中的全部规范。该文件是代码规范的唯一详细规则来源，包含 20 条编码要求、代码生成标记要求和提交结果前的自查要求。
 - 这些规则适用于 `game/`、`battle/`、`gate/`、`platform/`、`rpc/` 等后端目录，也适用于为后端功能修改的其他 Go 包。
 - 完成代码修改后，按该清单逐条自查。若确实需要因兼容性或现有接口而例外，必须在交付说明中指出具体规则、涉及代码和原因，不得静默忽略。
 - 不要只为满足规则而改变对外协议、持久化格式或现有业务语义；遇到冲突时保留兼容性，并说明例外。

@@ -7,55 +7,51 @@ import (
 )
 
 type uidRequest interface {
+	// GetUID：返回请求目标玩家的编号。
 	GetUID() uint64
 }
 
-// RegisterPlayerMsg 注册必须已有在线玩家的 UID 请求。
-//
-// 校验通过的玩家会直接注入 Context.Player，业务侧无需再查一次。
+// RegisterPlayerMsg 注册必须属于当前玩家角色的客户端请求。
 func RegisterPlayerMsg[Req any](
-	py *Play,
+	actor *PlayerActor,
 	prototype Req,
-	h func(*Context, Req),
+	handler func(*Context, Req),
 ) {
-	py.Router().Register(prototype, func(ctx tree.Context, msg interface{}) {
+	actor.Router().Register(prototype, func(treeCtx tree.Context, msg interface{}) {
 		request, ok := msg.(uidRequest)
 		if !ok {
-			ctx.Response(nil, fmt.Errorf("play: %T missing uid", msg))
+			treeCtx.Response(nil, fmt.Errorf("player: %T missing uid", msg))
 			return
 		}
 		uid := request.GetUID()
-		if uid == 0 {
-			ctx.Response(nil, fmt.Errorf("play: %T missing uid", msg))
+		if uid == 0 || uid != actor.UID {
+			treeCtx.Response(nil, fmt.Errorf("player: request uid=%d does not match actor uid=%d", uid, actor.UID))
 			return
 		}
-		p := py.PlayerMgr.Get(uid)
-		if p == nil || !py.PlayerMgr.IsOnline(uid) {
-			ctx.Response(nil, fmt.Errorf("play: uid=%d not online", uid))
+		currentPlayer := actor.GetPlayer()
+		if currentPlayer == nil {
+			treeCtx.Response(nil, fmt.Errorf("player: uid=%d data is not loaded", actor.UID))
 			return
 		}
 		requestCtx := &Context{
-			Play:    py,
-			TreeCtx: ctx,
-			Req:     msg,
-			Player:  p,
+			Actor:   actor,
+			TreeCtx: treeCtx,
 		}
-		h(requestCtx, msg.(Req))
+		handler(requestCtx, msg.(Req))
 	})
 }
 
-// RegisterSysMsg 注册登录及其他不要求玩家已在线的消息，Context.Player 为 nil。
+// RegisterSysMsg 注册登录及其他系统消息；系统消息仍绑定在当前玩家角色上。
 func RegisterSysMsg[Msg any](
-	py *Play,
+	actor *PlayerActor,
 	prototype Msg,
-	h func(*Context, Msg),
+	handler func(*Context, Msg),
 ) {
-	py.Router().Register(prototype, func(ctx tree.Context, msg interface{}) {
+	actor.Router().Register(prototype, func(treeCtx tree.Context, msg interface{}) {
 		requestCtx := &Context{
-			Play:    py,
-			TreeCtx: ctx,
-			Req:     msg,
+			Actor:   actor,
+			TreeCtx: treeCtx,
 		}
-		h(requestCtx, msg.(Msg))
+		handler(requestCtx, msg.(Msg))
 	})
 }

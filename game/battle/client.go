@@ -5,11 +5,14 @@ import (
 	"strconv"
 
 	"github.com/gogu-x/gogs/def"
+	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/natsrpc"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
+	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/cluster"
+	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -76,12 +79,14 @@ type record struct {
 }
 
 type Client struct {
-	selector     NodeSelector
-	sender       Sender
-	gameServerID int
-	gameNodeID   int
-	players      map[uint64]*record
-	completed    map[string]string
+	selector      NodeSelector
+	sender        Sender
+	gameServerID  int
+	gameNodeID    int
+	players       map[uint64]*record
+	completed     map[string]string
+	serverOpened  bool
+	serverClosing bool
 }
 
 func New(selector NodeSelector, sender Sender, gameServerID, gameNodeID int) *Client {
@@ -105,6 +110,24 @@ func (c *Client) MailboxSize() int    { return 8 * 1024 }
 
 func (c *Client) HandleMessage(ctx tree.Context, msg interface{}) {
 	switch m := msg.(type) {
+	case *sspb.Event:
+		if gameevent.IsServerOpened(m) {
+			c.serverOpened = true
+			c.serverClosing = false
+			tlog.Log.Info("[battle/Client.HandleMessage] 战斗客户端已处理开服事件")
+			ctx.Response(nil, nil)
+			return
+		}
+		if !gameevent.IsServerClosing(m) {
+			eventName := m.GetName()
+			err := fmt.Errorf("unsupported battle event %q", eventName)
+			tlog.Log.Error("[battle/Client.HandleMessage] 收到不支持的战斗事件, event=%v err=%v", eventName, err)
+			ctx.Response(nil, err)
+			return
+		}
+		c.serverClosing = true
+		tlog.Log.Info("[battle/Client.HandleMessage] 战斗客户端已处理关服事件")
+		ctx.Response(nil, nil)
 	case *Begin:
 		c.begin(ctx, m)
 	case *Reset:
@@ -132,6 +155,10 @@ func (c *Client) state(uid uint64) *record {
 }
 
 func (c *Client) begin(ctx tree.Context, msg *Begin) {
+	if !c.serverOpened || c.serverClosing {
+		ctx.Response(nil, fmt.Errorf("battle client is unavailable during server lifecycle transition"))
+		return
+	}
 	if msg == nil || msg.Request == nil || msg.Request.GetUID() == 0 {
 		ctx.Response(nil, fmt.Errorf("battle client: request and uid are required"))
 		return
@@ -217,19 +244,18 @@ func (c *Client) finished(ctx tree.Context, msg *pb.BattleFinishedNtf) {
 		r.Status = Finished
 		c.push(ctx, msg.Uid, msg)
 
-		// 推给 play 做结算。
-		//
-		// 跨 Actor 只能走消息：play 的包是 internal，这里既 import 不了也调不了它的
-		// Emit；而 play 内部的 comm.Event 只在它自己的 goroutine 里广播。所以链路是
-		//     本 Actor --Send--> play --Emit--> 任务/成就/活动 等订阅方
-		// 这也顺带把"谁来结算"和"谁关心结算"解耦了：订阅方不需要知道结果是从哪个
-		// Actor 投进来的。
-		//
-		// 必须放在这个去重块里面：重复的 Finished 不能重复结算。
-		// 用 Send 而不是 Request：结算失败也不该拖着 battle 侧不回收。
-		// 注意 Confirm 是发给 battle 进程的，和这里的投递是两码事，不要混。
-		if playPID, ok := ctx.Lookup(def.PLAY); ok {
-			ctx.Send(playPID, c.buildSettlement(msg))
+		// 结算按 UID 交给网关的玩家目录。玩家在线时直达现有 Actor，离线时
+		// 网关创建临时 PlayerActor，加载、处理并存盘后回收。
+		settlement := c.buildSettlement(msg)
+		gatePID, gateAvailable := ctx.Lookup(def.GameGate)
+		if !gateAvailable {
+			tlog.Log.Error("[battle/Client.finished] 网关 Actor 不可用，战斗结算未投递, uid=%v battleID=%v", msg.GetUid(), msg.GetBattleId())
+		} else {
+			for _, participant := range settlement.Participants {
+				if !ctx.Send(gatePID, &ipb.PlayerMessage{UID: participant.UID, Message: settlement}) {
+					tlog.Log.Error("[battle/Client.finished] 玩家结算投递失败, uid=%v battleID=%v", participant.UID, settlement.BattleID)
+				}
+			}
 		}
 	}
 

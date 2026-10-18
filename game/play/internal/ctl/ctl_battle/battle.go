@@ -7,8 +7,8 @@ import (
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/battle"
 	"github.com/gogu-x/gogs/game/play/internal/core"
-	"github.com/gogu-x/gogs/game/play/internal/module/player"
-	"github.com/gogu-x/gogs/game/play/internal/module/player/role"
+	"github.com/gogu-x/gogs/game/play/internal/player"
+	"github.com/gogu-x/gogs/game/play/internal/player/role"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/tree"
@@ -16,11 +16,12 @@ import (
 	"github.com/gogu-x/tree/tlog"
 )
 
-// OnCreateBattle 从玩家各个数据模块读取权威数据，组装战斗请求并发送给战斗服务。
+// OnCreateBattle 从玩家内存数据组装权威战斗请求并发送给战斗服务。
 func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 	uid := ctx.PlayerID()
-	request, err := buildBattleRequest(ctx.Player, req)
+	request, err := buildBattleRequest(ctx.GetPlayer(), req)
 	if err != nil {
+		tlog.Log.Error("[ctl_battle/OnCreateBattle] 组装战斗请求失败, pid=%v err=%v", uid, err)
 		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Error: err.Error()})
 		return
 	}
@@ -33,100 +34,126 @@ func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 		if err != nil {
 			ack.Error = err.Error()
 		}
-		pushAck(callbackCtx, uid, ack)
+		pushBattleAck(callbackCtx, uid, ack)
 	})
 	if !ok {
 		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Error: "battle client is unavailable"})
 	}
 }
 
-func buildBattleRequest(player *player.Player, incoming *pb_battle.StartBattleReq) (*pb_battle.StartBattleReq, error) {
-	if player == nil || player.UID == 0 {
+// buildBattleRequest 从玩家当前角色、装备和爬塔数据组装战斗请求。
+func buildBattleRequest(currentPlayer *player.Player, incoming *pb_battle.StartBattleReq) (*pb_battle.StartBattleReq, error) {
+	if currentPlayer == nil {
 		return nil, fmt.Errorf("battle request requires a valid player")
 	}
-	if player.TowerMgr == nil {
-		return nil, fmt.Errorf("player %d has no tower state", player.UID)
+	uid := currentPlayer.GetUID()
+	if uid == 0 {
+		return nil, fmt.Errorf("battle request requires a valid player")
+	}
+	towerMgr := currentPlayer.GetTowerMgr()
+	if towerMgr == nil {
+		return nil, fmt.Errorf("player %d has no tower state", uid)
 	}
 	if incoming == nil {
 		return nil, fmt.Errorf("battle request is required")
 	}
-	character, ok := player.RoleMgr.BattleCharacter()
-	if !ok {
-		return nil, fmt.Errorf("player %d has no configured character", player.UID)
+	roleMgr := currentPlayer.GetRoleMgr()
+	if roleMgr == nil {
+		return nil, fmt.Errorf("player %d has no role state", uid)
 	}
-	characterMessage, err := battleRoleMessage(player, character)
+	character, ok := roleMgr.BattleCharacter()
+	if !ok {
+		return nil, fmt.Errorf("player %d has no configured character", uid)
+	}
+	characterMessage, err := battleRoleMessage(currentPlayer, character)
 	if err != nil {
 		return nil, err
 	}
+	towerLayer := towerMgr.GetLayer()
 
 	return &pb_battle.StartBattleReq{
-		UID:                  player.UID,
+		UID:                  uid,
 		ServerID:             uint32(conf.ServerID),
 		SourceNodeId:         uint32(conf.NodeId),
 		BattleType:           pb_battle.BattleType_BATTLE_TYPE_TOWER,
-		BusinessId:           fmt.Sprintf("tower-%d-%d", player.UID, player.TowerMgr.Layer),
+		BusinessId:           fmt.Sprintf("tower-%d-%d", uid, towerLayer),
 		AttackerRoles:        []*pb_battle.Role{characterMessage},
-		MonsterGroupConfigId: player.TowerMgr.Layer,
+		MonsterGroupConfigId: towerLayer,
 	}, nil
 }
 
-func battleRoleMessage(player *player.Player, selectedRole *role.Role) (*pb_battle.Role, error) {
-	message := &pb_battle.Role{
-		RoleId:       selectedRole.ID,
-		RoleConfigId: selectedRole.ConfigID,
-		Level:        selectedRole.Level,
-		Star:         selectedRole.Star,
-		Breakthrough: selectedRole.Breakthrough,
-		Skills:       make([]*pb_battle.RoleSkill, 0, len(selectedRole.Skills)),
-		Equips:       make([]*pb_battle.RoleEquip, 0, len(selectedRole.EquipmentIDs)),
+func battleRoleMessage(currentPlayer *player.Player, selectedRole *role.Role) (*pb_battle.Role, error) {
+	if currentPlayer == nil || selectedRole == nil {
+		return nil, fmt.Errorf("battle role and player are required")
 	}
-	for _, skill := range selectedRole.Skills {
-		message.Skills = append(message.Skills, &pb_battle.RoleSkill{SkillConfigId: skill.ConfigID, Level: skill.Level})
+	roleID := selectedRole.GetID()
+	roleConfigID := selectedRole.GetConfigID()
+	skills := selectedRole.GetSkills()
+	equipmentIDs := selectedRole.GetEquipmentIDs()
+	equipmentMgr := currentPlayer.GetEquipmentMgr()
+	if equipmentMgr == nil {
+		return nil, fmt.Errorf("player %d has no equipment state", currentPlayer.GetUID())
 	}
-	for _, equipmentID := range selectedRole.EquipmentIDs {
-		equip, ok := player.EquipmentMgr.Get(equipmentID)
+	roleSkills := make([]*pb_battle.RoleSkill, 0, len(skills))
+	for _, skill := range skills {
+		roleSkills = append(roleSkills, &pb_battle.RoleSkill{SkillConfigId: skill.GetConfigID(), Level: skill.GetLevel()})
+	}
+	roleEquips := make([]*pb_battle.RoleEquip, 0, len(equipmentIDs))
+	for _, equipmentID := range equipmentIDs {
+		equip, ok := equipmentMgr.Get(equipmentID)
 		if !ok {
-			return nil, fmt.Errorf("role %q references missing equipment %q", selectedRole.ID, equipmentID)
+			return nil, fmt.Errorf("role %q references missing equipment %q", roleID, equipmentID)
 		}
-		message.Equips = append(message.Equips, &pb_battle.RoleEquip{
-			EquipId: equip.ID, EquipConfigId: equip.ConfigID,
-			Level: equip.Level, RefineLevel: equip.RefineLevel,
+		roleEquips = append(roleEquips, &pb_battle.RoleEquip{
+			EquipId: equip.GetID(), EquipConfigId: equip.GetConfigID(),
+			Level: equip.GetLevel(), RefineLevel: equip.GetRefineLevel(),
 		})
+	}
+	message := &pb_battle.Role{
+		RoleId:       roleID,
+		RoleConfigId: roleConfigID,
+		Level:        selectedRole.GetLevel(),
+		Star:         selectedRole.GetStar(),
+		Breakthrough: selectedRole.GetBreakthrough(),
+		Skills:       roleSkills,
+		Equips:       roleEquips,
 	}
 	return message, nil
 }
 
-func pushAck(ctx tree.Context, uid uint64, ack *pb_battle.StartBattleAck) {
-	if gate, ok := ctx.Lookup(def.GameGate); ok {
-		ctx.Send(gate, &ipb.PushToMsg{UID: uid, Msg: ack})
-	}
-}
-
-// OnBattleFinished 结算一场战斗。
-//
-// 目前只打日志 + 广播 BattleSettled —— 玩家数据层（PlayerMgr.Loader/Save）还是空实现，
-// 没有地方落库。等数据层接上后在这里按 Settlement 改数据即可：投递方（game/battle）
-// 和订阅方（任务/成就/活动）都不需要动。
-//
-// 幂等提醒：同一场战斗的结果可能重复投递（NATS 重发、Game 重连后的补投）。现在只写
-// 日志无所谓，真接数据层时必须以 BattleID 做去重键。
+// OnBattleFinished 在当前玩家角色中处理结算并触发玩家级业务事件。
 func OnBattleFinished(ctx *core.Context, settlement *battle.Settlement) {
-	if settlement == nil || settlement.BattleID == "" {
+	if ctx == nil || settlement == nil || settlement.BattleID == "" {
+		return
+	}
+	uid := ctx.PlayerID()
+	participantFound := false
+	for _, participant := range settlement.Participants {
+		if participant.UID == uid {
+			participantFound = true
+			tlog.Log.Info("[ctl_battle/OnBattleFinished] 收到玩家战斗结算, pid=%v battleID=%v server=%v node=%v type=%v outcome=%v units=%v checksum=%v",
+				uid, settlement.BattleID, participant.ServerID, participant.NodeID,
+				settlement.BattleType, settlement.Outcome,
+				len(settlement.Units), settlement.Checksum)
+			break
+		}
+	}
+	if !participantFound {
+		tlog.Log.Error("[ctl_battle/OnBattleFinished] 结算中没有当前玩家, pid=%v battleID=%v", uid, settlement.BattleID)
 		return
 	}
 
-	for _, p := range settlement.Participants {
-		// 刻意不去 PlayerMgr 查在线玩家：战斗现在要跑十几秒，玩家很可能中途掉线，
-		// 查在线会让整个结算被静默跳过。接数据层时应当按 uid 走 load → 改 → save，
-		// 把结果推给客户端只是附带的一步，离线就跳过。
-		tlog.Log.Info("play/battle-settle: battleID=%v uid=%v server=%v node=%v type=%v outcome=%v units=%v checksum=%v",
-			settlement.BattleID, p.UID, p.ServerID, p.NodeID,
-			settlement.BattleType, settlement.Outcome,
-			len(settlement.Units), settlement.Checksum)
-	}
-
-	// 广播给任务/成就/活动等模块。Arg 里放结算输入本身，订阅方按需自取。
 	arg := comm.NewArg()
 	arg.Set("settlement", settlement)
 	ctx.Emit(core.BattleSettled, arg)
+}
+
+func pushBattleAck(ctx tree.Context, uid uint64, ack *pb_battle.StartBattleAck) {
+	if gate, ok := ctx.Lookup(def.GameGate); ok {
+		if !ctx.Send(gate, &ipb.PushToMsg{UID: uid, Msg: ack}) {
+			tlog.Log.Error("[ctl_battle/pushBattleAck] 战斗响应投递失败, pid=%v", uid)
+		}
+		return
+	}
+	tlog.Log.Error("[ctl_battle/pushBattleAck] 网关 Actor 不可用, pid=%v", uid)
 }

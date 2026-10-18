@@ -13,7 +13,7 @@ make deepcopy
 ```
 
 To run the source generator without compiling the standalone binary, use
-`go generate ./game/play/internal/module/player` for the player package tree.
+`go generate ./game/play/internal/player` for the player package tree.
 
 The command writes `zz_generated.deepcopy.go` beside each marked package. The
 generator clones pointers to marked structs, maps, slices, arrays, and nested

@@ -3,7 +3,7 @@ package equipment
 import (
 	"sort"
 
-	"github.com/gogu-x/gogs/game/play/internal/module/player/role"
+	"github.com/gogu-x/gogs/game/play/internal/player/role"
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/gogs/pb/cspb/pb_equipment"

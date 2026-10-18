@@ -1,9 +1,10 @@
 package core
 
-// 模块级事件名。业务包通过 Context.Event() 注册与触发。
+// 玩家业务事件名，由玩家角色注册监听器并触发。
 const (
-	ServerStart    = "ServerStart"
-	PlayerOnLogin  = "PlayerOnLogin"
-	PlayerOnLogout = "PlayerOnLogout"
-	BattleSettled  = "BattleSettled"
+	PlayerOnLogin       = "PlayerOnLogin"
+	PlayerOnLogout      = "PlayerOnLogout"
+	PlayerOnServerOpen  = "PlayerOnServerOpen"
+	PlayerOnServerClose = "PlayerOnServerClose"
+	BattleSettled       = "BattleSettled"
 )

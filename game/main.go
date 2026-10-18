@@ -4,14 +4,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/activity"
 	"github.com/gogu-x/gogs/game/battle"
+	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/game/gate"
 	"github.com/gogu-x/gogs/game/guild"
-	"github.com/gogu-x/gogs/game/play"
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb"
@@ -61,16 +63,37 @@ func main() {
 				tlog.Log.Error("load confs error: %v", err)
 				return err
 			}
-			tree.Default().Spawn(
-				play.NewPlay(),
-				battle.New(nil, nil, conf.ServerID, conf.NodeId),
-				gate.NewGate(),
-				guild.NewGuild(),
-				activity.NewActivity(),
+			system := tree.Default()
+			system.Spawn(
 				mongorpc.NewActor(def.Mongo, db),
 				natsrpc.NewNats(natsrpc.Game, conf.ServerID, conf.NodeId, conf.NatsURL),
+				battle.New(nil, nil, conf.ServerID, conf.NodeId),
+				guild.NewGuild(),
+				activity.NewActivity(uint64(conf.ServerID)),
+				gate.NewGate(),
 			)
-			tree.Default().Start()
+			if err := gameevent.SendToActors(
+				system,
+				gameevent.NewServerOpened(),
+				[]string{def.Guild, def.ActorActivity, def.BattleClient, def.GameGate},
+			); err != nil {
+				system.Shutdown()
+				return err
+			}
+
+			quit := make(chan os.Signal, 1)
+			signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+			<-quit
+			signal.Stop(quit)
+
+			if err := gameevent.SendToActors(
+				system,
+				gameevent.NewServerClosing(),
+				[]string{def.GameGate, def.BattleClient, def.Guild, def.ActorActivity},
+			); err != nil {
+				tlog.Log.Error("[game/main] 关服事件处理失败, err=%v", err)
+			}
+			system.Shutdown()
 			return nil
 		},
 	}

@@ -4,24 +4,28 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/ipb"
+	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
+	"github.com/gogu-x/tree/tlog"
 )
 
 const maxFramesPerSecond = 200
 
 type session struct {
-	pid        tree.PID
-	generation uint64
-	uid        uint64
+	pid         tree.PID
+	playerPID   tree.PID
+	activityPID tree.PID
+	generation  uint64
+	uid         uint64
 }
 
 type openSession struct {
-	stream pb_gateway.Gateway_StreamServer
-	msg    interface{}
+	stream  pb_gateway.Gateway_StreamServer
+	msg     interface{}
+	request *tree.Envelope
 }
 
 type openedSession struct {
@@ -48,6 +52,8 @@ type GsAgent struct {
 	generation  uint64
 	stream      pb_gateway.Gateway_StreamServer
 	manager     tree.PID
+	playerPID   tree.PID
+	activityPID tree.PID
 	router      tree.Router
 	uid         uint64
 	windowStart time.Time
@@ -59,12 +65,16 @@ func newGsAgent(
 	generation uint64,
 	stream pb_gateway.Gateway_StreamServer,
 	manager tree.PID,
+	playerPID tree.PID,
+	activityPID tree.PID,
 ) *GsAgent {
 	return &GsAgent{
 		uid:         uid,
 		generation:  generation,
 		stream:      stream,
 		manager:     manager,
+		playerPID:   playerPID,
+		activityPID: activityPID,
 		windowStart: time.Now(),
 	}
 }
@@ -110,20 +120,36 @@ func (g *GsAgent) onInbound(ctx tree.Context, msg interface{}) {
 	}
 
 	msgInfo, ok := msg.(*inboundFrame)
-	if !ok {
-		g.close(ctx, "inbound rate limit exceeded")
-	}
-	if msgInfo.msg == nil {
+	if !ok || msgInfo == nil || msgInfo.msg == nil {
 		g.close(ctx, "inbound msg exceeded")
-	}
-
-	playPID, ok := ctx.Lookup(def.PLAY)
-	if !ok {
-		g.close(ctx, "Play actor is unavailable")
 		return
 	}
-	if !ctx.Send(playPID, msgInfo.msg) {
-		g.close(ctx, "Play actor stopped")
+
+	targetPID := g.playerPID
+	switch msgInfo.msg.(type) {
+	case *pb_activity.GetActivityListReq:
+		targetPID = g.activityPID
+	case *pb_activity.JoinActivityReq:
+		targetPID = g.activityPID
+	case *pb_activity.GetProgressReq:
+		targetPID = g.activityPID
+	case *pb_activity.ClaimRewardReq:
+		targetPID = g.activityPID
+	}
+	if targetPID.ID == 0 {
+		tlog.Log.Error("[gate/GsAgent.onInbound] 玩家业务 Actor PID 缺失, pid=%v type=%T", g.uid, msgInfo.msg)
+		g.close(ctx, "player actor is unavailable")
+		return
+	}
+	inbound := &ipb.PlayerInbound{
+		UID:        g.uid,
+		Generation: g.generation,
+		Message:    msgInfo.msg,
+	}
+	tlog.Log.Debug("[gate/GsAgent.onInbound] 收到玩家请求, pid=%v generation=%v type=%T", g.uid, g.generation, msgInfo.msg)
+	if !ctx.TrySend(targetPID, inbound) {
+		tlog.Log.Error("[gate/GsAgent.onInbound] 玩家业务 Actor 不可用或队列已满, pid=%v actorPID=%v type=%T", g.uid, targetPID, msgInfo.msg)
+		g.close(ctx, "player actor is unavailable or overloaded")
 	}
 }
 

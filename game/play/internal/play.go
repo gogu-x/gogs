@@ -1,20 +1,28 @@
-// Package internal 负责 play 模块的装配：把业务包（ctl_*）的处理函数注册到
-// // core.Play 上。装配天生需要认识全部业务包，而业务包需要认识 core.Context，
-// // 因此装配与 Play 的定义必须分包，否则会形成 internal → ctl_* → core → internal 的循环。
+// internal 包装配单玩家角色的路由和事件监听器。
 package internal
 
 import (
 	"github.com/gogu-x/gogs/game/play/internal/core"
 )
 
-// NewPlay 构造 Play Actor，并注入装配逻辑。
-// Boot 由 core.Play.OnInit 在公共能力就绪之后调用，此时
-func NewPlay() *core.Play {
-	py := &core.Play{}
-	py.Boot = func(p *core.Play) {
-		RegDbLoader(p)
-		InitEvent(p)
-		InitRoutes(p)
+// NewPlayerActor 构造一个由玩家编号独占的玩家角色。
+func NewPlayerActor(uid uint64) *core.PlayerActor {
+	return newPlayerActor(uid, nil)
+}
+
+// NewPlayerActorWithMessages 创建带有预先排队系统消息的玩家角色。
+func NewPlayerActorWithMessages(uid uint64, messages []interface{}) *core.PlayerActor {
+	return newPlayerActor(uid, append([]interface{}(nil), messages...))
+}
+
+func newPlayerActor(uid uint64, messages []interface{}) *core.PlayerActor {
+	playerActor := &core.PlayerActor{
+		UID: uid,
+		Boot: func(playerActor *core.PlayerActor) {
+			InitEvent(playerActor)
+			InitRoutes(playerActor)
+		},
 	}
-	return py
+	playerActor.SetInitialMessages(messages)
+	return playerActor
 }

@@ -5,12 +5,5 @@ import (
 	"github.com/gogu-x/tree/comm"
 )
 
-// OnServerStart 开服事件。它由 Play.Emit 在 OnInit 中触发，
-func OnServerStart(ctx *core.Context, arg *comm.Arg) {
-
-}
-
-// OnLogin 登录事件。
-func OnLogin(play *core.Play, arg *comm.Arg) {
-
-}
+// OnLogin 处理玩家登录事件；聊天模块尚无登录期逻辑。
+func OnLogin(_ *core.PlayerActor, _ *comm.Arg) {}
