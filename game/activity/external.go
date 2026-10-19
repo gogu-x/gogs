@@ -7,7 +7,9 @@ import (
 
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/activity/internal"
-	"github.com/gogu-x/gogs/game/activity/internal/playeractor"
+	activitymodel "github.com/gogu-x/gogs/game/activity/internal/model"
+	activityowner "github.com/gogu-x/gogs/game/activity/internal/owner"
+	activityruntime "github.com/gogu-x/gogs/game/activity/internal/runtime"
 	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
@@ -16,26 +18,31 @@ import (
 	"github.com/gogu-x/tree/db/mongorpc"
 	"github.com/gogu-x/tree/timer"
 	"github.com/gogu-x/tree/tlog"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 const (
-	activityLifecycleTimerType    = timer.TimerType(1000005)
-	activityLifecycleTickInterval = time.Second
-	maxPendingActivityRequests    = 1024
+	// defaultActivityServerID 表示未传入服务器编号时使用的默认编号。
+	defaultActivityServerID = uint64(1)
+	// activityOwnerSaveInterval 表示活动记录的定时存盘间隔。
+	activityOwnerSaveInterval = time.Minute
+	// maxPendingActivityRequests 表示活动 Actor 加载服务器数据期间暂存请求的数量上限。
+	maxPendingActivityRequests = 1024
 )
 
+// pendingActivityRequest 保存活动 Actor 加载期间暂存的消息和请求信封。
 type pendingActivityRequest struct {
 	message interface{}
 	request *tree.Envelope
 }
 
-// Activity owns server-scoped activity state and its persistence lifecycle.
+// Activity 统一管理不同归属对象的活动状态及其存盘生命周期。
 type Activity struct {
-	mgr           *internal.Mgr
+	serverID      uint64
 	router        tree.Router
 	messageRouter tree.Router
 	wheel         *timer.TimeWheel
+	system        *tree.Tree
+	selfPID       tree.PID
 	store         *mongorpc.Store
 	model         *PersistenceModel
 	lifecycle     *mongorpc.Lifecycle
@@ -44,77 +51,80 @@ type Activity struct {
 	pending       []pendingActivityRequest
 	serverOpened  bool
 	serverClosing bool
+	ownerStates   map[ownerKey]*ownerActivityState
+	ownerLoads    int
+	shutdownSave  *tree.Envelope
+	pendingSaves  []*tree.Envelope
 }
 
-// NewActivity creates the server activity Actor for an optional server ID.
+// NewActivity 创建可选服务器编号对应的全局活动 Actor。
 func NewActivity(serverID ...uint64) *Activity {
 	if !RegisterBuiltins() {
 		tlog.Log.Error("[activity/NewActivity] 注册内置活动模板生命周期失败")
 	}
-	return &Activity{mgr: internal.NewMgr(serverID...)}
+	currentServerID := defaultActivityServerID
+	if len(serverID) > 0 && serverID[0] > 0 {
+		currentServerID = serverID[0]
+	}
+	return &Activity{serverID: currentServerID, ownerStates: make(map[ownerKey]*ownerActivityState)}
 }
 
-// NewPlayerActivityActor creates an activity Actor independent from PlayerActor.
-func NewPlayerActivityActor(uid uint64) tree.Actor {
-	return playeractor.New(uid, nil)
-}
-
-// NewPlayerActivityActorWithMessages creates an activity Actor with queued offline commands.
-func NewPlayerActivityActorWithMessages(uid uint64, messages []interface{}) tree.Actor {
-	return playeractor.New(uid, messages)
-}
-
-// Name returns the server activity Actor name.
+// Name 返回全局活动 Actor 的名称。
 func (actor *Activity) Name() string { return def.ActorActivity }
 
-// OnInit registers routes and persistence before loading server activity data.
+// OnInit 注册消息路由和存盘模型，并加载服务器活动数据。
 func (actor *Activity) OnInit(ctx tree.Context) {
 	internal.InitMessageHandlers(
 		&actor.messageRouter,
 		actor.onServerEvent,
 		actor.onSaveAllActivities,
+		actor.onPlayerSessionOpened,
+		actor.onPlayerSessionClosed,
+		actor.onOwnerActivityMessage,
+		actor.onPlayerActivityOwnerReleased,
+		actor.onLifecycleTick,
 		actor.onUnhandledMessage,
 	)
-	internal.InitRoutes(&actor.router, actor.mgr)
-	actor.wheel = timer.NewTimeWheel(32, ctx.Self(), ctx.System())
-	actor.wheel.Register(activityLifecycleTimerType, func(_ interface{}) {
-		actor.onLifecycleTick()
-	})
+	internal.InitRoutes(&actor.router, actor.onGetServerActivityList)
+	actor.registerTimers(ctx)
 	actor.store = mongorpc.NewStore(def.Mongo)
 	actor.lifecycle = mongorpc.NewLifecycle(actor.store, actor.wheel, ctx)
-	actor.model = NewPersistenceModel(
-		func(callback func(*Record) bool) {
-			if record := actor.mgr.GetActivityRecord(); record != nil && callback != nil {
-				callback(record)
-			}
-		},
-		func(snapshot *Record) {
-			current := actor.mgr.GetActivityRecord()
-			if current != nil && snapshot != nil && current.GetID() == snapshot.GetID() && current.Revision() == snapshot.Revision() {
-				current.SetDirty(false)
-			}
-		},
-		time.Minute,
-	)
+	actor.model = NewPersistenceModel(actor.rangeActivityRecords, actor.afterActivityRecordSaved, activityOwnerSaveInterval)
+	if err := activityowner.RegisterLegacyPlayerModel(actor.store); err != nil {
+		actor.failLoad(ctx, err)
+		return
+	}
 	if err := actor.lifecycle.Register(actor.model); err != nil {
 		actor.failLoad(ctx, err)
 		return
 	}
-	if !actor.lifecycle.LoadOne(
-		ctx,
-		(*Record)(nil),
-		RecordID(ScopeServer, actor.mgr.ServerID()),
-		actor.onActivityLoaded,
-	) {
-		actor.failLoad(ctx, errors.New("server activity load request could not be sent"))
+	serverKey := ownerKey{scope: activitymodel.ScopeServer, ownerID: actor.serverID}
+	if actor.ensureOwnerState(ctx, serverKey) == nil {
+		actor.failLoad(ctx, errors.New("server activity state is unavailable"))
 		return
 	}
 	actor.scheduleLifecycleTick()
 }
 
-// HandleMessage routes server activity messages to their registered handlers.
+// HandleMessage 将全局活动消息分发给已注册的处理方法。
 func (actor *Activity) HandleMessage(ctx tree.Context, message interface{}) {
 	actor.messageRouter.Route(ctx, message)
+}
+
+// onGetServerActivityList 返回当前服务器归属的活动列表。
+func (actor *Activity) onGetServerActivityList(ctx tree.Context, _ *pb_activity.GetActivityListReq) {
+	ctx.Response(actor.serverActivityListAck(), nil)
+}
+
+// serverActivityListAck 组装当前服务器归属对象的活动列表响应。
+func (actor *Activity) serverActivityListAck() *pb_activity.GetActivityListAck {
+	key := ownerKey{scope: activitymodel.ScopeServer, ownerID: actor.serverID}
+	state := actor.ownerStates[key]
+	activities := make([]*pb_activity.ActivityInfo, 0)
+	if state != nil && state.ready && state.data != nil && state.data.GetManager() != nil {
+		activities = append(activities, activityruntime.Default().GetInfoList(state.data.GetManager())...)
+	}
+	return &pb_activity.GetActivityListAck{Activities: activities}
 }
 
 // onServerEvent 处理服务器开服和关服事件。
@@ -138,16 +148,20 @@ func (actor *Activity) onServerEvent(ctx tree.Context, message *sspb.Event) {
 		actor.queueRequest(ctx, message)
 		return
 	}
+	if actor.ownerLoads > 0 {
+		actor.shutdownSave = ctx.RequestEnvelope()
+		return
+	}
 	actor.saveAll(ctx, ctx.RequestEnvelope())
 }
 
-// onSaveAllActivities 处理服务器活动存盘请求。
+// onSaveAllActivities 处理全局活动数据存盘请求。
 func (actor *Activity) onSaveAllActivities(ctx tree.Context, message *ipb.SaveAllActivities) {
 	if !actor.ready {
 		actor.queueRequest(ctx, message)
 		return
 	}
-	actor.saveAll(ctx, ctx.RequestEnvelope())
+	actor.saveAllWhenOwnersReady(ctx, ctx.RequestEnvelope())
 }
 
 // onUnhandledMessage 将其他消息排入加载队列或转交活动业务路由。
@@ -167,7 +181,7 @@ func (actor *Activity) onUnhandledMessage(ctx tree.Context, message interface{})
 	actor.router.Route(ctx, message)
 }
 
-// OnStop stops timers after the caller completes its explicit persistence flush.
+// OnStop 停止活动存盘生命周期和时间轮。
 func (actor *Activity) OnStop(_ tree.Context) {
 	if actor.lifecycle != nil {
 		actor.lifecycle.Stop()
@@ -177,33 +191,7 @@ func (actor *Activity) OnStop(_ tree.Context) {
 	}
 }
 
-func (actor *Activity) onActivityLoaded(ctx tree.Context, value interface{}, err error) {
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		err = nil
-		value = nil
-	}
-	if err != nil {
-		actor.failLoad(ctx, err)
-		return
-	}
-	if value != nil {
-		record, ok := value.(*Record)
-		if !ok || record == nil || record.GetScope() != ScopeServer ||
-			record.GetOwnerID() != actor.mgr.ServerID() || record.GetID() != RecordID(ScopeServer, actor.mgr.ServerID()) {
-			actor.failLoad(ctx, fmt.Errorf("invalid server activity document %T", value))
-			return
-		}
-		if record.GetManager() == nil {
-			record.SetManager(NewManager())
-			record.MarkDirty()
-		}
-		actor.mgr.SetActivityRecord(record)
-	}
-	actor.syncServerActivities(time.Now().Unix(), "onActivityLoaded")
-	actor.ready = true
-	actor.drainPending(ctx)
-}
-
+// failLoad 记录加载错误并完成已排队请求。
 func (actor *Activity) failLoad(ctx tree.Context, err error) {
 	actor.loadErr = err
 	actor.ready = true
@@ -211,6 +199,7 @@ func (actor *Activity) failLoad(ctx tree.Context, err error) {
 	actor.drainPending(ctx)
 }
 
+// queueRequest 在全局活动数据加载期间暂存请求。
 func (actor *Activity) queueRequest(ctx tree.Context, message interface{}) {
 	request := ctx.RequestEnvelope()
 	if request == nil {
@@ -225,6 +214,7 @@ func (actor *Activity) queueRequest(ctx tree.Context, message interface{}) {
 	actor.pending = append(actor.pending, pendingActivityRequest{message: message, request: request})
 }
 
+// drainPending 在数据加载完成后按顺序处理暂存请求。
 func (actor *Activity) drainPending(ctx tree.Context) {
 	pending := actor.pending
 	actor.pending = nil
@@ -236,15 +226,27 @@ func (actor *Activity) drainPending(ctx tree.Context) {
 			item.request.Respond(nil, actor.loadErr)
 			continue
 		}
+		if actor.serverClosing {
+			if _, isActivityRequest := item.message.(*ipb.PlayerActivityMessage); isActivityRequest {
+				item.request.Respond(nil, fmt.Errorf("activity actor is shutting down"))
+				continue
+			}
+		}
 		switch message := item.message.(type) {
 		case *ipb.SaveAllActivities:
-			actor.saveAll(ctx, item.request)
+			actor.saveAllWhenOwnersReady(ctx, item.request)
 		case *pb_activity.GetActivityListReq:
-			item.request.Respond(actor.mgr.GetActivityListAck(), nil)
+			item.request.Respond(actor.serverActivityListAck(), nil)
+		case *ipb.PlayerActivityMessage:
+			actor.dispatchOwnerActivityRequest(ctx, item.request, message)
 		default:
 			if gameevent.IsServerClosing(message) {
 				actor.serverClosing = true
-				actor.saveAll(ctx, item.request)
+				if actor.ownerLoads > 0 {
+					actor.shutdownSave = item.request
+				} else {
+					actor.saveAll(ctx, item.request)
+				}
 				continue
 			}
 			if gameevent.IsServerOpened(message) {
@@ -257,36 +259,27 @@ func (actor *Activity) drainPending(ctx tree.Context) {
 	}
 }
 
-func (actor *Activity) onLifecycleTick() {
-	if actor.ready && actor.loadErr == nil {
-		actor.syncServerActivities(time.Now().Unix(), "onLifecycleTick")
+// saveAllWhenOwnersReady 等待所有归属数据加载完成后执行全量存盘。
+func (actor *Activity) saveAllWhenOwnersReady(ctx tree.Context, request *tree.Envelope) {
+	if actor.ownerLoads > 0 {
+		if request != nil {
+			actor.pendingSaves = append(actor.pendingSaves, request)
+		}
+		return
 	}
+	actor.saveAll(ctx, request)
+}
+
+// onLifecycleTick 推进活动生命周期、处理延迟存盘并安排下一次定时消息。
+func (actor *Activity) onLifecycleTick(ctx tree.Context, _ *internal.LifecycleTick) {
+	if actor.ready && actor.loadErr == nil && !actor.serverClosing {
+		actor.syncOwnerActivities(ctx, time.Now().Unix())
+	}
+	actor.finishDeferredSaves(ctx)
 	actor.scheduleLifecycleTick()
 }
 
-func (actor *Activity) syncServerActivities(now int64, caller string) {
-	if actor == nil || actor.mgr == nil {
-		return
-	}
-	changed, transitions := actor.mgr.SyncServerActivities(now)
-	if changed {
-		tlog.Log.Info("[activity/Activity.%s] 已同步服务器活动模板及生命周期", caller)
-	}
-	for _, transition := range transitions {
-		tlog.Log.Info("[activity/Activity.%s] 服务器活动状态已变更, activity=%v from=%v to=%v owner=%v",
-			caller, transition.GetTemplateID(), transition.GetFrom(), transition.GetTo(), transition.GetOwnerID())
-	}
-}
-
-func (actor *Activity) scheduleLifecycleTick() {
-	if actor.wheel == nil {
-		return
-	}
-	if actor.wheel.After(activityLifecycleTimerType, activityLifecycleTickInterval, nil) == nil {
-		tlog.Log.Error("[activity/Activity.scheduleLifecycleTick] 安排服务器活动定时器失败")
-	}
-}
-
+// saveAll 存盘当前全局活动 Actor 管理的所有活动记录。
 func (actor *Activity) saveAll(ctx tree.Context, request *tree.Envelope) {
 	if actor.lifecycle == nil {
 		if request != nil {
@@ -306,7 +299,13 @@ func (actor *Activity) saveAll(ctx tree.Context, request *tree.Envelope) {
 	}
 	actor.lifecycle.SaveAll(ctx, func(_ tree.Context, err error) {
 		if err != nil {
-			tlog.Log.Error("[activity/Activity.saveAll] 关服前服务器活动存盘失败, err=%v", err)
+			tlog.Log.Error("[activity/Activity.saveAll] 关服前活动数据存盘失败, err=%v", err)
+		} else {
+			for key, state := range actor.ownerStates {
+				if state != nil && state.releaseRequested && !state.online {
+					actor.releaseOwnerState(key, state)
+				}
+			}
 		}
 		if request != nil {
 			request.Respond(nil, err)

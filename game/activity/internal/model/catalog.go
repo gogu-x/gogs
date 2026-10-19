@@ -5,20 +5,20 @@ import (
 	"sync"
 )
 
-// Catalog stores immutable activity templates for the running game process.
+// Catalog 保存当前游戏进程中的不可变活动模板。
 type Catalog struct {
 	mu        sync.RWMutex
 	templates map[uint64]*Template
 }
 
-// NewCatalog creates an empty activity template catalog.
+// NewCatalog 创建空的活动模板目录。
 func NewCatalog() *Catalog {
 	return &Catalog{templates: make(map[uint64]*Template)}
 }
 
-// Register adds a template when its identity, owner scope, and time range are valid.
+// Register 在模板标识、类型、归属范围和时间范围有效时注册模板。
 func (catalog *Catalog) Register(template *Template) bool {
-	if catalog == nil || template == nil || template.GetID() == 0 || template.GetName() == "" ||
+	if catalog == nil || template == nil || template.GetID() == 0 || template.GetName() == "" || template.GetType() == "" ||
 		!validScope(template.GetScope()) || template.GetStartTime() < 0 ||
 		template.GetEndTime() < 0 || template.GetTarget() < 0 {
 		return false
@@ -39,7 +39,7 @@ func (catalog *Catalog) Register(template *Template) bool {
 	return true
 }
 
-// Get returns a copy of a template by ID.
+// Get 按模板 ID 返回模板副本。
 func (catalog *Catalog) Get(templateID uint64) (*Template, bool) {
 	if catalog == nil {
 		return nil, false
@@ -54,7 +54,7 @@ func (catalog *Catalog) Get(templateID uint64) (*Template, bool) {
 	return template, ok
 }
 
-// List returns copies of templates matching a scope in ID order.
+// List 按模板 ID 顺序返回指定归属范围的模板副本。
 func (catalog *Catalog) List(scope OwnerScope) []*Template {
 	if catalog == nil || !validScope(scope) {
 		return nil
@@ -78,5 +78,5 @@ func (catalog *Catalog) List(scope OwnerScope) []*Template {
 
 var defaultCatalog = NewCatalog()
 
-// DefaultCatalog returns the process-wide template catalog.
+// DefaultCatalog 返回进程级活动模板目录。
 func DefaultCatalog() *Catalog { return defaultCatalog }

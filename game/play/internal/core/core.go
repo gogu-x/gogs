@@ -122,6 +122,7 @@ func (actor *PlayerActor) OnStop(ctx tree.Context) {
 	if actor.wheel != nil {
 		actor.wheel.Stop()
 	}
+	actor.notifyActivityOwnerReleased(ctx)
 	if actor.gatePID.ID != 0 {
 		ctx.Send(actor.gatePID, &ipb.PlayerActorStopped{UID: actor.UID, PID: ctx.Self()})
 	}
@@ -365,7 +366,7 @@ func (actor *PlayerActor) sendLoginFailure(ctx tree.Context, code pb_common.ErrC
 }
 
 // onSessionOpened 将新会话代次绑定到当前玩家角色。
-func (actor *PlayerActor) onSessionOpened(_ tree.Context, message *ipb.PlayerSessionOpened) {
+func (actor *PlayerActor) onSessionOpened(ctx tree.Context, message *ipb.PlayerSessionOpened) {
 	uid := actor.UID
 	if message == nil || message.UID != uid || message.Generation <= actor.sessionGeneration {
 		return
@@ -373,6 +374,7 @@ func (actor *PlayerActor) onSessionOpened(_ tree.Context, message *ipb.PlayerSes
 	actor.sessionGeneration = message.Generation
 	actor.sessionActive = true
 	actor.MarkOnline()
+	actor.notifyActivity(ctx, message)
 	tlog.Log.Info("[play/PlayerActor.onSessionOpened] 玩家会话已绑定, pid=%v generation=%v", uid, actor.sessionGeneration)
 }
 
@@ -446,6 +448,7 @@ func (actor *PlayerActor) onSessionClosed(ctx tree.Context, message *ipb.Session
 	actor.sessionActive = false
 	actor.online = false
 	actor.sessionGeneration = message.Generation
+	actor.notifyActivity(ctx, message)
 	actor.evictAfterSave = false
 	actor.stopRequested = false
 	arg := comm.NewArg()
@@ -454,6 +457,28 @@ func (actor *PlayerActor) onSessionClosed(ctx tree.Context, message *ipb.Session
 	tlog.Log.Info("[play/PlayerActor.onSessionClosed] 玩家会话已断开, pid=%v", uid)
 	actor.scheduleIdleEviction()
 	actor.save(ctx)
+}
+
+// notifyActivity 将玩家会话生命周期消息转发给全局活动 Actor。
+func (actor *PlayerActor) notifyActivity(ctx tree.Context, message interface{}) {
+	if ctx == nil || message == nil {
+		return
+	}
+	activityActorPID, ok := ctx.Lookup(def.ActorActivity)
+	if !ok || !ctx.Send(activityActorPID, message) {
+		tlog.Log.Error("[play/PlayerActor.notifyActivity] 转发玩家活动会话消息失败, pid=%v type=%T", actor.UID, message)
+	}
+}
+
+// notifyActivityOwnerReleased 通知全局活动 Actor 保存并释放当前玩家的活动数据。
+func (actor *PlayerActor) notifyActivityOwnerReleased(ctx tree.Context) {
+	if ctx == nil {
+		return
+	}
+	activityActorPID, ok := ctx.Lookup(def.ActorActivity)
+	if !ok || !ctx.Send(activityActorPID, &ipb.PlayerActivityOwnerReleased{UID: actor.UID}) {
+		tlog.Log.Error("[play/PlayerActor.notifyActivityOwnerReleased] 通知活动 Actor 释放玩家数据失败, pid=%v", actor.UID)
+	}
 }
 
 // save 保存当前玩家数据快照，且不设置完成回调。

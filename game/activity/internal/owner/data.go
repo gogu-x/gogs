@@ -1,4 +1,4 @@
-// Package owner keeps one aggregate's activity data and persistence lifecycle together.
+// Package owner 统一管理单个归属对象的活动数据和存盘生命周期。
 package owner
 
 import (
@@ -15,7 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-// Data owns activity state and persistence for one player, server, or guild.
+// Data 管理一个玩家、服务器或联盟的活动状态及其存盘生命周期。
 type Data struct {
 	scope       activitymodel.OwnerScope
 	ownerID     uint64
@@ -23,15 +23,16 @@ type Data struct {
 	persistence *activitypersistence.Model
 }
 
-// LegacyPlayerDocument exposes only the old embedded activity field for migration reads.
+// LegacyPlayerDocument 仅包含迁移旧玩家内嵌活动数据所需的字段。
 type LegacyPlayerDocument struct {
 	ID       uint64   `bson:"_id"`      // 玩家文档 ID。
 	Activity bson.Raw `bson:"activity"` // 旧版玩家文档中的活动管理器。
 }
 
+// legacyPlayerModel 描述迁移旧玩家活动数据时读取的玩家文档模型。
 type legacyPlayerModel struct{}
 
-// New creates empty activity data for one owner.
+// New 为指定归属对象创建空活动数据。
 func New(scope activitymodel.OwnerScope, ownerID uint64) *Data {
 	return &Data{
 		scope:   scope,
@@ -40,7 +41,7 @@ func New(scope activitymodel.OwnerScope, ownerID uint64) *Data {
 	}
 }
 
-// Register adds this owner's activity document model to a Mongo store.
+// Register 将该归属对象的活动文档模型注册到 Mongo 存储中。
 func (data *Data) Register(store *mongorpc.Store) error {
 	if data == nil || store == nil {
 		return errors.New("activity owner persistence store is unavailable")
@@ -59,13 +60,21 @@ func (data *Data) Register(store *mongorpc.Store) error {
 		},
 		time.Minute,
 	)
-	if err := store.Register(&legacyPlayerModel{}); err != nil {
+	if err := RegisterLegacyPlayerModel(store); err != nil {
 		return err
 	}
 	return nil
 }
 
-// PersistenceModel returns this owner's activity collection model.
+// RegisterLegacyPlayerModel 注册读取旧玩家活动字段所需的 Mongo 模型。
+func RegisterLegacyPlayerModel(store *mongorpc.Store) error {
+	if store == nil {
+		return errors.New("activity owner persistence store is unavailable")
+	}
+	return store.Register(&legacyPlayerModel{})
+}
+
+// PersistenceModel 返回该归属对象的活动集合模型。
 func (data *Data) PersistenceModel() mongorpc.Model {
 	if data == nil {
 		return nil
@@ -73,7 +82,7 @@ func (data *Data) PersistenceModel() mongorpc.Model {
 	return data.persistence
 }
 
-// Load loads this owner's activity document and migrates an old embedded BSON value when needed.
+// Load 加载该归属对象的活动文档，并在需要时迁移旧版内嵌 BSON 数据。
 func (data *Data) Load(
 	ctx tree.Context,
 	store *mongorpc.Store,
@@ -99,6 +108,16 @@ func (data *Data) Load(
 				record, valid := data.loadedRecord(value, nil)
 				if !valid {
 					callback(callbackCtx, errors.New("invalid activity owner document"))
+					return
+				}
+				data.record = record
+				callback(callbackCtx, nil)
+				return
+			}
+			if data.scope != activitymodel.ScopePlayer {
+				record, valid := data.newRecordFromLegacy(nil)
+				if !valid {
+					callback(callbackCtx, errors.New("empty activity owner record could not be created"))
 					return
 				}
 				data.record = record
@@ -137,6 +156,7 @@ func (data *Data) Load(
 	)
 }
 
+// loadedRecord 校验加载记录的归属信息并补齐缺失的管理器。
 func (data *Data) loadedRecord(value interface{}, _ bson.Raw) (*activitymodel.Record, bool) {
 	if value != nil {
 		record, ok := value.(*activitymodel.Record)
@@ -153,6 +173,7 @@ func (data *Data) loadedRecord(value interface{}, _ bson.Raw) (*activitymodel.Re
 	return data.newRecordFromLegacy(nil)
 }
 
+// newRecordFromLegacy 将旧版内嵌活动数据转换为独立活动记录。
 func (data *Data) newRecordFromLegacy(legacy bson.Raw) (*activitymodel.Record, bool) {
 	manager := activitymodel.NewManager()
 	if len(legacy) > 0 {
@@ -167,7 +188,7 @@ func (data *Data) newRecordFromLegacy(legacy bson.Raw) (*activitymodel.Record, b
 	return record, true
 }
 
-// GetManager returns this owner's activity instances.
+// GetManager 返回该归属对象的活动实例管理器。
 func (data *Data) GetManager() *activitymodel.Manager {
 	if data == nil || data.record == nil {
 		return nil
@@ -175,7 +196,15 @@ func (data *Data) GetManager() *activitymodel.Manager {
 	return data.record.GetManager()
 }
 
-// SetManager replaces this owner's in-memory activity instances.
+// GetRecord 返回该归属对象的活动存盘记录。
+func (data *Data) GetRecord() *activitymodel.Record {
+	if data == nil {
+		return nil
+	}
+	return data.record
+}
+
+// SetManager 替换该归属对象内存中的活动实例管理器。
 func (data *Data) SetManager(manager *activitymodel.Manager) {
 	if data == nil || data.record == nil {
 		return
@@ -183,19 +212,19 @@ func (data *Data) SetManager(manager *activitymodel.Manager) {
 	data.record.SetManager(manager)
 }
 
-// MarkDirty marks this owner's activity document for persistence.
+// MarkDirty 将该归属对象的活动文档标记为需要存盘。
 func (data *Data) MarkDirty() {
 	if data != nil && data.record != nil {
 		data.record.MarkDirty()
 	}
 }
 
-// IsDirty reports whether this owner's activity document needs persistence.
+// IsDirty 返回该归属对象的活动文档是否需要存盘。
 func (data *Data) IsDirty() bool {
 	return data != nil && data.record != nil && data.record.IsDirty()
 }
 
-// Sync materializes configured templates and advances this owner's lifecycle.
+// Sync 根据配置生成活动实例并推进该归属对象的活动生命周期。
 func (data *Data) Sync(now int64) ([]activitymodel.Transition, bool) {
 	if data == nil || data.record == nil || data.record.GetManager() == nil {
 		return nil, false
@@ -214,7 +243,7 @@ func (data *Data) Sync(now int64) ([]activitymodel.Transition, bool) {
 	return transitions, changed
 }
 
-// Save persists this owner's dirty activity document and clears it by snapshot version.
+// Save 存盘该归属对象的脏活动文档，并按快照版本清理脏标记。
 func (data *Data) Save(
 	ctx tree.Context,
 	store *mongorpc.Store,
@@ -247,12 +276,16 @@ func (data *Data) Save(
 	)
 }
 
+// GetCollection 返回旧版活动数据所在的玩家集合名称。
 func (legacyPlayerModel) GetCollection() string { return "player" }
 
+// GetPrototype 返回旧版玩家活动文档的结构体原型。
 func (legacyPlayerModel) GetPrototype() interface{} { return (*LegacyPlayerDocument)(nil) }
 
+// GetIDField 返回旧版玩家文档的主键字段名称。
 func (legacyPlayerModel) GetIDField() string { return "_id" }
 
+// GetKey 返回旧版玩家文档的玩家编号。
 func (legacyPlayerModel) GetKey(value interface{}) interface{} {
 	document, ok := value.(*LegacyPlayerDocument)
 	if !ok || document == nil {
@@ -261,14 +294,20 @@ func (legacyPlayerModel) GetKey(value interface{}) interface{} {
 	return document.ID
 }
 
+// Clone 返回旧版迁移读取文档本身。
 func (legacyPlayerModel) Clone(value interface{}) interface{} { return value }
 
+// Range 不遍历旧版文档，因为该模型仅用于迁移读取。
 func (legacyPlayerModel) Range(func(interface{}) bool) {}
 
+// GetSaveInterval 返回零，表示旧版玩家文档模型不参与自动存盘。
 func (legacyPlayerModel) GetSaveInterval() time.Duration { return 0 }
 
+// AfterSave 不处理旧版玩家文档的存盘回调。
 func (legacyPlayerModel) AfterSave(tree.Context, interface{}) error { return nil }
 
+// MackDirty 返回旧版玩家文档不需要存盘。
 func (legacyPlayerModel) MackDirty(interface{}) bool { return false }
 
+// GetTickerType 返回旧版玩家文档模型使用的定时器类型。
 func (legacyPlayerModel) GetTickerType() timer.TimerType { return timer.TimerType(1000007) }

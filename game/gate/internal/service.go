@@ -8,11 +8,9 @@ import (
 
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/game/activity"
 	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/game/play"
 	"github.com/gogu-x/gogs/ipb"
-	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	"github.com/gogu-x/gogs/pb/cspb/pb_auth"
 	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/gogs/pb/sspb"
@@ -25,18 +23,21 @@ import (
 )
 
 const (
+	// playerMessageRetryTimerType 表示玩家系统消息重试定时器类型。
 	playerMessageRetryTimerType = timer.TimerType(1000002)
-	playerMessageRetryInterval  = time.Second
-	maxPendingPlayerMessages    = 512
+	// playerMessageRetryInterval 表示玩家系统消息重试间隔。
+	playerMessageRetryInterval = time.Second
+	// maxPendingPlayerMessages 表示单个玩家 Actor 的待发送消息上限。
+	maxPendingPlayerMessages = 512
 )
 
 type playerActorState struct {
-	pid         tree.PID
-	activityPID tree.PID
-	evicting    bool
-	pending     []interface{}
+	pid      tree.PID
+	evicting bool
+	pending  []interface{}
 }
 
+// AddPending 将需要重试的消息加入玩家 Actor 的待发送队列。
 func (state *playerActorState) AddPending(message interface{}) bool {
 	if state == nil || len(state.pending) >= maxPendingPlayerMessages {
 		return false
@@ -45,6 +46,7 @@ func (state *playerActorState) AddPending(message interface{}) bool {
 	return true
 }
 
+// TakePending 取出玩家 Actor 的全部待发送消息。
 func (state *playerActorState) TakePending() []interface{} {
 	if state == nil {
 		return nil
@@ -84,11 +86,13 @@ func NewGateActor() *GateActor {
 	}
 }
 
+// Name 返回网关 Actor 的注册名称。
 func (g *GateActor) Name() string { return def.GameGate }
 
 // MailboxSize 返回网关消息队列容量，用于容纳集中到达的服务器推送。
 func (g *GateActor) MailboxSize() int { return 8 * 1024 }
 
+// OnInit 注册网关消息处理方法并初始化会话目录。
 func (g *GateActor) OnInit(ctx tree.Context) {
 	g.system = ctx.System()
 	g.router.Register(&openSession{}, g.onOpenSession)
@@ -138,10 +142,12 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 	}
 }
 
+// HandleMessage 将网关消息分发给已注册的处理方法。
 func (g *GateActor) HandleMessage(ctx tree.Context, msg interface{}) {
 	g.router.Route(ctx, msg)
 }
 
+// OnStop 关闭网关接入并停止相关定时器。
 func (g *GateActor) OnStop(ctx tree.Context) {
 	if g.messageRetryWheel != nil {
 		g.messageRetryWheel.Stop()
@@ -154,13 +160,13 @@ func (g *GateActor) OnStop(ctx tree.Context) {
 		delete(g.sessions, uid)
 		ctx.Send(current.pid, &stopAgent{})
 		ctx.Send(current.playerPID, &ipb.SessionClosed{UID: uid, Generation: current.generation})
-		ctx.Send(current.activityPID, &ipb.SessionClosed{UID: uid, Generation: current.generation})
 	}
 	if g.grpcServer != nil {
 		g.grpcServer.Stop()
 	}
 }
 
+// onServerEvent 根据服务器生命周期事件启动开服或关服处理。
 func (g *GateActor) onServerEvent(ctx tree.Context, message interface{}) {
 	serverEvent, ok := message.(*sspb.Event)
 	if !ok || serverEvent == nil || !gameevent.IsServerLifecycle(serverEvent) {
@@ -182,6 +188,7 @@ func (g *GateActor) onServerEvent(ctx tree.Context, message interface{}) {
 	}
 }
 
+// onServerOpened 处理服务器开服事件并恢复网关接入。
 func (g *GateActor) onServerOpened(ctx tree.Context, message *sspb.Event) {
 	if g.shuttingDown {
 		ctx.Response(nil, fmt.Errorf("game gateway is shutting down"))
@@ -204,9 +211,6 @@ func (g *GateActor) onServerOpened(ctx tree.Context, message *sspb.Event) {
 		if state.pid.ID != 0 && !ctx.Send(state.pid, gameevent.Clone(message)) {
 			tlog.Log.Error("[gate/GateActor.onServerOpened] 通知玩家 Actor 开服事件失败, pid=%v playerPID=%v", uid, state.pid)
 		}
-		if state.activityPID.ID != 0 && !ctx.Send(state.activityPID, gameevent.Clone(message)) {
-			tlog.Log.Error("[gate/GateActor.onServerOpened] 通知玩家活动 Actor 开服事件失败, pid=%v activityPID=%v", uid, state.activityPID)
-		}
 	}
 	tlog.Log.Info("[gate/GateActor.onServerOpened] 网关已接收开服事件, playerActors=%v", len(g.playerActors))
 	ctx.Response(nil, nil)
@@ -217,6 +221,7 @@ func (g *GateActor) onServerClosing(ctx tree.Context, message *sspb.Event) {
 	g.beginServerShutdown(ctx, message)
 }
 
+// spawnPlayerActor 创建玩家 Actor 并传入需要优先处理的初始消息。
 func (g *GateActor) spawnPlayerActor(ctx tree.Context, uid uint64, messages []interface{}) tree.PID {
 	var actor tree.Actor
 	if g.serverOpened && !g.shuttingDown {
@@ -229,18 +234,7 @@ func (g *GateActor) spawnPlayerActor(ctx tree.Context, uid uint64, messages []in
 	return ctx.System().SpawnOne(actor)
 }
 
-func (g *GateActor) spawnPlayerActivityActor(ctx tree.Context, uid uint64, messages []interface{}) tree.PID {
-	var actor tree.Actor
-	if g.serverOpened && !g.shuttingDown {
-		actor = activity.NewPlayerActivityActorWithMessages(uid, g.prependServerOpened(messages))
-	} else if len(messages) > 0 {
-		actor = activity.NewPlayerActivityActorWithMessages(uid, messages)
-	} else {
-		actor = activity.NewPlayerActivityActor(uid)
-	}
-	return ctx.System().SpawnOne(actor)
-}
-
+// prependServerOpened 将开服事件放到玩家 Actor 的初始消息队列前部。
 func (g *GateActor) prependServerOpened(messages []interface{}) []interface{} {
 	initialMessages := make([]interface{}, 0, len(messages)+1)
 	serverOpenedEvent := g.serverOpenedEvent
@@ -252,6 +246,7 @@ func (g *GateActor) prependServerOpened(messages []interface{}) []interface{} {
 	return initialMessages
 }
 
+// onOpenSession 验证登录流并为玩家创建或复用会话。
 func (g *GateActor) onOpenSession(ctx tree.Context, msg interface{}) {
 	if g.shuttingDown {
 		ctx.Response(nil, fmt.Errorf("game gateway is shutting down"))
@@ -310,6 +305,7 @@ func (g *GateActor) onOpenSession(ctx tree.Context, msg interface{}) {
 	ctx.Response(opened, nil)
 }
 
+// createSession 绑定玩家 Actor、创建网关代理并启动玩家会话。
 func (g *GateActor) createSession(ctx tree.Context, open *openSession) (*openedSession, error) {
 	if openSessionCanceled(open) {
 		return nil, fmt.Errorf("gateway stream is already closed")
@@ -328,10 +324,6 @@ func (g *GateActor) createSession(ctx tree.Context, open *openSession) (*openedS
 		state.pid = g.spawnPlayerActor(ctx, uid, nil)
 		tlog.Log.Info("[gate/GateActor.createSession] 已创建玩家 Actor, pid=%v playerPID=%v", uid, state.pid)
 	}
-	if state.activityPID.ID == 0 {
-		state.activityPID = g.spawnPlayerActivityActor(ctx, uid, nil)
-		tlog.Log.Info("[gate/GateActor.createSession] 已创建玩家活动 Actor, pid=%v activityPID=%v", uid, state.activityPID)
-	}
 	if state.evicting {
 		return nil, fmt.Errorf("player actor %d is stopping", uid)
 	}
@@ -345,29 +337,21 @@ func (g *GateActor) createSession(ctx tree.Context, open *openSession) (*openedS
 			return nil, fmt.Errorf("could not bind gateway session to player actor")
 		}
 	}
-	if !ctx.Send(state.activityPID, &ipb.PlayerSessionOpened{UID: uid, Generation: generation}) {
-		state.activityPID = g.spawnPlayerActivityActor(ctx, uid, nil)
-		if !ctx.Send(state.activityPID, &ipb.PlayerSessionOpened{UID: uid, Generation: generation}) {
-			return nil, fmt.Errorf("could not bind gateway session to player activity actor")
-		}
-	}
 	if previous, exists := g.sessions[uid]; exists {
 		ctx.Send(previous.pid, &stopAgent{})
 	}
-	agent := newGsAgent(uid, generation, open.stream, ctx.Self(), state.pid, state.activityPID)
+	agent := newGsAgent(uid, generation, open.stream, ctx.Self(), state.pid)
 	agentPID := ctx.System().SpawnOne(agent)
 	g.sessions[uid] = session{
-		pid:         agentPID,
-		playerPID:   state.pid,
-		activityPID: state.activityPID,
-		generation:  generation,
-		uid:         uid,
+		pid:        agentPID,
+		playerPID:  state.pid,
+		generation: generation,
+		uid:        uid,
 	}
 	if !ctx.Send(agentPID, &inboundFrame{msg: open.msg}) {
 		delete(g.sessions, uid)
 		ctx.Send(agentPID, &stopAgent{})
 		ctx.Send(state.pid, &ipb.SessionClosed{UID: uid, Generation: generation})
-		ctx.Send(state.activityPID, &ipb.SessionClosed{UID: uid, Generation: generation})
 		return nil, fmt.Errorf("could not send initial login message to gateway agent")
 	}
 	tlog.Log.Info("[gate/GateActor.createSession] 玩家网关会话已建立, pid=%v generation=%v playerPID=%v",
@@ -375,6 +359,7 @@ func (g *GateActor) createSession(ctx tree.Context, open *openSession) (*openedS
 	return &openedSession{pid: agentPID, uid: uid, generation: generation}, nil
 }
 
+// onCloseSession 关闭指定版本的玩家网关会话。
 func (g *GateActor) onCloseSession(ctx tree.Context, msg interface{}) {
 	closed, ok := msg.(*closeSession)
 	if !ok || closed == nil {
@@ -386,10 +371,11 @@ func (g *GateActor) onCloseSession(ctx tree.Context, msg interface{}) {
 	}
 	delete(g.sessions, closed.uid)
 	ctx.Send(current.pid, &stopAgent{})
-	g.notifySessionClosed(ctx, closed.uid, current.playerPID, current.activityPID, current.generation)
+	g.notifySessionClosed(ctx, closed.uid, current.playerPID, current.generation)
 	tlog.Log.Info("[gate/GateActor.onCloseSession] 网关会话已关闭, pid=%v reason=%v", closed.uid, closed.reason)
 }
 
+// onPushToMsg 将玩家 Actor 的协议响应转发到在线会话。
 func (g *GateActor) onPushToMsg(ctx tree.Context, msg interface{}) {
 	push, ok := msg.(*ipb.PushToMsg)
 	if !ok || push == nil || push.Msg == nil {
@@ -404,6 +390,7 @@ func (g *GateActor) onPushToMsg(ctx tree.Context, msg interface{}) {
 	}
 }
 
+// onPlayerMessage 将服务器发给玩家的消息路由到对应玩家 Actor。
 func (g *GateActor) onPlayerMessage(ctx tree.Context, msg interface{}) {
 	if g.shuttingDown {
 		tlog.Log.Error("[gate/GateActor.onPlayerMessage] 服务关停期间拒绝玩家系统消息, type=%T", msg)
@@ -415,24 +402,6 @@ func (g *GateActor) onPlayerMessage(ctx tree.Context, msg interface{}) {
 		return
 	}
 	state := g.playerActors[command.UID]
-	if isPlayerActivityMessage(command.Message) {
-		activityMessage := &ipb.PlayerActivityMessage{UID: command.UID, Message: command.Message}
-		if state == nil {
-			activityPID := g.spawnPlayerActivityActor(ctx, command.UID, []interface{}{activityMessage})
-			g.playerActors[command.UID] = &playerActorState{activityPID: activityPID}
-			tlog.Log.Info("[gate/GateActor.onPlayerMessage] 为离线玩家创建活动 Actor, pid=%v activityPID=%v type=%T", command.UID, activityPID, command.Message)
-			return
-		}
-		if state.activityPID.ID == 0 {
-			state.activityPID = g.spawnPlayerActivityActor(ctx, command.UID, []interface{}{activityMessage})
-			return
-		}
-		if !ctx.TrySend(state.activityPID, activityMessage) {
-			tlog.Log.Error("[gate/GateActor.onPlayerMessage] 玩家活动 Actor 不可用或队列已满, pid=%v activityPID=%v type=%T",
-				command.UID, state.activityPID, command.Message)
-		}
-		return
-	}
 	if state == nil {
 		playerPID := g.spawnPlayerActor(ctx, command.UID, []interface{}{command.Message})
 		g.playerActors[command.UID] = &playerActorState{pid: playerPID}
@@ -454,6 +423,7 @@ func (g *GateActor) onPlayerMessage(ctx tree.Context, msg interface{}) {
 	}
 }
 
+// onPlayerActorEvictReady 在离线玩家 Actor 可以回收时请求其停止。
 func (g *GateActor) onPlayerActorEvictReady(ctx tree.Context, msg interface{}) {
 	ready, ok := msg.(*ipb.PlayerActorEvictReady)
 	if !ok || ready == nil {
@@ -481,6 +451,7 @@ func (g *GateActor) onPlayerActorEvictReady(ctx tree.Context, msg interface{}) {
 	g.schedulePlayerMessageRetry()
 }
 
+// onPlayerActorStopped 清理已停止的玩家 Actor 并恢复等待中的会话或消息。
 func (g *GateActor) onPlayerActorStopped(ctx tree.Context, msg interface{}) {
 	stopped, ok := msg.(*ipb.PlayerActorStopped)
 	if !ok || stopped == nil {
@@ -497,9 +468,7 @@ func (g *GateActor) onPlayerActorStopped(ctx tree.Context, msg interface{}) {
 		delete(g.pendingOpen, stopped.UID)
 		if g.shuttingDown {
 			open.request.Respond(nil, fmt.Errorf("game gateway is shutting down"))
-			if state.activityPID.ID == 0 {
-				delete(g.playerActors, stopped.UID)
-			}
+			delete(g.playerActors, stopped.UID)
 			return
 		}
 		if openSessionCanceled(open) {
@@ -523,16 +492,14 @@ func (g *GateActor) onPlayerActorStopped(ctx tree.Context, msg interface{}) {
 		return
 	}
 	if g.shuttingDown {
-		if state.activityPID.ID == 0 {
-			delete(g.playerActors, stopped.UID)
-		}
+		delete(g.playerActors, stopped.UID)
 		return
 	}
 	if len(pendingMessages) > 0 {
 		state.pid = g.spawnPlayerActor(ctx, stopped.UID, pendingMessages)
 		tlog.Log.Info("[gate/GateActor.onPlayerActorStopped] 已重建玩家 Actor 并恢复排队消息, pid=%v playerPID=%v count=%v", stopped.UID, state.pid, len(pendingMessages))
 	}
-	if state.pid.ID == 0 && state.activityPID.ID == 0 {
+	if state.pid.ID == 0 {
 		delete(g.playerActors, stopped.UID)
 	}
 }
@@ -570,7 +537,7 @@ func (g *GateActor) beginServerShutdown(ctx tree.Context, message *sspb.Event) {
 	for uid, current := range g.sessions {
 		delete(g.sessions, uid)
 		ctx.Send(current.pid, &stopAgent{})
-		g.notifySessionClosed(ctx, uid, current.playerPID, current.activityPID, current.generation)
+		g.notifySessionClosed(ctx, uid, current.playerPID, current.generation)
 	}
 	for uid, state := range g.playerActors {
 		if state.evicting && state.hasPending() {
@@ -587,12 +554,6 @@ func (g *GateActor) beginServerShutdown(ctx tree.Context, message *sspb.Event) {
 			g.shutdownRemaining++
 			ctx.RequestCallback(state.pid, &ipb.StopPlayerActor{UID: uid, Shutdown: true}, func(callbackCtx tree.Context, _ interface{}, err error) {
 				g.onPlayerShutdownComplete(callbackCtx, uid, err)
-			})
-		}
-		if state.activityPID.ID != 0 {
-			g.shutdownRemaining++
-			ctx.RequestCallback(state.activityPID, gameevent.Clone(serverClosingEvent), func(callbackCtx tree.Context, _ interface{}, err error) {
-				g.onPlayerActivityShutdownComplete(callbackCtx, uid, err)
 			})
 		}
 	}
@@ -616,20 +577,6 @@ func (g *GateActor) onPlayerShutdownComplete(_ tree.Context, uid uint64, err err
 	}
 }
 
-// onPlayerActivityShutdownComplete 记录玩家活动角色的关服结果并更新等待数量。
-func (g *GateActor) onPlayerActivityShutdownComplete(_ tree.Context, uid uint64, err error) {
-	if err != nil && g.shutdownErr == nil {
-		g.shutdownErr = err
-		tlog.Log.Error("[gate/GateActor.onPlayerActivityShutdownComplete] 玩家活动角色关服处理失败, pid=%v err=%v", uid, err)
-	}
-	if g.shutdownRemaining > 0 {
-		g.shutdownRemaining--
-	}
-	if g.shutdownRemaining == 0 {
-		g.finishServerShutdown()
-	}
-}
-
 // finishServerShutdown 在所有玩家角色完成关服后回复生命周期请求。
 func (g *GateActor) finishServerShutdown() {
 	waiter := g.shutdownWaiter
@@ -639,6 +586,7 @@ func (g *GateActor) finishServerShutdown() {
 	}
 }
 
+// onPlayerLoadFailed 关闭数据加载失败玩家的在线会话。
 func (g *GateActor) onPlayerLoadFailed(ctx tree.Context, msg interface{}) {
 	failed, ok := msg.(*ipb.PlayerLoadFailed)
 	if !ok || failed == nil {
@@ -654,6 +602,7 @@ func (g *GateActor) onPlayerLoadFailed(ctx tree.Context, msg interface{}) {
 	tlog.Log.Error("[gate/GateActor.onPlayerLoadFailed] 玩家数据加载失败，已关闭会话, pid=%v reason=%v", failed.UID, failed.Reason)
 }
 
+// onBanUID 封禁玩家并关闭其当前网关会话。
 func (g *GateActor) onBanUID(ctx tree.Context, msg interface{}) {
 	ban, ok := msg.(*ipb.BanUID)
 	if !ok || ban == nil || ban.UID == 0 {
@@ -665,6 +614,7 @@ func (g *GateActor) onBanUID(ctx tree.Context, msg interface{}) {
 	}
 }
 
+// onUnbanUID 从当前网关的内存封禁列表中移除玩家。
 func (g *GateActor) onUnbanUID(_ tree.Context, msg interface{}) {
 	unban, ok := msg.(*ipb.UnbanUID)
 	if !ok || unban == nil {
@@ -673,6 +623,7 @@ func (g *GateActor) onUnbanUID(_ tree.Context, msg interface{}) {
 	delete(g.bannedUIDs, unban.UID)
 }
 
+// closeCurrent 从网关会话目录中移除玩家并通知玩家 Actor 断线。
 func (g *GateActor) closeCurrent(
 	ctx tree.Context,
 	uid uint64,
@@ -681,10 +632,11 @@ func (g *GateActor) closeCurrent(
 ) {
 	delete(g.sessions, uid)
 	ctx.Send(current.pid, &stopAgent{})
-	g.notifySessionClosed(ctx, uid, current.playerPID, current.activityPID, current.generation)
+	g.notifySessionClosed(ctx, uid, current.playerPID, current.generation)
 	tlog.Log.Info("[gate/GateActor.closeCurrent] 网关会话已关闭, pid=%v reason=%v", uid, reason)
 }
 
+// rejectCanceledOpen 检查登录流是否已取消并关闭刚创建的会话。
 func (g *GateActor) rejectCanceledOpen(ctx tree.Context, open *openSession, opened *openedSession) bool {
 	if !openSessionCanceled(open) {
 		return false
@@ -697,21 +649,19 @@ func (g *GateActor) rejectCanceledOpen(ctx tree.Context, open *openSession, open
 	return true
 }
 
+// notifySessionClosed 将网关会话关闭消息发送给玩家 Actor。
 func (g *GateActor) notifySessionClosed(
 	ctx tree.Context,
 	uid uint64,
 	playerPID tree.PID,
-	activityPID tree.PID,
 	generation uint64,
 ) {
 	if playerPID.ID != 0 && !ctx.Send(playerPID, &ipb.SessionClosed{UID: uid, Generation: generation}) {
 		tlog.Log.Error("[gate/GateActor.notifySessionClosed] 通知玩家 Actor 断线失败, pid=%v playerPID=%v", uid, playerPID)
 	}
-	if activityPID.ID != 0 && !ctx.Send(activityPID, &ipb.SessionClosed{UID: uid, Generation: generation}) {
-		tlog.Log.Error("[gate/GateActor.notifySessionClosed] 通知玩家活动 Actor 断线失败, pid=%v activityPID=%v", uid, activityPID)
-	}
 }
 
+// onPlayerMessageRetryTimer 重试发送待处理的玩家系统消息和 Actor 停止请求。
 func (g *GateActor) onPlayerMessageRetryTimer() {
 	g.messageRetryTimer = nil
 	if g.shuttingDown {
@@ -734,6 +684,7 @@ func (g *GateActor) onPlayerMessageRetryTimer() {
 	g.schedulePlayerMessageRetry()
 }
 
+// flushPending 按顺序向玩家 Actor 重发排队消息。
 func (g *GateActor) flushPending(state *playerActorState) {
 	if state == nil || state.evicting || state.pid.ID == 0 || g.system == nil {
 		return
@@ -752,6 +703,7 @@ func (g *GateActor) flushPending(state *playerActorState) {
 	}
 }
 
+// schedulePlayerMessageRetry 在仍有待处理工作时安排下一次重试。
 func (g *GateActor) schedulePlayerMessageRetry() {
 	if g.messageRetryWheel == nil || g.messageRetryTimer != nil || g.shuttingDown {
 		return
@@ -765,6 +717,7 @@ func (g *GateActor) schedulePlayerMessageRetry() {
 	}
 }
 
+// hasPlayerMessageRetryWork 检查玩家 Actor 目录中是否还有待重试工作。
 func (g *GateActor) hasPlayerMessageRetryWork() bool {
 	for _, state := range g.playerActors {
 		if state == nil || state.pid.ID == 0 {
@@ -777,25 +730,12 @@ func (g *GateActor) hasPlayerMessageRetryWork() bool {
 	return false
 }
 
+// hasPending 返回玩家 Actor 是否有尚未发送的消息。
 func (state *playerActorState) hasPending() bool {
 	return state != nil && len(state.pending) > 0
 }
 
-func isPlayerActivityMessage(message interface{}) bool {
-	switch message.(type) {
-	case *pb_activity.GetActivityListReq:
-		return true
-	case *pb_activity.JoinActivityReq:
-		return true
-	case *pb_activity.GetProgressReq:
-		return true
-	case *pb_activity.ClaimRewardReq:
-		return true
-	default:
-		return false
-	}
-}
-
+// validateFrame 检查客户端网关帧及其协议负载是否有效。
 func validateFrame(frame *pb_gateway.Frame) error {
 	if frame == nil {
 		return fmt.Errorf("empty gateway frame")
@@ -806,6 +746,7 @@ func validateFrame(frame *pb_gateway.Frame) error {
 	return nil
 }
 
+// openSessionCanceled 检查登录流或其上下文是否已经关闭。
 func openSessionCanceled(open *openSession) bool {
 	return open == nil || open.stream == nil || open.stream.Context().Err() != nil
 }

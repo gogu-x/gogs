@@ -1,4 +1,4 @@
-// Package activity exposes the activity Actor and the stable API used by game modules.
+// Package activity 向游戏模块公开活动 Actor 和稳定的活动 API。
 package activity
 
 import (
@@ -13,108 +13,117 @@ import (
 	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 )
 
-// OwnerScope identifies the aggregate that owns an activity instance.
+// OwnerScope 标识活动实例所属的归属对象类型。
 type OwnerScope = activitymodel.OwnerScope
 
-// Status describes the lifecycle state of an activity instance.
+// Status 描述活动实例当前所处的生命周期状态。
 type Status = activitymodel.Status
 
-// Template defines immutable configuration used to create owner-scoped instances.
+// TemplateType 标识活动模板实现包提供的模板类型。
+type TemplateType = activitymodel.TemplateType
+
+// Template 定义创建归属对象活动实例时使用的不可变配置。
 type Template = activitymodel.Template
 
-// Instance is the mutable activity state owned by a player, server, or guild.
+// Instance 是由玩家、服务器或联盟持有的可变活动实例数据。
 type Instance = activitymodel.Instance
 
-// Transition records one activity lifecycle state change.
+// Transition 记录一次活动生命周期状态变化。
 type Transition = activitymodel.Transition
 
-// Manager stores activity instances for one owner aggregate.
+// Manager 按活动实例 ID 管理单个归属对象持有的活动实例。
 type Manager = activitymodel.Manager
 
-// Catalog stores immutable activity templates for the running game process.
+// Catalog 保存当前游戏进程中的不可变活动模板。
 type Catalog = activitymodel.Catalog
 
-// Record stores one owner's activity state in the dedicated activity collection.
+// Record 在独立活动集合中保存一个归属对象的活动状态。
 type Record = activitymodel.Record
 
-// LifecycleDefinition binds one template package to its lifecycle hooks.
+// LifecycleDefinition 将一个模板类型绑定到完整行为实现。
 type LifecycleDefinition = activitylifecycle.Definition
 
-// LifecycleRegistry stores independently implemented activity template hooks.
+// TemplateBehavior 定义活动模板实例必须实现的全部标准行为。
+type TemplateBehavior = activitylifecycle.Behavior
+
+// LifecycleRegistry 保存由独立活动模板包实现的类型行为。
 type LifecycleRegistry = activitylifecycle.Registry
 
-// RuntimeEngine runs template lifecycle hooks against owner-scoped activity data.
+// RuntimeEngine 按实例类型执行归属对象的活动行为。
 type RuntimeEngine = activityruntime.Engine
 
-// PersistenceModel adapts owner-scoped activity records to Mongo persistence.
+// PersistenceModel 将归属对象活动记录接入 Mongo 存盘。
 type PersistenceModel = activitypersistence.Model
 
-// OwnerData owns activity state and persistence for one player, server, or guild.
+// OwnerData 管理一个玩家、服务器或联盟的活动状态和存盘。
 type OwnerData = activityowner.Data
 
 const (
-	// ScopeUnspecified indicates that no activity owner was selected.
+	// ScopeUnspecified 表示未指定活动归属对象。
 	ScopeUnspecified = activitymodel.ScopeUnspecified
-	// ScopePlayer assigns an activity instance to one player.
+	// ScopePlayer 表示活动实例归属于单个玩家。
 	ScopePlayer = activitymodel.ScopePlayer
-	// ScopeServer assigns an activity instance to one game server.
+	// ScopeServer 表示活动实例归属于当前游戏服务器。
 	ScopeServer = activitymodel.ScopeServer
-	// ScopeGuild assigns an activity instance to one guild.
+	// ScopeGuild 表示活动实例归属于单个联盟。
 	ScopeGuild = activitymodel.ScopeGuild
 
-	// StatusUnspecified represents an invalid or uninitialized lifecycle state.
+	// StatusUnspecified 表示无效或未初始化的生命周期状态。
 	StatusUnspecified = activitymodel.StatusUnspecified
-	// StatusScheduled represents an activity waiting for its start time.
+	// StatusScheduled 表示活动等待开始时间到达。
 	StatusScheduled = activitymodel.StatusScheduled
-	// StatusStarting represents an activity entering its running phase.
+	// StatusStarting 表示活动正在进入运行阶段。
 	StatusStarting = activitymodel.StatusStarting
-	// StatusRunning represents an activity accepting progress and participation.
+	// StatusRunning 表示活动接受参与和进度变更。
 	StatusRunning = activitymodel.StatusRunning
-	// StatusClosing represents an activity that has stopped accepting progress.
+	// StatusClosing 表示活动已停止接受进度变更。
 	StatusClosing = activitymodel.StatusClosing
-	// StatusClosed represents an activity whose lifecycle is complete.
+	// StatusClosed 表示活动生命周期已结束。
 	StatusClosed = activitymodel.StatusClosed
 )
 
-// NewManager creates an empty owner-scoped activity manager.
+// NewManager 创建空的归属对象活动实例管理器。
 func NewManager() *Manager { return activitymodel.NewManager() }
 
-// NewOwnerData creates activity data for one aggregate.
+// NewOwnerData 为一个归属对象创建活动数据。
 func NewOwnerData(scope OwnerScope, ownerID uint64) *OwnerData {
 	return activityowner.New(scope, ownerID)
 }
 
-// NewRecord creates an activity record for one owner.
+// NewRecord 为一个归属对象创建活动存盘记录。
 func NewRecord(scope OwnerScope, ownerID uint64, manager *Manager) *Record {
 	return activitymodel.NewRecord(scope, ownerID, manager)
 }
 
-// RecordID returns the stable document ID for an owner activity record.
+// RecordID 返回归属对象活动记录的稳定文档 ID。
 func RecordID(scope OwnerScope, ownerID uint64) string {
 	return activitymodel.RecordID(scope, ownerID)
 }
 
-// NewCatalog creates an empty activity template catalog.
+// NewCatalog 创建空的活动模板目录。
 func NewCatalog() *Catalog { return activitymodel.NewCatalog() }
 
-// DefaultCatalog returns the process-wide activity template catalog.
+// DefaultCatalog 返回进程级活动模板目录。
 func DefaultCatalog() *Catalog { return activitymodel.DefaultCatalog() }
 
-// NewLifecycleRegistry creates an empty lifecycle hook registry.
+// NewLifecycleRegistry 创建空的活动模板类型注册表。
 func NewLifecycleRegistry() *LifecycleRegistry { return activitylifecycle.NewRegistry() }
 
-// DefaultLifecycleRegistry returns the process-wide activity lifecycle registry.
+// DefaultLifecycleRegistry 返回进程级活动模板类型注册表。
 func DefaultLifecycleRegistry() *LifecycleRegistry { return activitylifecycle.DefaultRegistry() }
 
-// NewRuntimeEngine creates an activity runtime using the supplied registry.
+// NewRuntimeEngine 使用指定的类型注册表创建活动运行引擎。
 func NewRuntimeEngine(registry *LifecycleRegistry) *RuntimeEngine {
 	return activityruntime.NewEngine(registry)
 }
 
-// DefaultRuntime returns the process-wide activity runtime engine.
-func DefaultRuntime() *RuntimeEngine { return activityruntime.Default() }
+// DefaultRuntime 返回进程级活动运行引擎。
+func DefaultRuntime() *RuntimeEngine {
+	RegisterBuiltins()
+	return activityruntime.Default()
+}
 
-// NewPersistenceModel creates a dedicated activity collection model.
+// NewPersistenceModel 创建独立活动集合的存盘模型。
 func NewPersistenceModel(
 	rangeRecords func(func(*Record) bool),
 	afterSave func(*Record),
@@ -123,12 +132,12 @@ func NewPersistenceModel(
 	return activitypersistence.NewModel(rangeRecords, afterSave, interval)
 }
 
-// ToInfo converts an activity instance to the existing client activity message.
+// ToInfo 将活动实例转换为客户端活动信息。
 func ToInfo(instance *Instance) *pb_activity.ActivityInfo {
 	return activityprotocol.ToInfo(instance)
 }
 
-// ToProgress converts an activity instance to the existing progress message.
+// ToProgress 将活动实例转换为客户端进度信息。
 func ToProgress(instance *Instance) *pb_activity.ActivityProgress {
 	return activityprotocol.ToProgress(instance)
 }

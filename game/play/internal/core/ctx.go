@@ -34,6 +34,19 @@ func (ctx *Context) PlayerID() uint64 {
 	return currentPlayer.GetUID()
 }
 
+// SessionActive 返回当前玩家请求是否来自有效网关会话。
+func (ctx *Context) SessionActive() bool {
+	return ctx != nil && ctx.Actor != nil && ctx.Actor.sessionActive
+}
+
+// SessionGeneration 返回当前玩家 Actor 绑定的网关会话版本。
+func (ctx *Context) SessionGeneration() uint64 {
+	if ctx == nil || ctx.Actor == nil {
+		return 0
+	}
+	return ctx.Actor.sessionGeneration
+}
+
 // Response 回复当前请求；普通网关消息没有请求信封时不执行任何操作。
 func (ctx *Context) Response(value interface{}, err error) {
 	if ctx != nil && ctx.TreeCtx != nil {
@@ -71,8 +84,7 @@ func (ctx *Context) CastCall(
 	if !ok {
 		return false
 	}
-	ctx.TreeCtx.RequestCallback(pid, msg, callback)
-	return true
+	return ctx.TreeCtx.RequestCallback(pid, msg, callback) != nil
 }
 
 // CastPlayerMsg 通过网关向在线玩家推送协议消息。
