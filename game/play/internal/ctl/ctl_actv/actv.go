@@ -16,7 +16,7 @@ func OnGetActivityList(ctx *core.Context, request *pb_activity.GetActivityListRe
 	if request == nil {
 		return
 	}
-	forwardActivityRequest(ctx, request.GetUID(), request, &pb_activity.GetActivityListAck{})
+	forwardActivityRequest(ctx, 0, request, &pb_activity.GetActivityListAck{})
 }
 
 // OnJoinActivity 将玩家加入活动请求转发到全局活动 Actor。
@@ -24,7 +24,7 @@ func OnJoinActivity(ctx *core.Context, request *pb_activity.JoinActivityReq) {
 	if request == nil {
 		return
 	}
-	forwardActivityRequest(ctx, request.GetUID(), request, &pb_activity.JoinActivityAck{Code: pb_common.ErrCode_INTERNAL})
+	forwardActivityRequest(ctx, request.GetActivityId(), request, &pb_activity.JoinActivityAck{Code: pb_common.ErrCode_INTERNAL})
 }
 
 // OnGetActivityProgress 将玩家活动进度请求转发到全局活动 Actor。
@@ -32,7 +32,7 @@ func OnGetActivityProgress(ctx *core.Context, request *pb_activity.GetProgressRe
 	if request == nil {
 		return
 	}
-	forwardActivityRequest(ctx, request.GetUID(), request, &pb_activity.GetProgressAck{Code: pb_common.ErrCode_INTERNAL})
+	forwardActivityRequest(ctx, request.GetActivityId(), request, &pb_activity.GetProgressAck{Code: pb_common.ErrCode_INTERNAL})
 }
 
 // OnClaimActivityReward 将玩家领取活动奖励请求转发到全局活动 Actor。
@@ -40,21 +40,26 @@ func OnClaimActivityReward(ctx *core.Context, request *pb_activity.ClaimRewardRe
 	if request == nil {
 		return
 	}
-	forwardActivityRequest(ctx, request.GetUID(), request, &pb_activity.ClaimRewardAck{Code: pb_common.ErrCode_INTERNAL})
+	forwardActivityRequest(ctx, request.GetActivityId(), request, &pb_activity.ClaimRewardAck{Code: pb_common.ErrCode_INTERNAL})
 }
 
 // forwardActivityRequest 通过玩家 Actor 转发活动请求并将结果推送回客户端。
 func forwardActivityRequest(
 	ctx *core.Context,
-	uid uint64,
+	activityID uint64,
 	message interface{},
 	fallback proto.Message,
 ) {
-	if ctx == nil || uid == 0 || message == nil {
+	if ctx == nil {
+		return
+	}
+	uid := ctx.PlayerID()
+	if uid == 0 || message == nil {
 		return
 	}
 	activityMessage := &ipb.PlayerActivityMessage{
 		UID:        uid,
+		ActvID:     activityID,
 		Generation: ctx.SessionGeneration(),
 		Online:     ctx.SessionActive(),
 		Message:    message,

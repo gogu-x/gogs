@@ -2,10 +2,8 @@ package guild
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/game/activity"
 	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/game/guild/internal"
 	"github.com/gogu-x/gogs/ipb"
@@ -20,9 +18,7 @@ import (
 )
 
 const (
-	guildActivityTimerType    = timer.TimerType(1000004)
-	guildActivityTickInterval = time.Second
-	maxPendingGuildRequests   = 1024
+	maxPendingGuildRequests = 1024
 )
 
 type pendingGuildRequest struct {
@@ -30,7 +26,7 @@ type pendingGuildRequest struct {
 	request *tree.Envelope
 }
 
-// Guild owns guild aggregates, their Mongo lifecycle, and guild-scoped activities.
+// Guild owns guild aggregates and their Mongo lifecycle.
 type Guild struct {
 	store         *internal.Store
 	router        tree.Router
@@ -53,20 +49,16 @@ func NewGuild() *Guild {
 // Name returns the unique guild Actor name.
 func (guild *Guild) Name() string { return def.Guild }
 
-// OnInit registers request routes, persistence, loading, and activity lifecycle ticks.
+// OnInit registers guild routes and persistence, then loads guild aggregates.
 func (guild *Guild) OnInit(ctx tree.Context) {
 	internal.InitMessageHandlers(
 		&guild.messageRouter,
 		guild.onServerEvent,
 		guild.onSaveAllGuilds,
-		guild.onGetGuildActivities,
 		guild.onUnhandledMessage,
 	)
-	internal.InitRoutes(&guild.router, guild.store)
+	internal.InitRoutes(&guild.router, guild.store, guild.onCreateGuild)
 	guild.wheel = timer.NewTimeWheel(32, ctx.Self(), ctx.System())
-	guild.wheel.Register(guildActivityTimerType, func(_ interface{}) {
-		guild.onActivityTick()
-	})
 	guild.model = internal.NewPersistenceModel(guild.store)
 	mongoStore := mongorpc.NewStore(def.Mongo)
 	guild.lifecycle = mongorpc.NewLifecycle(mongoStore, guild.wheel, ctx)
@@ -74,25 +66,35 @@ func (guild *Guild) OnInit(ctx tree.Context) {
 		guild.failLoad(ctx, err)
 		return
 	}
-	activityModel := activity.NewPersistenceModel(
-		guild.store.RangeActivityRecords,
-		guild.store.AfterActivityRecordSaved,
-		time.Minute,
-	)
-	if err := guild.lifecycle.Register(activityModel); err != nil {
-		guild.failLoad(ctx, err)
-		return
-	}
 	if !guild.lifecycle.LoadAll(ctx, (*internal.Guild)(nil), bson.M{}, guild.onGuildsLoaded) {
 		guild.failLoad(ctx, fmt.Errorf("guild load request could not be sent"))
 		return
 	}
-	guild.scheduleActivityTick()
 }
 
 // HandleMessage routes guild messages to their registered handlers.
 func (guild *Guild) HandleMessage(ctx tree.Context, message interface{}) {
 	guild.messageRouter.Route(ctx, message)
+}
+
+// onCreateGuild 创建联盟后通知活动服务加载该联盟的活动归属。
+func (guild *Guild) onCreateGuild(ctx tree.Context, request *pb_guild.CreateGuildReq) {
+	ack := guild.store.Create(request)
+	if ack != nil && ack.GetCode() == pb_common.ErrCode_OK && ack.GetGuild() != nil {
+		guild.notifyActivityOwnerCreated(ctx, ack.GetGuild().GetGuildId())
+	}
+	ctx.Response(ack, nil)
+}
+
+// notifyActivityOwnerCreated 通过单向事件通知活动服务加载联盟活动。
+func (guild *Guild) notifyActivityOwnerCreated(ctx tree.Context, guildID uint64) {
+	if guildID == 0 {
+		return
+	}
+	activityPID, ok := ctx.Lookup(def.ActorActivity)
+	if !ok || !ctx.Send(activityPID, &ipb.CreateGuildActivityOwner{GuildID: guildID}) {
+		tlog.Log.Error("[guild/Guild.notifyActivityOwnerCreated] 联盟活动创建事件发送失败, guild=%v", guildID)
+	}
 }
 
 // onServerEvent 处理 Guild Actor 的服务器开服和关服事件。
@@ -124,11 +126,6 @@ func (guild *Guild) onSaveAllGuilds(ctx tree.Context, _ *ipb.SaveAllGuilds) {
 	guild.saveAll(ctx)
 }
 
-// onGetGuildActivities 返回玩家所属联盟的活动数据。
-func (guild *Guild) onGetGuildActivities(ctx tree.Context, request *ipb.GetGuildActivities) {
-	guild.handleGuildActivities(ctx, request)
-}
-
 // onUnhandledMessage 将联盟请求交给加载队列或业务路由处理。
 func (guild *Guild) onUnhandledMessage(ctx tree.Context, message interface{}) {
 	if guild.serverClosing {
@@ -144,27 +141,6 @@ func (guild *Guild) onUnhandledMessage(ctx tree.Context, message interface{}) {
 		return
 	}
 	guild.router.Route(ctx, message)
-}
-
-func (guild *Guild) handleGuildActivities(ctx tree.Context, request *ipb.GetGuildActivities) {
-	if request == nil {
-		ctx.Response(nil, fmt.Errorf("guild activity request is nil"))
-		return
-	}
-	if guild.loadErr != nil {
-		ctx.Response(nil, guild.loadErr)
-		return
-	}
-	if !guild.ready {
-		guild.queueRequest(ctx, request)
-		return
-	}
-	activities, ok := guild.store.HandlePending(request)
-	if !ok {
-		ctx.Response(nil, fmt.Errorf("guild activity request could not be handled"))
-		return
-	}
-	ctx.Response(activities, nil)
 }
 
 // OnStop stops guild timers after the caller has completed its explicit flush.
@@ -188,39 +164,15 @@ func (guild *Guild) onGuildsLoaded(ctx tree.Context, value interface{}, err erro
 	for index := range *loaded {
 		guilds = append(guilds, &(*loaded)[index])
 	}
-	if err := guild.store.ReplaceAll(guilds); err != nil {
-		guild.failLoad(ctx, err)
-		return
-	}
-	if !guild.lifecycle.LoadAll(
-		ctx,
-		(*activity.Record)(nil),
-		bson.M{"scope": activity.ScopeGuild},
-		guild.onGuildActivitiesLoaded,
-	) {
-		guild.failLoad(ctx, fmt.Errorf("guild activity load request could not be sent"))
-	}
-}
-
-func (guild *Guild) onGuildActivitiesLoaded(ctx tree.Context, value interface{}, err error) {
-	if err != nil {
-		guild.failLoad(ctx, err)
-		return
-	}
-	loaded, ok := value.(*[]activity.Record)
-	if !ok || loaded == nil {
-		guild.failLoad(ctx, fmt.Errorf("invalid guild activity load result %T", value))
-		return
-	}
-	records := make([]*activity.Record, 0, len(*loaded))
-	for index := range *loaded {
-		records = append(records, &(*loaded)[index])
-	}
-	guild.store.ReplaceActivityRecords(records)
-	changed := guild.store.SyncActivityLifecycle(time.Now().Unix())
+	guild.store.ReplaceAll(guilds)
+	guild.store.Range(func(owner *internal.Guild) bool {
+		if owner != nil && !owner.IsDeleted() {
+			guild.notifyActivityOwnerCreated(ctx, owner.GetID())
+		}
+		return true
+	})
 	guild.ready = true
-	tlog.Log.Info("[guild/Guild.onGuildActivitiesLoaded] 联盟及活动数据加载完成, guilds=%v activityRecords=%v activityUpdates=%v",
-		guild.store.Count(), len(records), changed)
+	tlog.Log.Info("[guild/Guild.onGuildsLoaded] 联盟数据加载完成, guilds=%v", guild.store.Count())
 	guild.drainPending(ctx)
 }
 
@@ -281,6 +233,9 @@ func (guild *Guild) drainPending(ctx tree.Context) {
 			item.request.Respond(nil, fmt.Errorf("unsupported guild request %T", item.message))
 			continue
 		}
+		if createAck, ok := response.(*pb_guild.CreateGuildAck); ok && createAck.GetCode() == pb_common.ErrCode_OK && createAck.GetGuild() != nil {
+			guild.notifyActivityOwnerCreated(ctx, createAck.GetGuild().GetGuildId())
+		}
 		item.request.Respond(response, nil)
 	}
 }
@@ -302,25 +257,6 @@ func (guild *Guild) unavailableResponse(message interface{}) interface{} {
 		return &pb_guild.GetGuildAck{Code: pb_common.ErrCode_INTERNAL}
 	default:
 		return nil
-	}
-}
-
-func (guild *Guild) onActivityTick() {
-	if guild.ready && guild.loadErr == nil {
-		changed := guild.store.SyncActivityLifecycle(time.Now().Unix())
-		if changed > 0 {
-			tlog.Log.Info("[guild/Guild.onActivityTick] 联盟活动生命周期已推进, updates=%v", changed)
-		}
-	}
-	guild.scheduleActivityTick()
-}
-
-func (guild *Guild) scheduleActivityTick() {
-	if guild.wheel == nil {
-		return
-	}
-	if guild.wheel.After(guildActivityTimerType, guildActivityTickInterval, nil) == nil {
-		tlog.Log.Error("[guild/Guild.scheduleActivityTick] 安排联盟活动定时器失败")
 	}
 }
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/def"
-	"github.com/gogu-x/gogs/game/activity"
+	"github.com/gogu-x/gogs/game/actv"
 	"github.com/gogu-x/gogs/game/battle"
 	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/game/gate"
@@ -69,17 +69,10 @@ func main() {
 				natsrpc.NewNats(natsrpc.Game, conf.ServerID, conf.NodeId, conf.NatsURL),
 				battle.New(nil, nil, conf.ServerID, conf.NodeId),
 				guild.NewGuild(),
-				activity.NewActivity(uint64(conf.ServerID)),
+				actv.NewActivity(),
 				gate.NewGate(),
 			)
-			if err := gameevent.SendToActors(
-				system,
-				gameevent.NewServerOpened(),
-				[]string{def.Guild, def.ActorActivity, def.BattleClient, def.GameGate},
-			); err != nil {
-				system.Shutdown()
-				return err
-			}
+			gameevent.SendToActors(system, gameevent.NewServerOpened(), []string{def.Guild, def.ActorActivity, def.BattleClient, def.GameGate})
 
 			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

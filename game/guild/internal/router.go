@@ -6,8 +6,12 @@ import (
 	"github.com/gogu-x/tree"
 )
 
-func InitRoutes(r *tree.Router, s *Store) {
-	util.Register(r, &pb_guild.CreateGuildReq{}, s.Create)
+func InitRoutes(
+	r *tree.Router,
+	s *Store,
+	onCreate func(tree.Context, *pb_guild.CreateGuildReq),
+) {
+	util.Register(r, &pb_guild.CreateGuildReq{}, onCreate)
 	util.Register(r, &pb_guild.JoinGuildReq{}, s.Join)
 	util.Register(r, &pb_guild.LeaveGuildReq{}, s.Leave)
 	util.Register(r, &pb_guild.GetGuildReq{}, s.Get)

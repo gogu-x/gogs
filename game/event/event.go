@@ -16,9 +16,12 @@ const (
 	TypeServerLifecycle int32 = 1
 
 	// NameServerOpened identifies the event sent after server startup.
-	NameServerOpened = "server.opened"
+	NameServerOpened = "serverStart"
 	// NameServerClosing identifies the event sent before server shutdown.
-	NameServerClosing = "server.closing"
+	NameServerClosing = "serverClone"
+	NameUserLogin     = "userLogin"
+	// NameUserLogout identifies the event sent before server shutdown.
+	NameUserLogout = "userLogout"
 
 	eventDeliveryTimeout = 30 * time.Second
 )
@@ -71,24 +74,10 @@ func SendToActors(system *tree.Tree, message *sspb.Event, actorNames []string) e
 		tlog.Log.Error("[event/SendToActors] 事件投递参数无效, actorCount=%v err=%v", len(actorNames), err)
 		return err
 	}
-	eventName := message.GetName()
 	var deliveryErr error
 	for _, actorName := range actorNames {
-		pid, ok := system.Lookup(actorName)
-		if !ok {
-			err := fmt.Errorf("actor %s was not found for event %q", actorName, eventName)
-			tlog.Log.Error("[event/SendToActors] 事件投递目标 Actor 不存在, actor=%v event=%v err=%v", actorName, eventName, err)
-			if deliveryErr == nil {
-				deliveryErr = err
-			}
-			continue
-		}
-		if _, err := system.Request(pid, Clone(message)).AwaitTimeout(eventDeliveryTimeout); err != nil {
-			tlog.Log.Error("[event/SendToActors] 等待 Actor 处理事件失败, actor=%v event=%v err=%v", actorName, eventName, err)
-			if deliveryErr == nil {
-				deliveryErr = err
-			}
-		}
+		pid, _ := system.Lookup(actorName)
+		system.Send(pid, Clone(message))
 	}
 	return deliveryErr
 }

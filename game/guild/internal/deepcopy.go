@@ -16,7 +16,6 @@ func (in *Guild) DeepCopy() *Guild {
 			out.Members[key1] = cloned3
 		}
 	}
-	out.LegacyActivities = in.LegacyActivities
 	return &out
 }
 

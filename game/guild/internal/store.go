@@ -3,17 +3,12 @@
 package internal
 
 import (
-	"fmt"
 	"sort"
 
-	"github.com/gogu-x/gogs/game/activity"
-	"github.com/gogu-x/gogs/ipb"
-	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/gogs/pb/cspb/pb_guild"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/tlog"
-	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // Member 保存一名玩家在联盟中的成员数据。
@@ -73,15 +68,14 @@ func (member *Member) ToProto() *pb_guild.GuildMember {
 // Guild 保存全局联盟 Actor 管理的联盟聚合数据。
 // +deepcopy-gen=true
 type Guild struct {
-	ID               uint64             `bson:"_id"`        // 联盟唯一 ID。
-	Name             string             `bson:"name"`       // 联盟名称。
-	Notice           string             `bson:"notice"`     // 联盟公告。
-	Leader           uint64             `bson:"leader"`     // 当前会长玩家 ID。
-	Members          map[uint64]*Member `bson:"members"`    // 按玩家 ID 索引的成员。
-	LegacyActivities bson.Raw           `bson:"activities"` // 旧版联盟文档中的活动数据，仅用于迁移。
-	Deleted          bool               `bson:"deleted"`    // 联盟是否已解散。
-	Dirty            bool               `bson:"-"`          // 是否需要存盘。
-	revision         uint64             `bson:"-"`          // 内存版本号，不写入联盟文档。
+	ID       uint64             `bson:"_id"`     // 联盟唯一 ID。
+	Name     string             `bson:"name"`    // 联盟名称。
+	Notice   string             `bson:"notice"`  // 联盟公告。
+	Leader   uint64             `bson:"leader"`  // 当前会长玩家 ID。
+	Members  map[uint64]*Member `bson:"members"` // 按玩家 ID 索引的成员。
+	Deleted  bool               `bson:"deleted"` // 联盟是否已解散。
+	Dirty    bool               `bson:"-"`       // 是否需要存盘。
+	revision uint64             `bson:"-"`       // 内存版本号，不写入联盟文档。
 }
 
 // GetID 返回联盟 ID。
@@ -127,21 +121,6 @@ func (guild *Guild) GetMembers() map[uint64]*Member {
 		return nil
 	}
 	return guild.Members
-}
-
-// GetLegacyActivities 返回旧版联盟文档中用于迁移的活动数据。
-func (guild *Guild) GetLegacyActivities() bson.Raw {
-	if guild == nil {
-		return nil
-	}
-	return guild.LegacyActivities
-}
-
-// ClearLegacyActivities 清除已迁移的旧版内嵌活动数据。
-func (guild *Guild) ClearLegacyActivities() {
-	if guild != nil {
-		guild.LegacyActivities = nil
-	}
 }
 
 // MarkDirty 标记联盟文档已修改并递增版本号。
@@ -204,24 +183,22 @@ func (guild *Guild) ToProto() *pb_guild.GuildInfo {
 
 // Store 管理所有联盟聚合数据和玩家到联盟的成员索引。
 type Store struct {
-	guilds          map[uint64]*Guild
-	activityRecords map[uint64]*activity.Record
-	memberGuild     map[uint64]uint64
-	nextID          uint64
+	guilds      map[uint64]*Guild
+	memberGuild map[uint64]uint64
+	nextID      uint64
 }
 
 // NewStore 创建空的联盟数据仓库。
 func NewStore() *Store {
 	return &Store{
-		guilds:          make(map[uint64]*Guild),
-		activityRecords: make(map[uint64]*activity.Record),
-		memberGuild:     make(map[uint64]uint64),
+		guilds:      make(map[uint64]*Guild),
+		memberGuild: make(map[uint64]uint64),
 	}
 }
 
-// Create 处理创建联盟请求。
-func (store *Store) Create(ctx tree.Context, req *pb_guild.CreateGuildReq) {
-	ctx.Response(store.create(req), nil)
+// Create 创建联盟并返回结果。
+func (store *Store) Create(req *pb_guild.CreateGuildReq) *pb_guild.CreateGuildAck {
+	return store.create(req)
 }
 
 // Join 处理加入联盟请求。
@@ -250,28 +227,9 @@ func (store *Store) HandlePending(message interface{}) (interface{}, bool) {
 		return store.leave(request), true
 	case *pb_guild.GetGuildReq:
 		return store.get(request), true
-	case *ipb.GetGuildActivities:
-		return store.activitiesForPlayer(request.GetUID()), true
 	default:
 		return nil, false
 	}
-}
-
-// activitiesForPlayer 返回玩家所属联盟的活动实例信息。
-func (store *Store) activitiesForPlayer(uid uint64) []*pb_activity.ActivityInfo {
-	if store == nil || uid == 0 {
-		return []*pb_activity.ActivityInfo{}
-	}
-	guildID, exists := store.memberGuild[uid]
-	if !exists {
-		return []*pb_activity.ActivityInfo{}
-	}
-	guild := store.getGuild(guildID)
-	record := store.activityRecords[guildID]
-	if guild == nil || guild.IsDeleted() || record == nil || record.GetManager() == nil {
-		return []*pb_activity.ActivityInfo{}
-	}
-	return activity.DefaultRuntime().GetInfoList(record.GetManager())
 }
 
 func (store *Store) create(req *pb_guild.CreateGuildReq) *pb_guild.CreateGuildAck {
@@ -301,7 +259,6 @@ func (store *Store) create(req *pb_guild.CreateGuildReq) *pb_guild.CreateGuildAc
 		Leader:  uid,
 		Members: make(map[uint64]*Member),
 	}
-	store.activityRecords[guildID] = activity.NewRecord(activity.ScopeGuild, guildID, activity.NewManager())
 	guild.GetMembers()[uid] = &Member{
 		UID:   uid,
 		Name:  req.GetLeaderName(),
@@ -444,98 +401,34 @@ func (store *Store) transferOrDisband(guild *Guild, remaining map[uint64]*Member
 }
 
 // ReplaceAll 在启动后恢复联盟文档并重建成员索引。
-func (store *Store) ReplaceAll(guilds []*Guild) error {
+func (store *Store) ReplaceAll(guilds []*Guild) {
 	if store == nil {
-		return nil
+		return
 	}
 	store.reset()
 	for _, guild := range guilds {
-		if guild == nil || guild.GetID() == 0 {
-			continue
-		}
-		if guild.GetMembers() == nil {
-			guild.Members = make(map[uint64]*Member)
-		}
-		legacyManager := activity.NewManager()
-		legacyData := guild.GetLegacyActivities()
-		if len(legacyData) > 0 {
-			if err := bson.Unmarshal(legacyData, legacyManager); err != nil {
-				return fmt.Errorf("decode legacy guild activity for guild %d: %w", guild.GetID(), err)
-			}
-		}
-		record := activity.NewRecord(activity.ScopeGuild, guild.GetID(), legacyManager)
-		if len(legacyData) > 0 {
-			record.MarkDirty()
-			guild.ClearLegacyActivities()
-			guild.MarkDirty()
-		}
-		store.activityRecords[guild.GetID()] = record
-		store.guilds[guild.GetID()] = guild
-		if guild.GetID() > store.nextID {
-			store.nextID = guild.GetID()
-		}
-		if guild.IsDeleted() {
-			continue
-		}
-		for _, member := range guild.GetMembers() {
-			if member != nil && member.GetUID() != 0 {
-				store.memberGuild[member.GetUID()] = guild.GetID()
-			}
-		}
-	}
-	return nil
-}
-
-// ReplaceActivityRecords 将已加载的活动文档绑定到联盟聚合数据。
-func (store *Store) ReplaceActivityRecords(records []*activity.Record) {
-	if store == nil {
-		return
-	}
-	for _, record := range records {
-		if record == nil || record.GetScope() != activity.ScopeGuild || record.GetOwnerID() == 0 {
-			continue
-		}
-		guild := store.getGuild(record.GetOwnerID())
 		if guild == nil {
 			continue
 		}
-		if record.GetID() != activity.RecordID(activity.ScopeGuild, guild.GetID()) {
-			tlog.Log.Error("[guild/Store.ReplaceActivityRecords] 联盟活动文档主键无效, guild=%v id=%v", guild.GetID(), record.GetID())
+		if guildID := guild.GetID(); guildID == 0 {
 			continue
+		} else {
+			if guild.GetMembers() == nil {
+				guild.Members = make(map[uint64]*Member)
+			}
+			store.guilds[guildID] = guild
+			if guildID > store.nextID {
+				store.nextID = guildID
+			}
+			if guild.IsDeleted() {
+				continue
+			}
+			for _, member := range guild.GetMembers() {
+				if member != nil && member.GetUID() != 0 {
+					store.memberGuild[member.GetUID()] = guildID
+				}
+			}
 		}
-		if record.GetManager() == nil {
-			record.SetManager(activity.NewManager())
-			record.MarkDirty()
-		}
-		store.activityRecords[guild.GetID()] = record
-		if len(guild.GetLegacyActivities()) > 0 {
-			guild.ClearLegacyActivities()
-			guild.MarkDirty()
-		}
-	}
-}
-
-// RangeActivityRecords 按联盟 ID 顺序遍历联盟活动文档。
-func (store *Store) RangeActivityRecords(callback func(*activity.Record) bool) {
-	if store == nil || callback == nil {
-		return
-	}
-	store.Range(func(guild *Guild) bool {
-		if guild == nil {
-			return true
-		}
-		return callback(store.activityRecords[guild.GetID()])
-	})
-}
-
-// AfterActivityRecordSaved 仅在当前活动文档版本未变化时清除脏标记。
-func (store *Store) AfterActivityRecordSaved(snapshot *activity.Record) {
-	if store == nil || snapshot == nil {
-		return
-	}
-	if current := store.activityRecords[snapshot.GetOwnerID()]; current != nil &&
-		current.GetID() == snapshot.GetID() && current.Revision() == snapshot.Revision() {
-		current.SetDirty(false)
 	}
 }
 
@@ -571,56 +464,9 @@ func (store *Store) getGuild(guildID uint64) *Guild {
 	return store.guilds[guildID]
 }
 
-// SyncActivityLifecycle 创建已配置的联盟活动实例并推进其生命周期。
-func (store *Store) SyncActivityLifecycle(now int64) int {
-	if store == nil {
-		return 0
-	}
-	changedCount := 0
-	store.Range(func(guild *Guild) bool {
-		if guild == nil || guild.IsDeleted() {
-			return true
-		}
-		activityRecord := store.activityRecords[guild.GetID()]
-		if activityRecord == nil {
-			activityRecord = activity.NewRecord(activity.ScopeGuild, guild.GetID(), activity.NewManager())
-			store.activityRecords[guild.GetID()] = activityRecord
-		}
-		activityMgr := activityRecord.GetManager()
-		if activityMgr == nil {
-			activityMgr = activity.NewManager()
-			activityRecord.SetManager(activityMgr)
-			activityRecord.MarkDirty()
-			changedCount++
-		}
-		activityChanged, transitions := activity.DefaultRuntime().Sync(
-			activityMgr,
-			activity.ScopeGuild,
-			guild.GetID(),
-			activity.DefaultCatalog().List(activity.ScopeGuild),
-			now,
-		)
-		if activityChanged {
-			activityRecord.MarkDirty()
-			changedCount++
-			tlog.Log.Info("[guild/Store.SyncActivityLifecycle] 已同步联盟活动模板, activities=%v guild=%v",
-				len(activityMgr.List()), guild.GetID())
-		}
-		if len(transitions) > 0 {
-			for _, transition := range transitions {
-				tlog.Log.Info("[guild/Store.SyncActivityLifecycle] 联盟活动状态已变更, instance=%v template=%v from=%v to=%v guild=%v",
-					transition.GetInstanceID(), transition.GetTemplateID(), transition.GetFrom(), transition.GetTo(), guild.GetID())
-			}
-		}
-		return true
-	})
-	return changedCount
-}
-
 // reset 清空联盟和活动的内存索引。
 func (store *Store) reset() {
 	store.guilds = make(map[uint64]*Guild)
-	store.activityRecords = make(map[uint64]*activity.Record)
 	store.memberGuild = make(map[uint64]uint64)
 	store.nextID = 0
 }

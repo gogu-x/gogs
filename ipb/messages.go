@@ -114,6 +114,7 @@ type SaveAllActivities struct{}
 // PlayerActivityMessage 将玩家活动请求从玩家 Actor 转发到全局活动 Actor。
 type PlayerActivityMessage struct {
 	UID        uint64      // 玩家唯一 ID。
+	ActvID     uint64      // 活动实例 ID；活动列表请求为 0。
 	Generation uint64      // 当前网关会话版本。
 	Online     bool        // 转发请求时玩家是否在线。
 	Message    interface{} // 要处理的活动业务请求。
@@ -125,6 +126,14 @@ func (message *PlayerActivityMessage) GetUID() uint64 {
 		return 0
 	}
 	return message.UID
+}
+
+// GetActvID 返回活动请求目标实例的编号。
+func (message *PlayerActivityMessage) GetActvID() uint64 {
+	if message == nil {
+		return 0
+	}
+	return message.ActvID
 }
 
 // GetGeneration 返回转发活动请求时使用的网关会话版本。
@@ -153,6 +162,47 @@ type PlayerActivityOwnerReleased struct {
 	UID uint64 // 玩家唯一 ID。
 }
 
+// CreatePlayerActivity 请求活动 Actor 为玩家创建一份按需活动实例。
+type CreatePlayerActivity struct {
+	UID      uint64 // 活动归属玩家 ID。
+	ConfigID uint64 // 要创建活动对应的配置 ID。
+}
+
+// GetConfigID 返回请求创建活动对应的配置 ID。
+func (message *CreatePlayerActivity) GetConfigID() uint64 {
+	if message == nil {
+		return 0
+	}
+	return message.ConfigID
+}
+
+// GetUID 返回按需活动实例的归属玩家 ID。
+func (message *CreatePlayerActivity) GetUID() uint64 {
+	if message == nil {
+		return 0
+	}
+	return message.UID
+}
+
+// CreatePlayerActivityAck 返回按需活动实例创建结果。
+type CreatePlayerActivityAck struct {
+	InstanceID uint64 // 创建或已存在的活动实例 ID。
+	Created    bool   // 本次请求是否新建了活动实例。
+}
+
+// GetInstanceID 返回创建或已存在的活动实例 ID。
+func (message *CreatePlayerActivityAck) GetInstanceID() uint64 {
+	if message == nil {
+		return 0
+	}
+	return message.InstanceID
+}
+
+// GetCreated 返回本次请求是否新建了活动实例。
+func (message *CreatePlayerActivityAck) GetCreated() bool {
+	return message != nil && message.Created
+}
+
 // GetUID 返回需要释放活动数据的玩家编号。
 func (message *PlayerActivityOwnerReleased) GetUID() uint64 {
 	if message == nil {
@@ -161,17 +211,17 @@ func (message *PlayerActivityOwnerReleased) GetUID() uint64 {
 	return message.UID
 }
 
-// GetGuildActivities 请求联盟 Actor 返回玩家所属联盟的活动。
-type GetGuildActivities struct {
-	UID uint64 // 查询联盟活动的玩家 ID。
+// CreateGuildActivityOwner 通知活动 Actor 联盟归属已创建或加载完成。
+type CreateGuildActivityOwner struct {
+	GuildID uint64 // 联盟归属 ID。
 }
 
-// GetUID 返回查询联盟活动的玩家编号。
-func (message *GetGuildActivities) GetUID() uint64 {
+// GetGuildID 返回需要初始化活动的联盟归属 ID。
+func (message *CreateGuildActivityOwner) GetGuildID() uint64 {
 	if message == nil {
 		return 0
 	}
-	return message.UID
+	return message.GuildID
 }
 
 // StopPlayerActor 请求玩家 Actor 存盘并在满足条件后停止。
