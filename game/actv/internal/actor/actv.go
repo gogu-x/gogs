@@ -3,7 +3,6 @@ package actor
 import (
 	"fmt"
 
-	activityconf "github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/tree"
@@ -70,7 +69,7 @@ func (actor *Activity) onActivityDataLoaded(ctx tree.Context, value interface{},
 		return
 	}
 	// 启动只加载服务器/联盟自己的单条数据，不含玩家条目，因此不会产生待结算条目。
-	actor.actvService.ApplyDataDocs(*docs)
+	actor.actvService.ApplyDataDocs(*docs, 0)
 	tlog.Log.Info("[activity/Activity.onActivityDataLoaded] 服务器和联盟活动组件数据加载完成, count=%v", len(*docs))
 	actor.finishStartupLoad(ctx)
 }
@@ -102,15 +101,7 @@ func (actor *Activity) restoreActivity(meta *service.ActvMeta) bool {
 			meta.GetActvID(), meta.GetCfgID(), templateType, configRow.GetType())
 		return false
 	}
-	config := activityconf.ActivityConfig{
-		ID:        uint64(configRow.GetID()),
-		Name:      fmt.Sprintf("%d", configRow.GetContentID()),
-		Type:      int32(templateType),
-		ConfigRow: configRow,
-		Scope:     int32(meta.GetOwnerScope()),
-		StartTime: meta.GetStartTs(),
-	}
-	actv := actor.actvService.NewActv(meta, config)
+	actv := actor.actvService.NewActv(meta, service.NewActivityConfig(configRow, meta))
 	if actv == nil || !actor.actvService.AddActv(actv) {
 		return false
 	}

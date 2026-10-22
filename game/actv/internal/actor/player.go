@@ -125,7 +125,7 @@ func (actor *Activity) onPlayerPartLoaded(ctx tree.Context, uid uint64, state *p
 // settleEndedPlayer 对已结束活动调用模块结算，结算结果存盘成功后卸载该玩家条目。
 // 存盘期间玩家被释放时，条目由释放流程存盘卸载，回调识别为过期后不再处理。
 func (actor *Activity) settleEndedPlayer(ctx tree.Context, uid uint64, state *playerLoadState) {
-	docs, settled := actor.actvService.SettleEndedPlayer(uid)
+	docs, settled := actor.actvService.SettleEndedPlayer(uid, actor.playerGuildID(uid))
 	if len(docs) == 0 {
 		return
 	}
@@ -156,12 +156,12 @@ func (actor *Activity) applyPlayerData(uid uint64, state *playerLoadState) {
 	}
 	actor.actvService.SetPlayerLoaded(uid)
 	if state.docs != nil {
-		actor.actvService.ApplyDataDocs(*state.docs)
+		actor.actvService.ApplyDataDocs(*state.docs, actor.playerGuildID(uid))
 	}
 	for _, actv := range restored {
 		actv.GetExt().OnLoaded()
 	}
-	actor.actvService.NotifyPlayerLoaded(uid)
+	actor.actvService.NotifyPlayerLoaded(uid, actor.playerGuildID(uid))
 	tlog.Log.Info("[activity/Activity.applyPlayerData] 玩家活动数据加载完成, pid=%v activities=%v data=%v",
 		uid, len(restored), docCount(state.docs))
 }
@@ -219,10 +219,10 @@ func (actor *Activity) onPlayerOwnerReleased(ctx tree.Context, message *ipb.Play
 		respondPending(state.pending, fmt.Errorf("player activity owner released"))
 		return
 	}
-	actor.actvService.NotifyPlayerUnload(uid)
+	actor.actvService.NotifyPlayerUnload(uid, actor.playerGuildID(uid))
 	metas := actor.actvService.PlayerDirtyMetas(uid)
-	docs := actor.actvService.PlayerDirtyData(uid)
-	actor.actvService.UnloadPlayer(uid)
+	docs := actor.actvService.PlayerDirtyData(uid, actor.playerGuildID(uid))
+	actor.actvService.UnloadPlayer(uid, actor.playerGuildID(uid))
 	released := &playerLoadState{releasing: true}
 	actor.players[uid] = released
 	actor.saveDocs(ctx, "release", uid, metas, docs, func(callbackCtx tree.Context) {
@@ -297,4 +297,11 @@ func respondPending(pending []pendingActivityRequest, err error) {
 			item.request.Respond(nil, err)
 		}
 	}
+}
+
+// playerGuildID 返回玩家所属联盟编号，用于按归属索引定位与玩家相关的联盟活动。
+// 活动 Actor 目前还拿不到联盟成员关系，统一返回 0：只处理服务器活动，联盟活动的玩家条目不加载、不通知。
+// 接入成员关系后在此返回真实联盟编号；加载与释放必须使用同一编号，保证条目能完整卸载。
+func (actor *Activity) playerGuildID(uint64) service.OwnerID {
+	return 0
 }

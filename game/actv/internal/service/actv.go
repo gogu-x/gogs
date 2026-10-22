@@ -10,13 +10,16 @@ import (
 )
 
 // ActvService 管理活动模板注册表、活动实例和归属索引。
+// 三个索引直接保存实例指针，遍历和查找不再经过编号二次查表；
+// 返回给调用方的切片为内部只读视图，删除实例时生成新切片，不影响进行中的遍历。
 type ActvService struct {
-	Tmp           map[TemplateType]ActvTemplate      // 已注册的活动模板。
-	actcMgr       map[ownerKey]map[int64]*Actv       // 每个归属对象持有的活动实例。
-	actvOwnerMgr  map[int64]ownerKey                 // 每个活动实例对应的归属对象。
-	ownerScopeMgr map[OwnerScope]map[OwnerID][]int64 // 每个归属对象的活动实例顺序。
-	actvOrder     []int64                            // 活动实例的全局注册顺序。
-	loadedPlayers map[uint64]bool                    // 活动数据已加载的玩家，“玩家是否已加载”的唯一数据来源。
+	Tmp           map[TemplateType]ActvTemplate // 已注册的活动模板。
+	tplScopes     map[TemplateType]OwnerScope   // 模板注册时声明的实例归属范围。
+	serverID      OwnerID                       // 本服编号，服务器活动的归属者。
+	actvs         map[int64]*Actv               // 全部活动实例，键为实例编号。
+	ownerActvs    map[ownerKey][]*Actv          // 每个归属者的活动实例，保持注册顺序。
+	orderedActvs  []*Actv                       // 全部活动实例，保持全局注册顺序，供 tick、事件和存盘遍历。
+	loadedPlayers map[uint64]bool               // 活动数据已加载的玩家，“玩家是否已加载”的唯一数据来源。
 }
 
 // ownerKey 唯一标识一个归属范围和归属对象。
@@ -25,13 +28,14 @@ type ownerKey struct {
 	id    OwnerID
 }
 
-// NewActvService 创建空的活动服务。
-func NewActvService() *ActvService {
+// NewActvService 创建本服的空活动服务。
+func NewActvService(serverID uint64) *ActvService {
 	return &ActvService{
 		Tmp:           make(map[TemplateType]ActvTemplate),
-		actcMgr:       make(map[ownerKey]map[int64]*Actv),
-		actvOwnerMgr:  make(map[int64]ownerKey),
-		ownerScopeMgr: make(map[OwnerScope]map[OwnerID][]int64),
+		tplScopes:     make(map[TemplateType]OwnerScope),
+		serverID:      OwnerID(serverID),
+		actvs:         make(map[int64]*Actv),
+		ownerActvs:    make(map[ownerKey][]*Actv),
 		loadedPlayers: make(map[uint64]bool),
 	}
 }
@@ -64,6 +68,7 @@ func (actv *Actv) GetExt() ActvBehavior {
 type ActvMeta struct {
 	ActvID       int64        `bson:"_id"`           // 活动实例编号。
 	StartTs      int64        `bson:"start_ts"`      // 活动开始时间戳。
+	EndTs        int64        `bson:"end_ts"`        // 活动结束时间戳；0 表示不自动结束。
 	Started      bool         `bson:"started"`       // 活动是否已执行启动行为。
 	CfgID        int32        `bson:"cfg_id"`        // 活动配置编号。
 	OwnerID      OwnerID      `bson:"owner_id"`      // 活动归属对象编号。
@@ -117,6 +122,14 @@ func (meta *ActvMeta) GetStartTs() int64 {
 		return 0
 	}
 	return meta.StartTs
+}
+
+// GetEndTs 返回活动结束时间戳。
+func (meta *ActvMeta) GetEndTs() int64 {
+	if meta == nil {
+		return 0
+	}
+	return meta.EndTs
 }
 
 // GetCfgID 返回活动配置编号。
@@ -183,41 +196,54 @@ func (as *ActvService) RemoveActv(activityID int64) {
 	if as == nil {
 		return
 	}
-	owner, found := as.actvOwnerMgr[activityID]
+	actv, found := as.actvs[activityID]
 	if !found {
 		return
 	}
-	delete(as.actvOwnerMgr, activityID)
-	if activities := as.actcMgr[owner]; activities != nil {
-		delete(activities, activityID)
-		if len(activities) == 0 {
-			delete(as.actcMgr, owner)
-		}
+	delete(as.actvs, activityID)
+	owner := actv.ownerKey()
+	if remaining := withoutActv(as.ownerActvs[owner], actv); len(remaining) > 0 {
+		as.ownerActvs[owner] = remaining
+	} else {
+		delete(as.ownerActvs, owner)
 	}
-	if owners := as.ownerScopeMgr[owner.scope]; owners != nil {
-		owners[owner.id] = removeID(owners[owner.id], activityID)
-		if len(owners[owner.id]) == 0 {
-			delete(owners, owner.id)
-		}
-	}
-	as.actvOrder = removeID(as.actvOrder, activityID)
+	as.orderedActvs = withoutActv(as.orderedActvs, actv)
 }
 
-func removeID(ids []int64, target int64) []int64 {
-	for index, id := range ids {
-		if id == target {
-			return append(ids[:index], ids[index+1:]...)
+// withoutActv 返回去掉指定实例后的新切片，不修改原切片，保证进行中的遍历安全。
+func withoutActv(list []*Actv, target *Actv) []*Actv {
+	result := make([]*Actv, 0, len(list))
+	for _, actv := range list {
+		if actv != target {
+			result = append(result, actv)
 		}
 	}
-	return ids
+	return result
 }
 
-// RegTpl 注册活动模板。
-func (as *ActvService) RegTpl(typ TemplateType, activityTemplate ActvTemplate) {
+// ownerKey 返回活动实例的归属键。
+func (actv *Actv) ownerKey() ownerKey {
+	meta := actv.GetMeta()
+	return ownerKey{scope: meta.GetOwnerScope(), id: meta.GetOwnerID()}
+}
+
+// RegTpl 注册活动模板，并声明该模板创建的实例归属范围（服务器 / 联盟 / 玩家）。
+func (as *ActvService) RegTpl(typ TemplateType, activityTemplate ActvTemplate, scope OwnerScope) {
 	if as == nil || activityTemplate == nil {
 		return
 	}
+	if scope != ScopePlayer && scope != ScopeServer && scope != ScopeGuild {
+		tlog.Log.Error("[activity/ActvService.RegTpl] 活动模板归属范围无效，拒绝注册, template=%v scope=%v", typ, scope)
+		return
+	}
 	as.Tmp[typ] = activityTemplate
+	as.tplScopes[typ] = scope
+}
+
+// TplScope 返回模板声明的归属范围；模板未注册时返回 false。
+func (as *ActvService) TplScope(typ TemplateType) (OwnerScope, bool) {
+	scope, ok := as.tplScopes[typ]
+	return scope, ok
 }
 
 // AddActv 将已创建或加载的活动实例加入归属索引。
@@ -239,66 +265,47 @@ func (as *ActvService) AddActv(actv *Actv) bool {
 		return false
 	}
 	owner := ownerKey{scope: ownerScope, id: ownerID}
-	if _, exists := as.actvOwnerMgr[activityID]; exists {
+	if _, exists := as.actvs[activityID]; exists {
 		tlog.Log.Error("[activity/ActvService.AddActv] 活动实例编号重复, activity=%v scope=%v owner=%v",
 			activityID, owner.scope, owner.id)
 		return false
 	}
-	ownerActivities := as.actcMgr[owner]
-	if ownerActivities == nil {
-		ownerActivities = make(map[int64]*Actv)
-		as.actcMgr[owner] = ownerActivities
-	}
-	ownerActivities[activityID] = actv
-	as.actvOwnerMgr[activityID] = owner
-	as.addOwnerActvID(owner, activityID)
-	as.actvOrder = append(as.actvOrder, activityID)
+	as.actvs[activityID] = actv
+	as.ownerActvs[owner] = append(as.ownerActvs[owner], actv)
+	as.orderedActvs = append(as.orderedActvs, actv)
 	meta.MarkDirty()
-	tlog.Log.Info("[activity/ActvService.AddActv] 注册活动实例, activity=%v scope=%v owner=%v before=%v after=%v",
-		activityID, owner.scope, owner.id, false, true)
+	tlog.Log.Info("[activity/ActvService.AddActv] 注册活动实例, activity=%v scope=%v owner=%v",
+		activityID, owner.scope, owner.id)
 	return true
 }
 
-// GetActvByID 按全局活动实例编号查找活动。
+// GetActvByID 按实例编号查找活动。
 func (as *ActvService) GetActvByID(activityID int64) *Actv {
 	if as == nil || activityID <= 0 {
 		return nil
 	}
-	owner, found := as.actvOwnerMgr[activityID]
-	if !found {
-		return nil
-	}
-	return as.actcMgr[owner][activityID]
+	return as.actvs[activityID]
 }
 
-// ListActvs 返回指定归属对象当前已加载的活动实例。
+// ListActvs 返回指定归属者的活动实例（按注册顺序）。返回内部只读视图，调用方不得修改。
 func (as *ActvService) ListActvs(scope OwnerScope, ownerID OwnerID) []*Actv {
 	if as == nil || scope == ScopeUnspecified || ownerID <= 0 {
 		return nil
 	}
-	activities := as.actcMgr[ownerKey{scope: scope, id: ownerID}]
-	activityIDs := as.ownerScopeMgr[scope][ownerID]
-	result := make([]*Actv, 0, len(activityIDs))
-	for _, activityID := range activityIDs {
-		if actv := activities[activityID]; actv != nil {
-			result = append(result, actv)
-		}
-	}
-	return result
+	return as.ownerActvs[ownerKey{scope: scope, id: ownerID}]
 }
 
-// ListAllActvs 按注册顺序返回全部活动实例。
+// ListServerActvs 返回本服的服务器活动实例。返回内部只读视图，调用方不得修改。
+func (as *ActvService) ListServerActvs() []*Actv {
+	return as.ListActvs(ScopeServer, as.serverID)
+}
+
+// ListAllActvs 按全局注册顺序返回全部活动实例。返回内部只读视图，调用方不得修改。
 func (as *ActvService) ListAllActvs() []*Actv {
 	if as == nil {
 		return nil
 	}
-	result := make([]*Actv, 0, len(as.actvOrder))
-	for _, activityID := range as.actvOrder {
-		if actv := as.GetActvByID(activityID); actv != nil {
-			result = append(result, actv)
-		}
-	}
-	return result
+	return as.orderedActvs
 }
 
 // HandleRequest 将玩家请求转发给活动模板，uid 透传给模板。归属校验规则：
@@ -326,9 +333,8 @@ func (as *ActvService) HandleEvent(event *sspb.Event) {
 	if as == nil || event == nil {
 		return
 	}
-	for _, activityID := range as.actvOrder {
-		actv := as.GetActvByID(activityID)
-		if actv == nil || actv.GetExt() == nil || actv.IsEnded() {
+	for _, actv := range as.orderedActvs {
+		if actv.GetExt() == nil || actv.IsEnded() {
 			continue
 		}
 		actv.GetExt().HandleEvent(event)
@@ -358,9 +364,6 @@ func (as *ActvService) StartDueActivities(now int64) {
 
 // HandleTicker 将生命周期定时回调分发给已启动的活动模板。
 func (as *ActvService) HandleTicker() {
-	if as == nil {
-		return
-	}
 	for _, actv := range as.ListAllActvs() {
 		if actv == nil || actv.GetMeta() == nil || !actv.GetMeta().Started || actv.GetExt() == nil || actv.IsEnded() {
 			continue
@@ -388,20 +391,4 @@ func (as *ActvService) EndActv(activityID int64) bool {
 	tlog.Log.Info("[activity/ActvService.EndActv] 活动结束, activity=%v scope=%v owner=%v",
 		meta.GetActvID(), meta.GetOwnerScope(), meta.GetOwnerID())
 	return true
-}
-
-// addOwnerActvID 按创建顺序记录归属对象持有的活动编号。
-func (as *ActvService) addOwnerActvID(owner ownerKey, activityID int64) {
-	owners := as.ownerScopeMgr[owner.scope]
-	if owners == nil {
-		owners = make(map[OwnerID][]int64)
-		as.ownerScopeMgr[owner.scope] = owners
-	}
-	activityIDs := owners[owner.id]
-	for _, existingID := range activityIDs {
-		if existingID == activityID {
-			return
-		}
-	}
-	owners[owner.id] = append(activityIDs, activityID)
 }

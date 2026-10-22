@@ -3,10 +3,13 @@ package base_test
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/game/actv/internal/template/base"
+	"github.com/gogu-x/gogs/game/actv/internal/trigger"
+	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	"github.com/gogu-x/tree/tlog"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -179,19 +182,19 @@ func TestDecodeFailureBlocks(t *testing.T) {
 	}
 
 	// 服务层：玩家已加载，但其条目解码失败，模板拿不到默认条目，也不会产生存盘快照。
-	svc := service.NewActvService()
-	svc.RegTpl(testTemplate, &testBehavior{})
+	svc := service.NewActvService(1)
+	svc.RegTpl(testTemplate, &testBehavior{}, service.ScopeServer)
 	_, server := newTestActv(t, svc, 10, service.ScopeServer, 1)
 	svc.SetPlayerLoaded(7)
-	svc.ApplyDataDocs([]service.ActvDataDoc{{ActvID: 10, Comp: 2, OwnerScope: service.ScopePlayer, OwnerID: 7, Data: bad}})
-	if server.member.Get(7) != nil || len(svc.PlayerDirtyData(7)) != 0 {
+	svc.ApplyDataDocs([]service.ActvDataDoc{{ActvID: 10, Comp: 2, OwnerScope: service.ScopePlayer, OwnerID: 7, Data: bad}}, 0)
+	if server.member.Get(7) != nil || len(svc.PlayerDirtyData(7, 0)) != 0 {
 		t.Fatal("decode failure must not create or save default entry")
 	}
 }
 
 func TestServiceLoadSaveUnload(t *testing.T) {
-	svc := service.NewActvService()
-	svc.RegTpl(testTemplate, &testBehavior{})
+	svc := service.NewActvService(1)
+	svc.RegTpl(testTemplate, &testBehavior{}, service.ScopeServer)
 	serverActv, server := newTestActv(t, svc, 10, service.ScopeServer, 1)
 	playerActv, player := newTestActv(t, svc, 20, service.ScopePlayer, 7)
 
@@ -230,7 +233,7 @@ func TestServiceLoadSaveUnload(t *testing.T) {
 	if got := len(svc.DirtyData()); got != 3 {
 		t.Fatalf("dirty data count = %d, want 3", got)
 	}
-	playerDocs := svc.PlayerDirtyData(7)
+	playerDocs := svc.PlayerDirtyData(7, 0)
 	if len(playerDocs) != 2 {
 		t.Fatalf("player dirty data count = %d, want 2", len(playerDocs))
 	}
@@ -248,7 +251,7 @@ func TestServiceLoadSaveUnload(t *testing.T) {
 		t.Fatalf("unexpected server doc %+v", doc)
 	}
 
-	svc.UnloadPlayer(7)
+	svc.UnloadPlayer(7, 0)
 	if svc.GetActvByID(20) != nil {
 		t.Fatal("player activity should be removed")
 	}
@@ -261,8 +264,8 @@ func TestServiceLoadSaveUnload(t *testing.T) {
 }
 
 func TestDuplicateCompIDRejected(t *testing.T) {
-	svc := service.NewActvService()
-	svc.RegTpl(testTemplate, &dupBehavior{})
+	svc := service.NewActvService(1)
+	svc.RegTpl(testTemplate, &dupBehavior{}, service.ScopeServer)
 	meta := &service.ActvMeta{ActvID: 1, CfgID: 1, OwnerID: 1, OwnerScope: service.ScopeServer, TemplateType: testTemplate}
 	if svc.NewActv(meta, conf.ActivityConfig{}) != nil {
 		t.Fatal("duplicate component id should fail")
@@ -311,8 +314,8 @@ func TestDataDocBSON(t *testing.T) {
 // TestPlayerHooks 校验上线/卸载钩子只通知服务器/联盟活动，卸载钩子中的修改进入存盘快照，
 // 以及玩家在线期间新增的服务器活动会自动补加载标记。
 func TestPlayerHooks(t *testing.T) {
-	svc := service.NewActvService()
-	svc.RegTpl(testTemplate, &testBehavior{})
+	svc := service.NewActvService(1)
+	svc.RegTpl(testTemplate, &testBehavior{}, service.ScopeServer)
 	serverActv, server := newTestActv(t, svc, 10, service.ScopeServer, 1)
 	_, player := newTestActv(t, svc, 20, service.ScopePlayer, 7)
 
@@ -322,7 +325,7 @@ func TestPlayerHooks(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	svc.NotifyPlayerLoaded(7)
+	svc.NotifyPlayerLoaded(7, 0)
 	if len(server.events) != 1 || server.events[0] != "loaded" || server.seenScore != 5 {
 		t.Fatalf("server hook events=%v score=%d", server.events, server.seenScore)
 	}
@@ -340,9 +343,9 @@ func TestPlayerHooks(t *testing.T) {
 	}
 
 	// 卸载钩子在取快照前调用，修改随释放存盘。
-	svc.NotifyPlayerUnload(7)
+	svc.NotifyPlayerUnload(7, 0)
 	var found bool
-	for _, doc := range svc.PlayerDirtyData(7) {
+	for _, doc := range svc.PlayerDirtyData(7, 0) {
 		if doc.ActvID != 10 || doc.Comp != 2 {
 			continue
 		}
@@ -355,7 +358,7 @@ func TestPlayerHooks(t *testing.T) {
 	if !found {
 		t.Fatal("unload hook change should be included in release snapshot")
 	}
-	svc.UnloadPlayer(7)
+	svc.UnloadPlayer(7, 0)
 	if svc.IsPlayerLoaded(7) {
 		t.Fatal("player should be unloaded")
 	}
@@ -432,8 +435,8 @@ func hasEntry(b *settleBehavior, uid uint64) bool {
 // TestEndedSettle 校验已结束活动：跳过 tick/上线通知、不新建条目；
 // 玩家上线后需要结算的执行 Settle、存盘后卸载，不需要的立即卸载。
 func TestEndedSettle(t *testing.T) {
-	svc := service.NewActvService()
-	svc.RegTpl(settleTemplate, &settleBehavior{})
+	svc := service.NewActvService(1)
+	svc.RegTpl(settleTemplate, &settleBehavior{}, service.ScopeServer)
 	meta := &service.ActvMeta{ActvID: 50, CfgID: 1, OwnerID: 1, OwnerScope: service.ScopeServer, TemplateType: settleTemplate, Started: true}
 	actv := svc.NewActv(meta, conf.ActivityConfig{})
 	if actv == nil || !svc.AddActv(actv) {
@@ -443,7 +446,7 @@ func TestEndedSettle(t *testing.T) {
 
 	// 在线玩家 1 在活动结束时由 OnClosed 结算。
 	svc.SetPlayerLoaded(1)
-	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 50, 1, settleData{Score: 3})})
+	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 50, 1, settleData{Score: 3})}, 0)
 	if !svc.EndActv(50) || !actv.IsEnded() || svc.EndActv(50) {
 		t.Fatal("EndActv should end once")
 	}
@@ -453,7 +456,7 @@ func TestEndedSettle(t *testing.T) {
 
 	svc.HandleTicker()
 	svc.SetPlayerLoaded(9)
-	svc.NotifyPlayerLoaded(9)
+	svc.NotifyPlayerLoaded(9, 0)
 	if b.ticks != 0 || b.logins != 0 {
 		t.Fatalf("ended activity must skip tick/hooks, ticks=%d logins=%d", b.ticks, b.logins)
 	}
@@ -462,8 +465,8 @@ func TestEndedSettle(t *testing.T) {
 	}
 
 	// 玩家 7 未结算：结算后存盘再卸载。
-	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 50, 7, settleData{Score: 5})})
-	docs, settled := svc.SettleEndedPlayer(7)
+	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 50, 7, settleData{Score: 5})}, 0)
+	docs, settled := svc.SettleEndedPlayer(7, 0)
 	if len(docs) != 1 || docs[0].OwnerID != 7 || len(settled) != 1 || settled[0] != 50 {
 		t.Fatalf("settle docs=%+v settled=%v", docs, settled)
 	}
@@ -482,8 +485,8 @@ func TestEndedSettle(t *testing.T) {
 	}
 
 	// 玩家 8 已结算：不调用 Settle，立即卸载。
-	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 50, 8, settleData{Score: 5, Settled: true})})
-	if docs, _ := svc.SettleEndedPlayer(8); len(docs) != 0 || hasEntry(b, 8) {
+	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 50, 8, settleData{Score: 5, Settled: true})}, 0)
+	if docs, _ := svc.SettleEndedPlayer(8, 0); len(docs) != 0 || hasEntry(b, 8) {
 		t.Fatal("settled player should be unloaded without saving")
 	}
 	if len(b.settled) != 2 {
@@ -493,12 +496,12 @@ func TestEndedSettle(t *testing.T) {
 
 // TestEndedWithoutSettler 未实现 Settler 的已结束活动，玩家条目加载后立即卸载。
 func TestEndedWithoutSettler(t *testing.T) {
-	svc := service.NewActvService()
-	svc.RegTpl(testTemplate, &testBehavior{})
+	svc := service.NewActvService(1)
+	svc.RegTpl(testTemplate, &testBehavior{}, service.ScopeServer)
 	_, b := newTestActv(t, svc, 60, service.ScopeServer, 1)
 	svc.EndActv(60)
-	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 60, 7, memberData{Score: 1})})
-	if docs, settled := svc.SettleEndedPlayer(7); len(docs) != 0 || len(settled) != 0 {
+	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 60, 7, memberData{Score: 1})}, 0)
+	if docs, settled := svc.SettleEndedPlayer(7, 0); len(docs) != 0 || len(settled) != 0 {
 		t.Fatal("no settle expected")
 	}
 	b.member.Range(func(uint64, *memberData) bool {
@@ -538,8 +541,8 @@ func (b *reqBehavior) HandleRequest(uid uint64, _ proto.Message) {
 // TestHandleRequestRouting 校验请求路由：服务器活动接受任意玩家并透传 uid；
 // 玩家独有活动只接受本人；联盟活动和已结束活动拒绝。
 func TestHandleRequestRouting(t *testing.T) {
-	svc := service.NewActvService()
-	svc.RegTpl(reqTemplate, &reqBehavior{})
+	svc := service.NewActvService(1)
+	svc.RegTpl(reqTemplate, &reqBehavior{}, service.ScopeServer)
 	newReq := func(id int64, scope service.OwnerScope, owner service.OwnerID) *reqBehavior {
 		meta := &service.ActvMeta{ActvID: id, CfgID: 1, OwnerID: owner, OwnerScope: scope, TemplateType: reqTemplate}
 		actv := svc.NewActv(meta, conf.ActivityConfig{})
@@ -636,5 +639,140 @@ func TestDataInit(t *testing.T) {
 	p := comp.Get(8)
 	if p.Level != 2 || !p.Tags["vip"] || p.Items == nil {
 		t.Fatalf("loaded entry should keep values and fill missing containers, got %+v", p)
+	}
+}
+
+// TestOwnerIndex 校验归属索引：增删后 actvs / ownerActvs / orderedActvs 一致；
+// 上线相关遍历只触及本服活动和玩家所属联盟活动，不触及其他联盟和其他玩家的活动。
+func TestOwnerIndex(t *testing.T) {
+	svc := service.NewActvService(1)
+	svc.RegTpl(testTemplate, &testBehavior{}, service.ScopeServer)
+	_, server := newTestActv(t, svc, 10, service.ScopeServer, 1)
+	_, otherServer := newTestActv(t, svc, 11, service.ScopeServer, 2) // 非本服
+	_, guildA := newTestActv(t, svc, 20, service.ScopeGuild, 100)
+	_, guildB := newTestActv(t, svc, 21, service.ScopeGuild, 200)
+	newTestActv(t, svc, 30, service.ScopePlayer, 7)
+	newTestActv(t, svc, 31, service.ScopePlayer, 7)
+	newTestActv(t, svc, 40, service.ScopePlayer, 8)
+
+	if got := len(svc.ListAllActvs()); got != 7 {
+		t.Fatalf("all = %d, want 7", got)
+	}
+	if got := svc.ListServerActvs(); len(got) != 1 || got[0].GetMeta().GetActvID() != 10 {
+		t.Fatalf("server actvs = %v", got)
+	}
+	if got := svc.ListActvs(service.ScopePlayer, 7); len(got) != 2 || got[0].GetMeta().GetActvID() != 30 {
+		t.Fatal("player index should keep order")
+	}
+
+	// 上线通知：玩家 7 属于联盟 100。
+	svc.NotifyPlayerLoaded(7, 100)
+	if len(server.events) != 1 || len(guildA.events) != 1 || len(guildB.events) != 0 || len(otherServer.events) != 0 {
+		t.Fatalf("notify scope wrong: server=%v guildA=%v guildB=%v other=%v",
+			server.events, guildA.events, guildB.events, otherServer.events)
+	}
+
+	// 其他联盟活动的玩家条目不挂入。
+	svc.SetPlayerLoaded(7)
+	svc.ApplyDataDocs([]service.ActvDataDoc{
+		{ActvID: 20, Comp: 2, OwnerScope: service.ScopePlayer, OwnerID: 7, Data: mustRaw(t, memberData{Score: 1})},
+		{ActvID: 21, Comp: 2, OwnerScope: service.ScopePlayer, OwnerID: 7, Data: mustRaw(t, memberData{Score: 1})},
+	}, 100)
+	if guildA.member.Get(7) == nil || guildA.member.Get(7).Score != 1 {
+		t.Fatal("own guild entry should load")
+	}
+	hasB := false
+	guildB.member.Range(func(uint64, *memberData) bool { hasB = true; return false })
+	if hasB {
+		t.Fatal("other guild entry must be skipped")
+	}
+
+	// 释放：移除玩家 7 的独有活动，卸载相关共享活动中的条目，索引同步。
+	svc.UnloadPlayer(7, 100)
+	if len(svc.ListActvs(service.ScopePlayer, 7)) != 0 || svc.GetActvByID(30) != nil || svc.GetActvByID(31) != nil {
+		t.Fatal("player activities should be removed")
+	}
+	if got := len(svc.ListAllActvs()); got != 5 {
+		t.Fatalf("all after unload = %d, want 5", got)
+	}
+	hasA := false
+	guildA.member.Range(func(uint64, *memberData) bool { hasA = true; return false })
+	if hasA {
+		t.Fatal("guild entry should be unloaded")
+	}
+	if len(svc.ListActvs(service.ScopePlayer, 8)) != 1 {
+		t.Fatal("other player unaffected")
+	}
+
+	// 遍历过程中删除不影响当前遍历。
+	all := svc.ListAllActvs()
+	svc.RemoveActv(40)
+	if len(all) != 5 || len(svc.ListAllActvs()) != 4 || svc.ListActvs(service.ScopePlayer, 8) != nil {
+		t.Fatal("remove should produce new slices and clean empty owner")
+	}
+}
+
+// TestCreateDueServerActvs 校验按时间规则创建服务器活动：只创建有效期内的轮次，重复检查不重复创建，
+// 到结束时间后结束；模板未注册或声明非服务器归属的配置被过滤。
+func TestCreateDueServerActvs(t *testing.T) {
+	svc := service.NewActvService(1)
+	svc.RegTpl(testTemplate, &testBehavior{}, service.ScopeServer)
+	svc.RegTpl(reqTemplate, &reqBehavior{}, service.ScopePlayer)
+	if scope, ok := svc.TplScope(testTemplate); !ok || scope != service.ScopeServer {
+		t.Fatal("template scope should be recorded")
+	}
+	svc.RegTpl(settleTemplate, &settleBehavior{}, service.ScopeUnspecified)
+	if _, ok := svc.TplScope(settleTemplate); ok {
+		t.Fatal("invalid scope must be rejected")
+	}
+
+	loc := time.Local
+	newPlan := func(id, tpl int32) *trigger.Plan {
+		plan, err := trigger.NewPlan(&glconf.ActvOnlineCfg{ID: id, Available: true, Type: tpl, TriggerType: 1,
+			TriggerVal: "2026-10-01 00:00:00", Reopen: true, TriggerRept: "7d", Duration: "3d"}, 0, loc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return plan
+	}
+	plans := svc.FilterServerPlans([]*trigger.Plan{
+		newPlan(100, int32(testTemplate)), // 服务器归属
+		newPlan(200, int32(reqTemplate)),  // 玩家归属，过滤
+		newPlan(300, 999),                 // 未注册，过滤
+	})
+	if len(plans) != 1 || plans[0].CfgID != 100 {
+		t.Fatalf("filtered plans = %d", len(plans))
+	}
+
+	start, _ := time.ParseInLocation("2006-01-02 15:04:05", "2026-10-15 00:00:00", loc) // 第 3 轮开始
+	now := start.Unix() + 3600
+	created := svc.CreateDueServerActvs(plans, now)
+	if len(created) != 1 {
+		t.Fatalf("created = %d, want 1", len(created))
+	}
+	meta := created[0].GetMeta()
+	if meta.GetActvID() != plans[0].InstanceID(3) || meta.GetOwnerScope() != service.ScopeServer || meta.GetOwnerID() != 1 ||
+		meta.GetStartTs() != start.Unix() || meta.GetEndTs() != start.Unix()+3*86400 || !meta.IsDirty() {
+		t.Fatalf("meta = %+v", meta)
+	}
+	if b := created[0].GetExt().(*testBehavior); !b.loaded {
+		t.Fatal("OnLoaded should be called on new instance")
+	}
+	if len(svc.CreateDueServerActvs(plans, now+60)) != 0 {
+		t.Fatal("existing instance must not be recreated")
+	}
+
+	svc.EndDueActivities(meta.GetEndTs() - 1)
+	if created[0].IsEnded() {
+		t.Fatal("should not end before EndTs")
+	}
+	svc.EndDueActivities(meta.GetEndTs())
+	if !created[0].IsEnded() {
+		t.Fatal("should end at EndTs")
+	}
+	// 结束后到保留期结束前（本例无保留期）不再创建同一轮；下一轮到期时创建新实例。
+	next := svc.CreateDueServerActvs(plans, start.Unix()+7*86400)
+	if len(next) != 1 || next[0].GetMeta().GetActvID() != plans[0].InstanceID(4) {
+		t.Fatal("next round should be created")
 	}
 }

@@ -118,19 +118,19 @@ func (as *ActvService) DirtyData() []*ActvDataDoc {
 }
 
 // PlayerDirtyData 返回随指定玩家加载的全部脏数据快照：
-// 玩家独有活动的单条数据，以及所有活动玩家列表中该玩家的条目。
-func (as *ActvService) PlayerDirtyData(uid uint64) []*ActvDataDoc {
+// 玩家独有活动的单条数据，以及相关共享活动玩家列表中该玩家的条目。
+func (as *ActvService) PlayerDirtyData(uid uint64, guildID OwnerID) []*ActvDataDoc {
 	var docs []*ActvDataDoc
 	for _, actv := range as.ListActvs(ScopePlayer, OwnerID(uid)) {
 		docs = actv.appendDirtyComps(docs)
 	}
-	for _, actv := range as.ListAllActvs() {
+	as.rangePlayerShared(guildID, func(actv *Actv) {
 		for _, comp := range actv.playerComps {
 			if comp.IsDirty(uid) {
 				docs = actv.appendDirtyPlayer(docs, comp, uid)
 			}
 		}
-	}
+	})
 	return docs
 }
 
@@ -179,56 +179,78 @@ func (as *ActvService) canCreatePlayerEntry(actv *Actv) func(uid uint64) bool {
 // IsPlayerLoaded 返回玩家活动数据是否已加载。
 func (as *ActvService) IsPlayerLoaded(uid uint64) bool { return as.loadedPlayers[uid] }
 
-// NotifyPlayerLoaded 通知所有服务器/联盟活动：该玩家的组件数据已恢复到实例中。
+// NotifyPlayerLoaded 通知玩家相关的进行中共享活动（本服活动 + 所属联盟活动）：该玩家的组件数据已恢复。
 // 玩家独有活动通过 OnLoaded 获知数据恢复，不重复通知。
-func (as *ActvService) NotifyPlayerLoaded(uid uint64) {
-	for _, actv := range as.listSharedActvs() {
-		actv.GetExt().OnPlayerLoaded(uid)
-	}
+func (as *ActvService) NotifyPlayerLoaded(uid uint64, guildID OwnerID) {
+	as.rangePlayerShared(guildID, func(actv *Actv) {
+		if !actv.IsEnded() {
+			actv.GetExt().OnPlayerLoaded(uid)
+		}
+	})
 }
 
-// NotifyPlayerUnload 通知所有服务器/联盟活动：该玩家即将卸载。
+// NotifyPlayerUnload 通知玩家相关的进行中共享活动：该玩家即将卸载。
 // 调用发生在取存盘快照之前，模板在钩子中的修改会随释放一起存盘。
-func (as *ActvService) NotifyPlayerUnload(uid uint64) {
-	for _, actv := range as.listSharedActvs() {
-		actv.GetExt().OnPlayerUnload(uid)
-	}
+func (as *ActvService) NotifyPlayerUnload(uid uint64, guildID OwnerID) {
+	as.rangePlayerShared(guildID, func(actv *Actv) {
+		if !actv.IsEnded() {
+			actv.GetExt().OnPlayerUnload(uid)
+		}
+	})
 }
 
-// listSharedActvs 返回进行中的服务器/联盟归属活动实例。
-func (as *ActvService) listSharedActvs() []*Actv {
-	all := as.ListAllActvs()
-	shared := make([]*Actv, 0, len(all))
-	for _, actv := range all {
-		if actv.GetMeta().GetOwnerScope() != ScopePlayer && actv.GetExt() != nil && !actv.IsEnded() {
-			shared = append(shared, actv)
+// rangePlayerShared 按归属索引遍历与玩家相关的共享活动：本服服务器活动，以及玩家所属联盟的活动。
+// guildID 为 0 表示玩家无联盟或联盟未知，只遍历服务器活动。遍历不分配内存。
+func (as *ActvService) rangePlayerShared(guildID OwnerID, fn func(actv *Actv)) {
+	for _, actv := range as.ListServerActvs() {
+		fn(actv)
+	}
+	if guildID > 0 {
+		for _, actv := range as.ListActvs(ScopeGuild, guildID) {
+			fn(actv)
 		}
 	}
-	return shared
 }
 
-// UnloadPlayer 移除玩家独有的活动实例，并从所有活动玩家列表组件中卸载该玩家条目。
+// isPlayerShared 返回共享活动是否与玩家相关：服务器活动，或玩家所属联盟的活动。
+func (as *ActvService) isPlayerShared(actv *Actv, guildID OwnerID) bool {
+	meta := actv.GetMeta()
+	switch meta.GetOwnerScope() {
+	case ScopeServer:
+		return meta.GetOwnerID() == as.serverID
+	case ScopeGuild:
+		return guildID > 0 && meta.GetOwnerID() == guildID
+	}
+	return false
+}
+
+// UnloadPlayer 移除玩家独有的活动实例，并从相关共享活动的玩家列表组件中卸载该玩家条目。
 // 调用方需先取走该玩家的脏数据快照。
-func (as *ActvService) UnloadPlayer(uid uint64) {
+func (as *ActvService) UnloadPlayer(uid uint64, guildID OwnerID) {
 	delete(as.loadedPlayers, uid)
 	for _, actv := range as.ListActvs(ScopePlayer, OwnerID(uid)) {
 		as.RemoveActv(actv.GetMeta().GetActvID())
 	}
-	for _, actv := range as.ListAllActvs() {
-		for _, comp := range actv.playerComps {
-			comp.Unload(uid)
-		}
-	}
+	as.rangePlayerShared(guildID, func(actv *Actv) {
+		actv.unloadPlayer(uid)
+	})
 }
 
 // ApplyDataDocs 将组件存盘数据分发给已恢复的活动实例；实例不存在或数据无效时跳过并记录日志。
-func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc) {
+// guildID 为玩家所属联盟：玩家列表条目只挂入与该玩家相关的共享活动，其他联盟活动的条目跳过，
+// 保证释放时按同一索引能完整卸载。启动加载不含玩家条目，传 0 即可。
+func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc, guildID OwnerID) {
 	for index := range docs {
 		doc := &docs[index]
 		actv := as.GetActvByID(doc.ActvID)
 		if actv == nil {
 			tlog.Log.Error("[activity/ActvService.ApplyDataDocs] 组件数据所属活动实例未加载，跳过, activity=%v comp=%v owner=%v/%v",
 				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID)
+			continue
+		}
+		if _, isPlayerComp := actv.playerComps[doc.Comp]; isPlayerComp && !as.isPlayerShared(actv, guildID) {
+			tlog.Log.Error("[activity/ActvService.ApplyDataDocs] 玩家条目所属活动与玩家无关，跳过, activity=%v comp=%v owner=%v/%v guild=%v",
+				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID, guildID)
 			continue
 		}
 		if err := actv.LoadData(doc); err != nil {
@@ -238,20 +260,20 @@ func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc) {
 	}
 }
 
-// SettleEndedPlayer 处理已结束服务器/联盟活动中刚加载的玩家数据：
+// SettleEndedPlayer 处理与玩家相关的已结束共享活动中刚加载的玩家数据：
 // 模块实现 Settler 且 NeedSettle 为 true 时调用 Settle；不需要结算的活动直接卸载该玩家条目。
 // 返回结算产生的脏数据快照，以及这些快照所属的活动，调用方存盘成功后再调用 UnloadEndedPlayer 卸载。
-func (as *ActvService) SettleEndedPlayer(uid uint64) ([]*ActvDataDoc, []int64) {
+func (as *ActvService) SettleEndedPlayer(uid uint64, guildID OwnerID) ([]*ActvDataDoc, []int64) {
 	var docs []*ActvDataDoc
 	var settled []int64
-	for _, actv := range as.ListAllActvs() {
-		if !actv.IsEnded() || actv.GetMeta().GetOwnerScope() == ScopePlayer || len(actv.playerComps) == 0 {
-			continue
+	as.rangePlayerShared(guildID, func(actv *Actv) {
+		if !actv.IsEnded() || len(actv.playerComps) == 0 {
+			return
 		}
 		settler, ok := actv.GetExt().(Settler)
 		if !ok || !settler.NeedSettle(uid) {
 			actv.unloadPlayer(uid)
-			continue
+			return
 		}
 		settler.Settle(uid)
 		tlog.Log.Info("[activity/ActvService.SettleEndedPlayer] 已结束活动玩家结算, activity=%v pid=%v", actv.GetMeta().GetActvID(), uid)
@@ -263,10 +285,10 @@ func (as *ActvService) SettleEndedPlayer(uid uint64) ([]*ActvDataDoc, []int64) {
 		}
 		if len(docs) == before {
 			actv.unloadPlayer(uid) // 结算未修改数据，无需存盘。
-			continue
+			return
 		}
 		settled = append(settled, actv.GetMeta().GetActvID())
-	}
+	})
 	return docs, settled
 }
 

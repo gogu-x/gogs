@@ -15,8 +15,8 @@ const (
 	TypeShop service.TemplateType = 2
 )
 
-// Register 注册所有内置活动模块。新增模板类型时，在参数列表中追加对应定义。
+// Register 注册所有内置活动模块，并声明各模块创建实例的归属范围。新增模板类型时在此追加。
 func Register(actvService *service.ActvService) {
-	actvService.RegTpl(TypeOnline, &online.Behavior{})
-	actvService.RegTpl(TypeShop, &shop.ShopBehavior{})
+	actvService.RegTpl(TypeOnline, &online.Behavior{}, service.ScopeServer)
+	actvService.RegTpl(TypeShop, &shop.ShopBehavior{}, service.ScopeServer)
 }

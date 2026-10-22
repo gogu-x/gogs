@@ -131,6 +131,7 @@ func (actor *Activity) dispatchEvent(ctx tree.Context, message *sspb.Event) {
 	}
 	if gameevent.IsServerOpened(message) {
 		actor.serverOpened = true
+		actor.startTrigger() // 先按配置创建实例，再启动已到开始时间的活动。
 		if actor.actvService != nil {
 			actor.actvService.StartDueActivities(time.Now().Unix())
 		}

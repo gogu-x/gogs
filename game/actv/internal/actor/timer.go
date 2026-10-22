@@ -22,6 +22,7 @@ func (actor *Activity) registerTimers(ctx tree.Context) {
 	actor.wheel.Register(activityLifecycleTimerType, func(interface{}) {
 		actor.onLifecycleTimer()
 	})
+	actor.registerTriggerTimer()
 }
 
 // onLifecycleTimer 将定时到期回调一次性投递到所属 Activity Actor，并携带其 Context。
@@ -41,14 +42,16 @@ func (actor *Activity) scheduleLifecycleTick() {
 	actor.wheel.After(activityLifecycleTimerType, activityLifecycleTickInterval, nil)
 }
 
-// onLifecycleTick 推进已加载归属对象的活动阶段并安排下一轮定时。
+// onLifecycleTick 推进活动阶段（开始、结束）并安排下一轮定时。
+// 加载完成前不推进，避免模板在组件数据恢复前执行 OnStart；收到开服事件前不开始也不结束活动。
 func (actor *Activity) onLifecycleTick(ctx tree.Context) {
 	if actor == nil || actor.serverClosing {
 		return
 	}
-	if actor.actvService != nil {
+	if actor.actvService != nil && actor.ready && actor.loadErr == nil && actor.serverOpened {
 		now := time.Now().Unix()
 		actor.actvService.StartDueActivities(now)
+		actor.actvService.EndDueActivities(now)
 		actor.actvService.HandleTicker()
 	}
 	actor.scheduleLifecycleTick()

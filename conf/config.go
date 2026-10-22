@@ -31,6 +31,10 @@ var (
 	// ServerID 区服 ID，由启动参数指定，每个 game 进程唯一
 	ServerID = 1
 
+	// ServerOpenTs 开服时间（Unix 秒），由启动参数 --server-open-ts 指定；0 表示未配置，
+	// 依赖开服时间的活动（开服后 N 天）不会触发。
+	ServerOpenTs int64 = 0
+
 	// NodeId ，由启动参数指定，相同game 多节点
 	NodeId = 1
 
@@ -77,6 +81,7 @@ var (
 func ConnectionFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.IntFlag{Name: "server-id", Usage: "server-id"},
+		&cli.Int64Flag{Name: "server-open-ts", Usage: "server open time in unix seconds"},
 		&cli.IntFlag{Name: "gate-id", Usage: "gate-id"},
 		&cli.IntFlag{Name: "node-id", Usage: "node-id"},
 		&cli.StringFlag{Name: "config", Usage: "JSON configuration file"},
@@ -154,6 +159,9 @@ func LoadAndApply(c *cli.Command) error {
 	}
 	if c.IsSet("server-id") {
 		ServerID = c.Int("server-id")
+	}
+	if c.IsSet("server-open-ts") {
+		ServerOpenTs = c.Int64("server-open-ts")
 	}
 	if c.IsSet("node-id") {
 		NodeId = c.Int("node-id")

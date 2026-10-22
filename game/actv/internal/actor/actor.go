@@ -7,6 +7,7 @@ import (
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	templates "github.com/gogu-x/gogs/game/actv/internal/template"
+	"github.com/gogu-x/gogs/game/actv/internal/trigger"
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/db/mongorpc"
@@ -31,24 +32,26 @@ type pendingActivityRequest struct {
 
 // Activity 统一管理不同归属对象的活动状态及其存盘生命周期。
 type Activity struct {
-	serverID      uint64
-	router        tree.Router
-	wheel         *timer.TimeWheel
-	system        *tree.Tree
-	selfPID       tree.PID
-	store         *mongorpc.Store
-	lifecycle     *mongorpc.Lifecycle
-	model         *activityPersistenceModel
-	dataModel     *activityDataPersistenceModel
-	actvService   *service.ActvService
-	ready         bool
-	loadErr       error
-	pending       []pendingActivityRequest
-	pendingEvents []*sspb.Event
-	pendingLogins map[uint64]bool             // 启动加载期间上线、待 ready 后加载的玩家。
-	players       map[uint64]*playerLoadState // 玩家活动数据的加载/释放状态。
-	serverOpened  bool
-	serverClosing bool
+	serverID       uint64
+	router         tree.Router
+	wheel          *timer.TimeWheel
+	system         *tree.Tree
+	selfPID        tree.PID
+	store          *mongorpc.Store
+	lifecycle      *mongorpc.Lifecycle
+	model          *activityPersistenceModel
+	dataModel      *activityDataPersistenceModel
+	actvService    *service.ActvService
+	ready          bool
+	loadErr        error
+	pending        []pendingActivityRequest
+	pendingEvents  []*sspb.Event
+	pendingLogins  map[uint64]bool             // 启动加载期间上线、待 ready 后加载的玩家。
+	players        map[uint64]*playerLoadState // 玩家活动数据的加载/释放状态。
+	serverOpened   bool
+	serverClosing  bool
+	triggerStarted bool            // 触发创建定时器是否已启动。
+	triggerPlans   []*trigger.Plan // 服务器归属活动的时间规则，触发启动时解析一次。
 }
 
 // NewActivity 创建可选服务器编号对应的全局活动 Actor。
@@ -59,7 +62,7 @@ func NewActivity() *Activity {
 	}
 	return &Activity{
 		serverID:      serverID,
-		actvService:   service.NewActvService(),
+		actvService:   service.NewActvService(serverID),
 		pendingLogins: make(map[uint64]bool),
 		players:       make(map[uint64]*playerLoadState),
 	}
