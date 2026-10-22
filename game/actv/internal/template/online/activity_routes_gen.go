@@ -7,24 +7,25 @@ import (
 
 	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	"github.com/gogu-x/gogs/pb/sspb"
+	"google.golang.org/protobuf/proto"
 )
 
-type generatedRequestHandler func(*Behavior, interface{})
+type generatedRequestHandler func(*Behavior, uint64, proto.Message)
 
 var generatedRequestHandlers = map[reflect.Type]generatedRequestHandler{
-	reflect.TypeOf((*pb_activity.ClaimRewardReq)(nil)): func(behavior *Behavior, request interface{}) {
-		behavior.handleClaimReward(request.(*pb_activity.ClaimRewardReq))
+	reflect.TypeOf((*pb_activity.ClaimRewardReq)(nil)): func(behavior *Behavior, uid uint64, request proto.Message) {
+		behavior.handleClaimReward(uid, request.(*pb_activity.ClaimRewardReq))
 	},
-	reflect.TypeOf((*pb_activity.GetProgressReq)(nil)): func(behavior *Behavior, request interface{}) {
-		behavior.handleGetProgress(request.(*pb_activity.GetProgressReq))
+	reflect.TypeOf((*pb_activity.GetProgressReq)(nil)): func(behavior *Behavior, uid uint64, request proto.Message) {
+		behavior.handleGetProgress(uid, request.(*pb_activity.GetProgressReq))
 	},
-	reflect.TypeOf((*pb_activity.JoinActivityReq)(nil)): func(behavior *Behavior, request interface{}) {
-		behavior.handleJoinActivity(request.(*pb_activity.JoinActivityReq))
+	reflect.TypeOf((*pb_activity.JoinActivityReq)(nil)): func(behavior *Behavior, uid uint64, request proto.Message) {
+		behavior.handleJoinActivity(uid, request.(*pb_activity.JoinActivityReq))
 	},
 }
 
-// HandleRequest 按注释标记生成的请求类型路由调用处理函数。
-func (behavior *Behavior) HandleRequest(request interface{}) {
+// HandleRequest 按注释标记生成的请求类型路由调用处理函数，uid 为发起请求的玩家。
+func (behavior *Behavior) HandleRequest(uid uint64, request proto.Message) {
 	if behavior == nil || request == nil {
 		return
 	}
@@ -32,7 +33,7 @@ func (behavior *Behavior) HandleRequest(request interface{}) {
 	if !found {
 		return
 	}
-	handler(behavior, request)
+	handler(behavior, uid, request)
 }
 
 type generatedActivityEventKey struct {

@@ -69,7 +69,8 @@ func (actor *Activity) onActivityDataLoaded(ctx tree.Context, value interface{},
 		actor.failLoad(ctx, fmt.Errorf("invalid activity data load result %T", value))
 		return
 	}
-	actor.applyDataDocs(*docs)
+	// 启动只加载服务器/联盟自己的单条数据，不含玩家条目，因此不会产生待结算条目。
+	actor.actvService.ApplyDataDocs(*docs)
 	tlog.Log.Info("[activity/Activity.onActivityDataLoaded] 服务器和联盟活动组件数据加载完成, count=%v", len(*docs))
 	actor.finishStartupLoad(ctx)
 }
@@ -80,23 +81,6 @@ func (actor *Activity) finishStartupLoad(ctx tree.Context) {
 	}
 	actor.ready = true
 	actor.drainPending(ctx)
-}
-
-// applyDataDocs 将组件存盘数据分发给已恢复的活动实例；实例不存在或组件未注册时跳过。
-func (actor *Activity) applyDataDocs(docs []service.ActvDataDoc) {
-	for index := range docs {
-		doc := &docs[index]
-		actv := actor.actvService.GetActvByID(doc.ActvID)
-		if actv == nil {
-			tlog.Log.Error("[activity/Activity.applyDataDocs] 组件数据所属活动实例未加载，跳过, activity=%v comp=%v owner=%v/%v",
-				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID)
-			continue
-		}
-		if err := actv.LoadData(doc); err != nil {
-			tlog.Log.Error("[activity/Activity.applyDataDocs] 组件数据恢复失败，跳过, activity=%v comp=%v owner=%v/%v err=%v",
-				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID, err)
-		}
-	}
 }
 
 func (actor *Activity) restoreActivity(meta *service.ActvMeta) bool {

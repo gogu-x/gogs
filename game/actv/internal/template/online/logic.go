@@ -33,19 +33,52 @@ func (b *Behavior) OnInit() {
 	b.AddPlayerComp(b.member)
 }
 
+// OnClosed 活动结束时结算内存中的在线玩家；离线玩家上线时由框架调用 NeedSettle/Settle。
+func (b *Behavior) OnClosed() {
+	b.member.Range(func(uid uint64, _ *MemberData) bool {
+		if b.NeedSettle(uid) {
+			b.Settle(uid)
+		}
+		return true
+	})
+}
+
+// NeedSettle 判断玩家是否需要结算：未结算且有进度。
+func (b *Behavior) NeedSettle(uid uint64) bool {
+	p := b.member.Get(uid)
+	return p != nil && !p.Settled && p.Progress > 0
+}
+
+// Settle 结算玩家。
+func (b *Behavior) Settle(uid uint64) {
+	p := b.member.Get(uid)
+	if p == nil {
+		return
+	}
+	p.Settled = true
+	b.member.MarkDirty(uid)
+}
+
 // handleJoinActivity 处理在线活动加入请求。
 // @activity.request
-func (b *Behavior) handleJoinActivity(request *pb_activity.JoinActivityReq) {
+func (b *Behavior) handleJoinActivity(uid uint64, request *pb_activity.JoinActivityReq) {
+	// 服务器活动中按 uid 取该玩家的列表条目；玩家已上线加载，不存在时自动新建。
+	p := b.member.Get(uid)
+	if p == nil {
+		return
+	}
+	p.Target = b.ActvCfg.GetTarget()
+	b.member.MarkDirty(uid)
 }
 
 // handleGetProgress 处理在线活动进度查询请求。
 // @activity.request
-func (b *Behavior) handleGetProgress(request *pb_activity.GetProgressReq) {
+func (b *Behavior) handleGetProgress(uid uint64, request *pb_activity.GetProgressReq) {
 }
 
 // handleClaimReward 处理在线活动领奖请求。
 // @activity.request
-func (b *Behavior) handleClaimReward(request *pb_activity.ClaimRewardReq) {
+func (b *Behavior) handleClaimReward(uid uint64, request *pb_activity.ClaimRewardReq) {
 }
 
 // handleUserLogin 处理玩家上线事件。

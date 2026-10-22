@@ -7,8 +7,10 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/game/actv/internal/template/base"
+	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	"github.com/gogu-x/tree/tlog"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestMain(m *testing.M) {
@@ -119,6 +121,8 @@ func TestCompRoundTrip(t *testing.T) {
 
 func TestPlayerCompGetRequiresLoaded(t *testing.T) {
 	comp := base.NewPlayerComp[memberData](2)
+	loaded := map[uint64]bool{}
+	comp.BindCreateChecker(func(uid uint64) bool { return loaded[uid] })
 	if comp.Get(7) != nil {
 		t.Fatal("unloaded player must return nil")
 	}
@@ -126,15 +130,62 @@ func TestPlayerCompGetRequiresLoaded(t *testing.T) {
 	if len(comp.DirtyPlayers()) != 0 {
 		t.Fatal("unloaded player must not become dirty")
 	}
-	comp.SetLoaded(7)
+	loaded[7] = true
 	comp.Get(7).Score = 5
 	comp.MarkDirty(7)
 	if !comp.IsDirty(7) {
 		t.Fatal("loaded player should be dirty")
 	}
+	delete(loaded, 7)
 	comp.Unload(7)
 	if comp.Get(7) != nil || comp.IsDirty(7) {
 		t.Fatal("unload should clear player")
+	}
+}
+
+// TestDecodeFailureBlocks 校验存盘数据解码失败后不会用默认值覆盖库中数据：
+// 玩家条目阻断新建和存盘，直到卸载；单条组件阻断存盘。
+func TestDecodeFailureBlocks(t *testing.T) {
+	bad := bson.Raw{0x01, 0x02, 0x03}
+
+	comp := base.NewPlayerComp[memberData](2)
+	comp.BindCreateChecker(func(uint64) bool { return true })
+	if err := comp.Load(7, bad); err == nil {
+		t.Fatal("bad data should fail to decode")
+	}
+	if comp.Get(7) != nil {
+		t.Fatal("blocked player must not get a default entry")
+	}
+	comp.MarkDirty(7)
+	if comp.IsDirty(7) || len(comp.DirtyPlayers()) != 0 {
+		t.Fatal("blocked player must not be saved")
+	}
+	if comp.Get(8) == nil {
+		t.Fatal("other players unaffected")
+	}
+	comp.Unload(7)
+	if comp.Get(7) == nil {
+		t.Fatal("unload should clear block")
+	}
+
+	single := base.NewComp[instData](1)
+	single.Data.Round = 9
+	if err := single.Load(bad); err == nil || !single.Blocked() {
+		t.Fatal("single comp should be blocked on decode failure")
+	}
+	single.MarkDirty()
+	if single.IsDirty() {
+		t.Fatal("blocked single comp must not be saved")
+	}
+
+	// 服务层：玩家已加载，但其条目解码失败，模板拿不到默认条目，也不会产生存盘快照。
+	svc := service.NewActvService()
+	svc.RegTpl(testTemplate, &testBehavior{})
+	_, server := newTestActv(t, svc, 10, service.ScopeServer, 1)
+	svc.SetPlayerLoaded(7)
+	svc.ApplyDataDocs([]service.ActvDataDoc{{ActvID: 10, Comp: 2, OwnerScope: service.ScopePlayer, OwnerID: 7, Data: bad}})
+	if server.member.Get(7) != nil || len(svc.PlayerDirtyData(7)) != 0 {
+		t.Fatal("decode failure must not create or save default entry")
 	}
 }
 
@@ -310,5 +361,280 @@ func TestPlayerHooks(t *testing.T) {
 	}
 	if _, again := newTestActv(t, svc, 40, service.ScopeServer, 1); again.member.Get(7) != nil {
 		t.Fatal("unloaded player must not be marked on new activity")
+	}
+}
+
+const settleTemplate service.TemplateType = 98
+
+type settleData struct {
+	Score   int32 `bson:"score"`
+	Settled bool  `bson:"settled,omitempty"`
+}
+
+// settleBehavior 实现 Settler 的测试模块，记录 tick、上线通知和结算调用。
+type settleBehavior struct {
+	base.BaseBehavior
+	member  *base.PlayerComp[settleData]
+	ticks   int
+	logins  int
+	settled []uint64
+}
+
+func (*settleBehavior) Create(actv *service.Actv, cfg conf.ActivityConfig) service.ActvBehavior {
+	b := &settleBehavior{}
+	b.Bind(actv, cfg)
+	return b
+}
+
+func (b *settleBehavior) OnInit() {
+	b.member = base.NewPlayerComp[settleData](2)
+	b.AddPlayerComp(b.member)
+}
+
+func (b *settleBehavior) NeedSettle(uid uint64) bool {
+	p := b.member.Get(uid)
+	return p != nil && !p.Settled && p.Score > 0
+}
+
+func (b *settleBehavior) Settle(uid uint64) {
+	p := b.member.Get(uid)
+	b.settled = append(b.settled, uid)
+	p.Settled = true
+	b.member.MarkDirty(uid)
+}
+
+func (b *settleBehavior) OnClosed() {
+	b.member.Range(func(uid uint64, _ *settleData) bool {
+		if b.NeedSettle(uid) {
+			b.Settle(uid)
+		}
+		return true
+	})
+}
+
+func (b *settleBehavior) OnTicker()             { b.ticks++ }
+func (b *settleBehavior) OnPlayerLoaded(uint64) { b.logins++ }
+
+func memberDoc(t *testing.T, actvID int64, uid uint64, data any) service.ActvDataDoc {
+	t.Helper()
+	return service.ActvDataDoc{ActvID: actvID, Comp: 2, OwnerScope: service.ScopePlayer, OwnerID: service.OwnerID(uid), Data: mustRaw(t, data)}
+}
+
+func hasEntry(b *settleBehavior, uid uint64) bool {
+	found := false
+	b.member.Range(func(id uint64, _ *settleData) bool {
+		found = found || id == uid
+		return true
+	})
+	return found
+}
+
+// TestEndedSettle 校验已结束活动：跳过 tick/上线通知、不新建条目；
+// 玩家上线后需要结算的执行 Settle、存盘后卸载，不需要的立即卸载。
+func TestEndedSettle(t *testing.T) {
+	svc := service.NewActvService()
+	svc.RegTpl(settleTemplate, &settleBehavior{})
+	meta := &service.ActvMeta{ActvID: 50, CfgID: 1, OwnerID: 1, OwnerScope: service.ScopeServer, TemplateType: settleTemplate, Started: true}
+	actv := svc.NewActv(meta, conf.ActivityConfig{})
+	if actv == nil || !svc.AddActv(actv) {
+		t.Fatal("create activity failed")
+	}
+	b := actv.GetExt().(*settleBehavior)
+
+	// 在线玩家 1 在活动结束时由 OnClosed 结算。
+	svc.SetPlayerLoaded(1)
+	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 50, 1, settleData{Score: 3})})
+	if !svc.EndActv(50) || !actv.IsEnded() || svc.EndActv(50) {
+		t.Fatal("EndActv should end once")
+	}
+	if len(b.settled) != 1 || b.settled[0] != 1 || !b.member.IsDirty(1) {
+		t.Fatalf("online player should be settled on close, got %v", b.settled)
+	}
+
+	svc.HandleTicker()
+	svc.SetPlayerLoaded(9)
+	svc.NotifyPlayerLoaded(9)
+	if b.ticks != 0 || b.logins != 0 {
+		t.Fatalf("ended activity must skip tick/hooks, ticks=%d logins=%d", b.ticks, b.logins)
+	}
+	if b.member.Get(9) != nil {
+		t.Fatal("ended activity must not create entries")
+	}
+
+	// 玩家 7 未结算：结算后存盘再卸载。
+	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 50, 7, settleData{Score: 5})})
+	docs, settled := svc.SettleEndedPlayer(7)
+	if len(docs) != 1 || docs[0].OwnerID != 7 || len(settled) != 1 || settled[0] != 50 {
+		t.Fatalf("settle docs=%+v settled=%v", docs, settled)
+	}
+	var saved settleData
+	if err := bson.Unmarshal(docs[0].Data, &saved); err != nil || !saved.Settled {
+		t.Fatalf("snapshot should contain settled flag, got %+v err=%v", saved, err)
+	}
+	svc.UnloadEndedPlayer(7, settled)
+	if !hasEntry(b, 7) {
+		t.Fatal("dirty entry must stay until saved")
+	}
+	svc.ClearDataDirty(docs[0])
+	svc.UnloadEndedPlayer(7, settled)
+	if hasEntry(b, 7) {
+		t.Fatal("saved entry should be unloaded")
+	}
+
+	// 玩家 8 已结算：不调用 Settle，立即卸载。
+	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 50, 8, settleData{Score: 5, Settled: true})})
+	if docs, _ := svc.SettleEndedPlayer(8); len(docs) != 0 || hasEntry(b, 8) {
+		t.Fatal("settled player should be unloaded without saving")
+	}
+	if len(b.settled) != 2 {
+		t.Fatalf("settle calls = %v, want [1 7]", b.settled)
+	}
+}
+
+// TestEndedWithoutSettler 未实现 Settler 的已结束活动，玩家条目加载后立即卸载。
+func TestEndedWithoutSettler(t *testing.T) {
+	svc := service.NewActvService()
+	svc.RegTpl(testTemplate, &testBehavior{})
+	_, b := newTestActv(t, svc, 60, service.ScopeServer, 1)
+	svc.EndActv(60)
+	svc.ApplyDataDocs([]service.ActvDataDoc{memberDoc(t, 60, 7, memberData{Score: 1})})
+	if docs, settled := svc.SettleEndedPlayer(7); len(docs) != 0 || len(settled) != 0 {
+		t.Fatal("no settle expected")
+	}
+	b.member.Range(func(uint64, *memberData) bool {
+		t.Fatal("entry should be unloaded")
+		return false
+	})
+}
+
+// reqBehavior 记录收到请求的玩家，并按 uid 写入玩家列表组件。
+type reqBehavior struct {
+	base.BaseBehavior
+	member *base.PlayerComp[memberData]
+	uids   []uint64
+}
+
+const reqTemplate service.TemplateType = 97
+
+func (*reqBehavior) Create(actv *service.Actv, cfg conf.ActivityConfig) service.ActvBehavior {
+	b := &reqBehavior{}
+	b.Bind(actv, cfg)
+	return b
+}
+
+func (b *reqBehavior) OnInit() {
+	b.member = base.NewPlayerComp[memberData](2)
+	b.AddPlayerComp(b.member)
+}
+
+func (b *reqBehavior) HandleRequest(uid uint64, _ proto.Message) {
+	b.uids = append(b.uids, uid)
+	if p := b.member.Get(uid); p != nil {
+		p.Score++
+		b.member.MarkDirty(uid)
+	}
+}
+
+// TestHandleRequestRouting 校验请求路由：服务器活动接受任意玩家并透传 uid；
+// 玩家独有活动只接受本人；联盟活动和已结束活动拒绝。
+func TestHandleRequestRouting(t *testing.T) {
+	svc := service.NewActvService()
+	svc.RegTpl(reqTemplate, &reqBehavior{})
+	newReq := func(id int64, scope service.OwnerScope, owner service.OwnerID) *reqBehavior {
+		meta := &service.ActvMeta{ActvID: id, CfgID: 1, OwnerID: owner, OwnerScope: scope, TemplateType: reqTemplate}
+		actv := svc.NewActv(meta, conf.ActivityConfig{})
+		if actv == nil || !svc.AddActv(actv) {
+			t.Fatalf("create activity %d failed", id)
+		}
+		return actv.GetExt().(*reqBehavior)
+	}
+	server := newReq(10, service.ScopeServer, 1)
+	player := newReq(20, service.ScopePlayer, 7)
+	newReq(30, service.ScopeGuild, 5)
+	svc.SetPlayerLoaded(7)
+	svc.SetPlayerLoaded(8)
+	req := &pb_activity.JoinActivityReq{}
+
+	for _, uid := range []uint64{7, 8} {
+		if err := svc.HandleRequest(uid, 10, req); err != nil {
+			t.Fatalf("server activity should accept player %d: %v", uid, err)
+		}
+	}
+	if len(server.uids) != 2 || server.uids[0] != 7 || server.uids[1] != 8 {
+		t.Fatalf("uid not passed through, got %v", server.uids)
+	}
+	if server.member.Get(8).Score != 1 || !server.member.IsDirty(8) {
+		t.Fatal("server activity should write player entry by uid")
+	}
+
+	if err := svc.HandleRequest(7, 20, req); err != nil || len(player.uids) != 1 {
+		t.Fatalf("owner request should pass: %v", err)
+	}
+	if err := svc.HandleRequest(8, 20, req); err == nil || len(player.uids) != 1 {
+		t.Fatal("other player's request to player activity must be rejected")
+	}
+	if err := svc.HandleRequest(7, 30, req); err == nil {
+		t.Fatal("guild activity must reject player requests for now")
+	}
+	if err := svc.HandleRequest(7, 99, req); err == nil {
+		t.Fatal("unknown activity must be rejected")
+	}
+	if err := svc.HandleRequest(0, 10, req); err == nil {
+		t.Fatal("request without uid must be rejected")
+	}
+	svc.EndActv(10)
+	if err := svc.HandleRequest(7, 10, req); err == nil || len(server.uids) != 2 {
+		t.Fatal("ended activity must reject requests")
+	}
+}
+
+// initData 实现 Initializer 的测试数据结构。
+type initData struct {
+	Level int32           `bson:"level"`
+	Items map[int32]int32 `bson:"items,omitempty"`
+	Tags  map[string]bool `bson:"tags,omitempty"`
+}
+
+func (d *initData) Init() {
+	if d.Items == nil {
+		d.Items = make(map[int32]int32)
+	}
+	if d.Tags == nil {
+		d.Tags = make(map[string]bool)
+	}
+}
+
+// TestDataInit 校验 Init 在新建、加载、字段缺失时都会补齐容器，且不覆盖已加载的值。
+func TestDataInit(t *testing.T) {
+	// 单条组件：新建即初始化。
+	single := base.NewComp[initData](1)
+	if single.Data.Items == nil || single.Data.Tags == nil {
+		t.Fatal("NewComp should init containers")
+	}
+	single.Data.Items[1] = 1 // 不会 panic
+
+	// 单条组件：加载已有数据保留值，缺失字段（tags）被补齐。
+	raw := mustRaw(t, bson.M{"level": 3, "items": bson.M{"5": 9}})
+	if err := single.Load(raw); err != nil {
+		t.Fatal(err)
+	}
+	if single.Data.Level != 3 || single.Data.Items[5] != 9 || single.Data.Tags == nil {
+		t.Fatalf("load should keep values and fill missing containers, got %+v", single.Data)
+	}
+
+	// 玩家条目：Get 新建即初始化。
+	comp := base.NewPlayerComp[initData](2)
+	comp.BindCreateChecker(func(uint64) bool { return true })
+	if p := comp.Get(7); p == nil || p.Items == nil || p.Tags == nil {
+		t.Fatal("new player entry should be initialized")
+	}
+
+	// 玩家条目：加载缺失字段的数据后补齐，已有值保留。
+	if err := comp.Load(8, mustRaw(t, bson.M{"level": 2, "tags": bson.M{"vip": true}})); err != nil {
+		t.Fatal(err)
+	}
+	p := comp.Get(8)
+	if p.Level != 2 || !p.Tags["vip"] || p.Items == nil {
+		t.Fatalf("loaded entry should keep values and fill missing containers, got %+v", p)
 	}
 }

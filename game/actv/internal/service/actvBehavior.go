@@ -4,6 +4,7 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	"github.com/gogu-x/gogs/pb/sspb"
+	"google.golang.org/protobuf/proto"
 )
 
 // ActvTemplate 创建指定活动实例和配置对应的活动行为对象。
@@ -24,5 +25,17 @@ type ActvBehavior interface {
 	OnClosed()
 	OnPack() *pb_activity.ActivityInfo
 	HandleEvent(event *sspb.Event)
-	HandleRequest(request interface{})
+	HandleRequest(uid uint64, request proto.Message)
+}
+
+// Settler 由需要在活动结束后结算玩家的模块实现（可选）。
+// 已结束的服务器/联盟活动在玩家上线、其数据加载进组件后调用：
+// NeedSettle 返回 true 时调用 Settle，结算结果存盘后框架卸载该玩家条目；
+// 返回 false 或模块未实现该接口时，框架直接卸载该玩家条目。
+// 是否已结算由模块在自己的组件数据中维护。
+type Settler interface {
+	// NeedSettle 返回玩家是否需要结算。
+	NeedSettle(uid uint64) bool
+	// Settle 结算玩家：读取组件数据、发奖、修改结算标记并 MarkDirty。
+	Settle(uid uint64)
 }

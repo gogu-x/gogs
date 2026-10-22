@@ -13,11 +13,11 @@ import (
 // maxPendingPlayerRequests 表示单个玩家活动数据加载期间暂存请求的数量上限。
 const maxPendingPlayerRequests = 64
 
-// playerLoadState 记录单个玩家活动数据的加载、释放状态和暂存请求。
+// playerLoadState 记录单个玩家活动数据加载/释放过程中的状态和暂存请求。
+// “是否已加载”不在此记录，统一查询 service.IsPlayerLoaded。
 // 状态对象被替换或删除后，旧加载回调通过指针比对识别为过期并丢弃。
 type playerLoadState struct {
 	loading   bool                     // 正在加载玩家活动数据。
-	loaded    bool                     // 玩家活动数据已挂入内存。
 	releasing bool                     // 正在存盘释放的数据，完成前不发起新加载。
 	reload    bool                     // 释放完成后需要重新加载。
 	pending   []pendingActivityRequest // 玩家数据就绪前暂存的请求。
@@ -47,7 +47,7 @@ func (actor *Activity) ensurePlayerLoaded(ctx tree.Context, uid uint64) *playerL
 		state = &playerLoadState{}
 		actor.players[uid] = state
 	}
-	if state.loaded || state.loading {
+	if actor.actvService.IsPlayerLoaded(uid) || state.loading {
 		return state
 	}
 	if state.releasing {
@@ -111,8 +111,8 @@ func (actor *Activity) onPlayerPartLoaded(ctx tree.Context, uid uint64, state *p
 		return
 	}
 	actor.applyPlayerData(uid, state)
-	state.loaded = true
 	state.metas, state.docs = nil, nil
+	actor.settleEndedPlayer(ctx, uid, state)
 	pending := state.pending
 	state.pending = nil
 	for _, item := range pending {
@@ -120,6 +120,21 @@ func (actor *Activity) onPlayerPartLoaded(ctx tree.Context, uid uint64, state *p
 		response, handleErr := actor.handlePlayerActivityMessage(message)
 		item.request.Respond(response, handleErr)
 	}
+}
+
+// settleEndedPlayer 对已结束活动调用模块结算，结算结果存盘成功后卸载该玩家条目。
+// 存盘期间玩家被释放时，条目由释放流程存盘卸载，回调识别为过期后不再处理。
+func (actor *Activity) settleEndedPlayer(ctx tree.Context, uid uint64, state *playerLoadState) {
+	docs, settled := actor.actvService.SettleEndedPlayer(uid)
+	if len(docs) == 0 {
+		return
+	}
+	actor.saveDocs(ctx, "settle", uid, nil, docs, func(callbackCtx tree.Context) {
+		if actor.players[uid] != state || !actor.actvService.IsPlayerLoaded(uid) {
+			return
+		}
+		actor.actvService.UnloadEndedPlayer(uid, settled)
+	})
 }
 
 // applyPlayerData 恢复玩家独有活动实例，并将组件数据挂入对应活动的组件。
@@ -141,7 +156,7 @@ func (actor *Activity) applyPlayerData(uid uint64, state *playerLoadState) {
 	}
 	actor.actvService.SetPlayerLoaded(uid)
 	if state.docs != nil {
-		actor.applyDataDocs(*state.docs)
+		actor.actvService.ApplyDataDocs(*state.docs)
 	}
 	for _, actv := range restored {
 		actv.GetExt().OnLoaded()
@@ -171,7 +186,7 @@ func (actor *Activity) dispatchPlayerRequest(ctx tree.Context, request *tree.Env
 		request.Respond(nil, fmt.Errorf("player activity data load failed"))
 		return
 	}
-	if state.loaded {
+	if actor.actvService.IsPlayerLoaded(uid) {
 		response, err := actor.handlePlayerActivityMessage(message)
 		request.Respond(response, err)
 		return
@@ -210,7 +225,7 @@ func (actor *Activity) onPlayerOwnerReleased(ctx tree.Context, message *ipb.Play
 	actor.actvService.UnloadPlayer(uid)
 	released := &playerLoadState{releasing: true}
 	actor.players[uid] = released
-	actor.savePlayerData(ctx, uid, metas, docs, func(callbackCtx tree.Context) {
+	actor.saveDocs(ctx, "release", uid, metas, docs, func(callbackCtx tree.Context) {
 		if actor.players[uid] != released {
 			return
 		}
@@ -224,9 +239,11 @@ func (actor *Activity) onPlayerOwnerReleased(ctx tree.Context, message *ipb.Play
 	})
 }
 
-// savePlayerData 存盘玩家释放时取出的元数据和组件数据快照，全部完成后回调。
-func (actor *Activity) savePlayerData(
+// saveDocs 存盘一批元数据和组件数据快照，全部完成（无论成败）后回调；reason 仅用于日志。
+// 失败的数据仍为脏数据，由定时存盘继续处理。
+func (actor *Activity) saveDocs(
 	ctx tree.Context,
+	reason string,
 	uid uint64,
 	metas []*service.ActvMeta,
 	docs []*service.ActvDataDoc,
@@ -239,11 +256,12 @@ func (actor *Activity) savePlayerData(
 	}
 	finish := func(callbackCtx tree.Context, err error) {
 		if err != nil {
-			tlog.Log.Error("[activity/Activity.savePlayerData] 玩家活动数据释放存盘失败, pid=%v err=%v", uid, err)
+			tlog.Log.Error("[activity/Activity.saveDocs] 玩家活动数据存盘失败, reason=%v pid=%v err=%v", reason, uid, err)
 		}
 		remaining--
 		if remaining == 0 {
-			tlog.Log.Info("[activity/Activity.savePlayerData] 玩家活动数据释放存盘完成, pid=%v metas=%v data=%v", uid, len(metas), len(docs))
+			tlog.Log.Info("[activity/Activity.saveDocs] 玩家活动数据存盘完成, reason=%v pid=%v metas=%v data=%v",
+				reason, uid, len(metas), len(docs))
 			done(callbackCtx)
 		}
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/tlog"
+	"google.golang.org/protobuf/proto"
 )
 
 const maxActivityInstanceID = uint64(1<<63 - 1)
@@ -55,10 +56,10 @@ func (actor *Activity) handlePlayerActivityMessage(message *ipb.PlayerActivityMe
 	}
 	uid := message.GetUID()
 	activityID := message.GetActvID()
-	request := message.GetMessage()
+	request, _ := message.GetMessage().(proto.Message)
 	if uid == 0 || request == nil {
-		tlog.Log.Error("[activity/Activity.onPlayerActivityMessage] 活动请求缺少玩家编号或请求体, pid=%v type=%T", uid, request)
-		return nil, fmt.Errorf("activity request requires a player and a message")
+		tlog.Log.Error("[activity/Activity.onPlayerActivityMessage] 活动请求缺少玩家编号或请求体不是协议消息, pid=%v type=%T", uid, message.GetMessage())
+		return nil, fmt.Errorf("activity request requires a player and a proto message")
 	}
 	tlog.Log.Info("[activity/Activity.onPlayerActivityMessage] 收到玩家活动请求, pid=%v activity=%v type=%T", uid, activityID, request)
 	if actor.actvService == nil {
@@ -66,12 +67,10 @@ func (actor *Activity) handlePlayerActivityMessage(message *ipb.PlayerActivityMe
 		tlog.Log.Error("[activity/Activity.onPlayerActivityMessage] 活动服务不可用, pid=%v activity=%v err=%v", uid, activityID, err)
 		return nil, err
 	}
-	actor.actvService.HandleRequest(
-		service.ScopePlayer,
-		service.OwnerID(uid),
-		int64(activityID),
-		request,
-	)
+	if err := actor.actvService.HandleRequest(uid, int64(activityID), request); err != nil {
+		tlog.Log.Error("[activity/Activity.onPlayerActivityMessage] 活动请求被拒绝, pid=%v activity=%v type=%T err=%v", uid, activityID, request, err)
+		return nil, err
+	}
 	return nil, nil
 }
 

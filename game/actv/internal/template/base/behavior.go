@@ -6,6 +6,7 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
 	"github.com/gogu-x/gogs/pb/sspb"
+	"google.golang.org/protobuf/proto"
 )
 
 // BaseBehavior 为绑定单个活动实例的模块提供默认生命周期、组件注册和通用信息行为。
@@ -67,7 +68,7 @@ func (*BaseBehavior) OnClosed() {}
 func (*BaseBehavior) HandleEvent(*sspb.Event) {}
 
 // HandleRequest 默认不处理模板未注册的请求。
-func (*BaseBehavior) HandleRequest(interface{}) {}
+func (*BaseBehavior) HandleRequest(uint64, proto.Message) {}
 
 // OnPack 根据活动元数据和配置组装客户端活动信息。
 func (*BaseBehavior) OnPack() *pb_activity.ActivityInfo {

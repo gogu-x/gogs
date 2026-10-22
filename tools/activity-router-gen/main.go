@@ -164,6 +164,11 @@ func generate(directory string) error {
 			return fmt.Errorf("activity request type import alias reflect conflicts with standard library")
 		}
 		usedAliases["reflect"] = "reflect"
+		const protoImportPath = "google.golang.org/protobuf/proto"
+		if existing, ok := usedAliases["proto"]; ok && existing != protoImportPath {
+			return fmt.Errorf("activity request type import alias proto conflicts with %s", protoImportPath)
+		}
+		usedAliases["proto"] = protoImportPath
 	}
 
 	source, err := render(fset, packageName, behaviorType, routes, eventRoutes, usedAliases)
@@ -215,20 +220,26 @@ func parseRoute(function *ast.FuncDecl) (route, error) {
 		return route{}, fmt.Errorf("annotated function %s must have a named behavior receiver", function.Name.Name)
 	}
 	arguments := flattenParameters(function.Type.Params)
-	if len(arguments) != 1 || function.Type.Results != nil && len(function.Type.Results.List) != 0 {
-		return route{}, fmt.Errorf("annotated function %s must have one parameter and no results", function.Name.Name)
+	if len(arguments) != 2 || function.Type.Results != nil && len(function.Type.Results.List) != 0 {
+		return route{}, fmt.Errorf("annotated function %s must have parameters (uid uint64, request *T) and no results", function.Name.Name)
 	}
-	if arguments[0].name != "request" {
-		return route{}, fmt.Errorf("annotated function %s parameter 1 must be named request", function.Name.Name)
+	if arguments[0].name != "uid" {
+		return route{}, fmt.Errorf("annotated function %s parameter 1 must be named uid", function.Name.Name)
 	}
-	_, ok = arguments[0].typeExpr.(*ast.StarExpr)
+	if ident, ok := arguments[0].typeExpr.(*ast.Ident); !ok || ident.Name != "uint64" {
+		return route{}, fmt.Errorf("annotated function %s uid parameter must be uint64", function.Name.Name)
+	}
+	if arguments[1].name != "request" {
+		return route{}, fmt.Errorf("annotated function %s parameter 2 must be named request", function.Name.Name)
+	}
+	_, ok = arguments[1].typeExpr.(*ast.StarExpr)
 	if !ok {
 		return route{}, fmt.Errorf("annotated function %s request parameter must be a pointer type", function.Name.Name)
 	}
 	return route{
 		method:      function.Name.Name,
 		behavior:    receiver.Name,
-		requestType: arguments[0].typeExpr,
+		requestType: arguments[1].typeExpr,
 	}, nil
 }
 
@@ -368,19 +379,19 @@ func render(
 	}
 	source.WriteString(")\n\n")
 	if len(routes) > 0 {
-		fmt.Fprintf(&source, "type generatedRequestHandler func(*%s, interface{})\n\n", behaviorType)
+		fmt.Fprintf(&source, "type generatedRequestHandler func(*%s, uint64, proto.Message)\n\n", behaviorType)
 		source.WriteString("var generatedRequestHandlers = map[reflect.Type]generatedRequestHandler{\n")
 		for _, route := range routes {
 			pointerType := route.requestType.(*ast.StarExpr).X
-			fmt.Fprintf(&source, "\treflect.TypeOf((*%s)(nil)): func(behavior *%s, request interface{}) {\n",
+			fmt.Fprintf(&source, "\treflect.TypeOf((*%s)(nil)): func(behavior *%s, uid uint64, request proto.Message) {\n",
 				nodeString(fset, pointerType), behaviorType)
-			fmt.Fprintf(&source, "\t\tbehavior.%s(request.(%s))\n\t},\n",
+			fmt.Fprintf(&source, "\t\tbehavior.%s(uid, request.(%s))\n\t},\n",
 				route.method, nodeString(fset, route.requestType))
 		}
 		source.WriteString("}\n\n")
-		fmt.Fprintf(&source, "// HandleRequest 按注释标记生成的请求类型路由调用处理函数。\nfunc (behavior *%s) HandleRequest(request interface{}) {\n",
+		fmt.Fprintf(&source, "// HandleRequest 按注释标记生成的请求类型路由调用处理函数，uid 为发起请求的玩家。\nfunc (behavior *%s) HandleRequest(uid uint64, request proto.Message) {\n",
 			behaviorType)
-		source.WriteString("\tif behavior == nil || request == nil {\n\t\treturn\n\t}\n\thandler, found := generatedRequestHandlers[reflect.TypeOf(request)]\n\tif !found {\n\t\treturn\n\t}\n\thandler(behavior, request)\n}\n\n")
+		source.WriteString("\tif behavior == nil || request == nil {\n\t\treturn\n\t}\n\thandler, found := generatedRequestHandlers[reflect.TypeOf(request)]\n\tif !found {\n\t\treturn\n\t}\n\thandler(behavior, uid, request)\n}\n\n")
 	}
 	if len(eventRoutes) > 0 {
 		source.WriteString("type generatedActivityEventKey struct {\n\teventType int32\n\tname string\n}\n\n")

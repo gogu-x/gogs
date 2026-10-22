@@ -1,9 +1,12 @@
 package service
 
 import (
+	"fmt"
+
 	activityconf "github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree/tlog"
+	"google.golang.org/protobuf/proto"
 )
 
 // ActvService 管理活动模板注册表、活动实例和归属索引。
@@ -13,7 +16,7 @@ type ActvService struct {
 	actvOwnerMgr  map[int64]ownerKey                 // 每个活动实例对应的归属对象。
 	ownerScopeMgr map[OwnerScope]map[OwnerID][]int64 // 每个归属对象的活动实例顺序。
 	actvOrder     []int64                            // 活动实例的全局注册顺序。
-	loadedPlayers map[uint64]bool                    // 活动数据已加载的玩家，新增实例时据此补标记。
+	loadedPlayers map[uint64]bool                    // 活动数据已加载的玩家，“玩家是否已加载”的唯一数据来源。
 }
 
 // ownerKey 唯一标识一个归属范围和归属对象。
@@ -66,6 +69,7 @@ type ActvMeta struct {
 	OwnerID      OwnerID      `bson:"owner_id"`      // 活动归属对象编号。
 	OwnerScope   OwnerScope   `bson:"owner_scope"`   // 活动归属对象范围。
 	TemplateType TemplateType `bson:"template_type"` // 活动模板类型。
+	State        ActvState    `bson:"state"`         // 活动运行状态。
 	Dirty        bool         `bson:"-"`             // 是否需要存盘。
 	revision     uint64       `bson:"-"`             // 内存版本号，不写入活动文档。
 }
@@ -166,7 +170,7 @@ func (as *ActvService) NewActv(meta *ActvMeta, config activityconf.ActivityConfi
 	}
 	actv.Ext = behavior
 	behavior.OnInit()
-	if err := actv.bindComponents(); err != nil {
+	if err := actv.bindComponents(as.canCreatePlayerEntry(actv)); err != nil {
 		tlog.Log.Error("[activity/ActvService.NewActv] 活动模板组件注册无效, activity=%v template=%v err=%v",
 			meta.GetActvID(), meta.GetTemplateType(), err)
 		return nil
@@ -249,14 +253,6 @@ func (as *ActvService) AddActv(actv *Actv) bool {
 	as.actvOwnerMgr[activityID] = owner
 	as.addOwnerActvID(owner, activityID)
 	as.actvOrder = append(as.actvOrder, activityID)
-	// 玩家在线期间新增的服务器/联盟活动，为已加载玩家补标记，使玩家列表组件可为其新建条目。
-	if ownerScope != ScopePlayer {
-		for uid := range as.loadedPlayers {
-			for _, comp := range actv.playerComps {
-				comp.SetLoaded(uid)
-			}
-		}
-	}
 	meta.MarkDirty()
 	tlog.Log.Info("[activity/ActvService.AddActv] 注册活动实例, activity=%v scope=%v owner=%v before=%v after=%v",
 		activityID, owner.scope, owner.id, false, true)
@@ -305,39 +301,34 @@ func (as *ActvService) ListAllActvs() []*Actv {
 	return result
 }
 
-// HandleRequest 将请求转发给指定归属对象下的活动模板。
-func (as *ActvService) HandleRequest(
-	scope OwnerScope,
-	ownerID OwnerID,
-	activityID int64,
-	request interface{},
-) {
-	if as == nil || request == nil {
-		return
+// HandleRequest 将玩家请求转发给活动模板，uid 透传给模板。归属校验规则：
+//   - 玩家独有活动：只接受归属玩家本人的请求；
+//   - 服务器活动：本服已加载的服务器活动接受任意玩家请求；
+//   - 联盟活动：活动 Actor 尚无联盟成员信息，暂不接受玩家请求；
+//   - 已结束活动：不再接受请求，结算由 Settler 处理。
+func (as *ActvService) HandleRequest(uid uint64, activityID int64, request proto.Message) error {
+	if as == nil || uid == 0 || request == nil {
+		return fmt.Errorf("activity request requires a player and a message")
 	}
 	actv := as.GetActvByID(activityID)
-	if actv == nil {
-		return
+	if actv == nil || actv.GetExt() == nil {
+		return fmt.Errorf("activity %d not found", activityID)
 	}
-	meta := actv.GetMeta()
-	if meta == nil || meta.GetOwnerScope() != scope || meta.GetOwnerID() != ownerID {
-		return
+	if actv.IsEnded() {
+		return fmt.Errorf("activity %d has ended", activityID)
 	}
-	behavior := actv.GetExt()
-	if behavior == nil {
-		return
-	}
-	behavior.HandleRequest(request)
+	actv.GetExt().HandleRequest(uid, request)
+	return nil
 }
 
-// HandleEvent 将事件按注册顺序分发给所有已加载活动实例。
+// HandleEvent 将事件按注册顺序分发给所有进行中的活动实例。
 func (as *ActvService) HandleEvent(event *sspb.Event) {
 	if as == nil || event == nil {
 		return
 	}
 	for _, activityID := range as.actvOrder {
 		actv := as.GetActvByID(activityID)
-		if actv == nil || actv.GetExt() == nil {
+		if actv == nil || actv.GetExt() == nil || actv.IsEnded() {
 			continue
 		}
 		actv.GetExt().HandleEvent(event)
@@ -350,7 +341,7 @@ func (as *ActvService) StartDueActivities(now int64) {
 		return
 	}
 	for _, actv := range as.ListAllActvs() {
-		if actv == nil || actv.GetMeta() == nil || actv.GetExt() == nil {
+		if actv == nil || actv.GetMeta() == nil || actv.GetExt() == nil || actv.IsEnded() {
 			continue
 		}
 		meta := actv.GetMeta()
@@ -371,11 +362,32 @@ func (as *ActvService) HandleTicker() {
 		return
 	}
 	for _, actv := range as.ListAllActvs() {
-		if actv == nil || actv.GetMeta() == nil || !actv.GetMeta().Started || actv.GetExt() == nil {
+		if actv == nil || actv.GetMeta() == nil || !actv.GetMeta().Started || actv.GetExt() == nil || actv.IsEnded() {
 			continue
 		}
 		actv.GetExt().OnTicker()
 	}
+}
+
+// IsEnded 返回活动实例是否已结束。
+func (actv *Actv) IsEnded() bool {
+	return actv != nil && actv.GetMeta() != nil && actv.GetMeta().State == StateEnded
+}
+
+// EndActv 结束活动实例：调用模板 OnClosed（模板在此固定全服结果、结算在线玩家），
+// 然后标记为已结束。实例继续常驻内存，供离线玩家上线时补结算。
+func (as *ActvService) EndActv(activityID int64) bool {
+	actv := as.GetActvByID(activityID)
+	if actv == nil || actv.GetExt() == nil || actv.IsEnded() {
+		return false
+	}
+	actv.GetExt().OnClosed()
+	meta := actv.GetMeta()
+	meta.State = StateEnded
+	meta.MarkDirty()
+	tlog.Log.Info("[activity/ActvService.EndActv] 活动结束, activity=%v scope=%v owner=%v",
+		meta.GetActvID(), meta.GetOwnerScope(), meta.GetOwnerID())
+	return true
 }
 
 // addOwnerActvID 按创建顺序记录归属对象持有的活动编号。

@@ -6,8 +6,8 @@ import (
 	"github.com/gogu-x/tree/tlog"
 )
 
-// bindComponents 收集模板注册的组件并校验组件编号唯一。
-func (actv *Actv) bindComponents() error {
+// bindComponents 收集模板注册的组件、校验组件编号唯一，并为玩家列表组件绑定新建条目判断。
+func (actv *Actv) bindComponents(canCreate func(uid uint64) bool) error {
 	actv.comps = make(map[int32]Component)
 	actv.playerComps = make(map[int32]PlayerComponent)
 	holder, ok := actv.Ext.(ComponentHolder)
@@ -30,6 +30,7 @@ func (actv *Actv) bindComponents() error {
 		if err := actv.checkCompID(comp.CompID()); err != nil {
 			return err
 		}
+		comp.BindCreateChecker(canCreate)
 		actv.playerComps[comp.CompID()] = comp
 	}
 	return nil
@@ -162,14 +163,16 @@ func (as *ActvService) ClearDataDirty(doc *ActvDataDoc) {
 	}
 }
 
-// SetPlayerLoaded 标记玩家活动数据已加载：所有活动的玩家列表组件允许为其新建条目，
-// 之后新增的服务器/联盟活动也会自动补标记。
+// SetPlayerLoaded 标记玩家活动数据已加载。这是“玩家是否已加载”的唯一数据来源：
+// 玩家列表组件通过绑定的判断函数实时查询，进行中的活动（含之后新增的）即可为该玩家新建条目。
 func (as *ActvService) SetPlayerLoaded(uid uint64) {
 	as.loadedPlayers[uid] = true
-	for _, actv := range as.ListAllActvs() {
-		for _, comp := range actv.playerComps {
-			comp.SetLoaded(uid)
-		}
+}
+
+// canCreatePlayerEntry 返回活动的玩家列表组件能否为玩家新建条目：玩家已加载且活动未结束。
+func (as *ActvService) canCreatePlayerEntry(actv *Actv) func(uid uint64) bool {
+	return func(uid uint64) bool {
+		return as.loadedPlayers[uid] && !actv.IsEnded()
 	}
 }
 
@@ -192,12 +195,12 @@ func (as *ActvService) NotifyPlayerUnload(uid uint64) {
 	}
 }
 
-// listSharedActvs 返回服务器/联盟归属的活动实例。
+// listSharedActvs 返回进行中的服务器/联盟归属活动实例。
 func (as *ActvService) listSharedActvs() []*Actv {
 	all := as.ListAllActvs()
 	shared := make([]*Actv, 0, len(all))
 	for _, actv := range all {
-		if actv.GetMeta().GetOwnerScope() != ScopePlayer && actv.GetExt() != nil {
+		if actv.GetMeta().GetOwnerScope() != ScopePlayer && actv.GetExt() != nil && !actv.IsEnded() {
 			shared = append(shared, actv)
 		}
 	}
@@ -215,5 +218,76 @@ func (as *ActvService) UnloadPlayer(uid uint64) {
 		for _, comp := range actv.playerComps {
 			comp.Unload(uid)
 		}
+	}
+}
+
+// ApplyDataDocs 将组件存盘数据分发给已恢复的活动实例；实例不存在或数据无效时跳过并记录日志。
+func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc) {
+	for index := range docs {
+		doc := &docs[index]
+		actv := as.GetActvByID(doc.ActvID)
+		if actv == nil {
+			tlog.Log.Error("[activity/ActvService.ApplyDataDocs] 组件数据所属活动实例未加载，跳过, activity=%v comp=%v owner=%v/%v",
+				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID)
+			continue
+		}
+		if err := actv.LoadData(doc); err != nil {
+			tlog.Log.Error("[activity/ActvService.ApplyDataDocs] 组件数据恢复失败，跳过, activity=%v comp=%v owner=%v/%v err=%v",
+				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID, err)
+		}
+	}
+}
+
+// SettleEndedPlayer 处理已结束服务器/联盟活动中刚加载的玩家数据：
+// 模块实现 Settler 且 NeedSettle 为 true 时调用 Settle；不需要结算的活动直接卸载该玩家条目。
+// 返回结算产生的脏数据快照，以及这些快照所属的活动，调用方存盘成功后再调用 UnloadEndedPlayer 卸载。
+func (as *ActvService) SettleEndedPlayer(uid uint64) ([]*ActvDataDoc, []int64) {
+	var docs []*ActvDataDoc
+	var settled []int64
+	for _, actv := range as.ListAllActvs() {
+		if !actv.IsEnded() || actv.GetMeta().GetOwnerScope() == ScopePlayer || len(actv.playerComps) == 0 {
+			continue
+		}
+		settler, ok := actv.GetExt().(Settler)
+		if !ok || !settler.NeedSettle(uid) {
+			actv.unloadPlayer(uid)
+			continue
+		}
+		settler.Settle(uid)
+		tlog.Log.Info("[activity/ActvService.SettleEndedPlayer] 已结束活动玩家结算, activity=%v pid=%v", actv.GetMeta().GetActvID(), uid)
+		before := len(docs)
+		for _, comp := range actv.playerComps {
+			if comp.IsDirty(uid) {
+				docs = actv.appendDirtyPlayer(docs, comp, uid)
+			}
+		}
+		if len(docs) == before {
+			actv.unloadPlayer(uid) // 结算未修改数据，无需存盘。
+			continue
+		}
+		settled = append(settled, actv.GetMeta().GetActvID())
+	}
+	return docs, settled
+}
+
+// UnloadEndedPlayer 结算存盘完成后，从指定已结束活动中卸载玩家条目；仍为脏数据的组件保留，
+// 由定时存盘或玩家释放继续处理。
+func (as *ActvService) UnloadEndedPlayer(uid uint64, activityIDs []int64) {
+	for _, activityID := range activityIDs {
+		actv := as.GetActvByID(activityID)
+		if actv == nil || !actv.IsEnded() {
+			continue
+		}
+		for _, comp := range actv.playerComps {
+			if !comp.IsDirty(uid) {
+				comp.Unload(uid)
+			}
+		}
+	}
+}
+
+func (actv *Actv) unloadPlayer(uid uint64) {
+	for _, comp := range actv.playerComps {
+		comp.Unload(uid)
 	}
 }

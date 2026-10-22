@@ -19,15 +19,15 @@ type Component interface {
 
 // PlayerComponent 是活动实例的玩家列表组件，每个玩家一份，随玩家上线加载、释放时卸载。
 type PlayerComponent interface {
-	CompID() int32                          // 组件编号，模板内唯一且不可变更。
-	Load(uid uint64, raw bson.Raw) error    // 从存盘数据恢复指定玩家的条目。
-	Save(uid uint64) (bson.Raw, error)      // 生成指定玩家条目的存盘快照。
-	SetLoaded(uid uint64)                   // 标记玩家数据已加载，库中无数据时允许新建条目。
-	Unload(uid uint64)                      // 卸载指定玩家的条目。
-	DirtyPlayers() []uint64                 // 返回有待存盘条目的玩家。
-	IsDirty(uid uint64) bool                // 指定玩家条目是否需要存盘。
-	Revision(uid uint64) uint64             // 指定玩家条目的内存版本号。
-	ClearDirty(uid uint64, revision uint64) // 存盘快照版本与当前版本一致时清除脏标记。
+	CompID() int32                              // 组件编号，模板内唯一且不可变更。
+	Load(uid uint64, raw bson.Raw) error        // 从存盘数据恢复指定玩家的条目。
+	Save(uid uint64) (bson.Raw, error)          // 生成指定玩家条目的存盘快照。
+	BindCreateChecker(fn func(uid uint64) bool) // 绑定“能否为玩家新建条目”的判断，由框架在实例创建时注入。
+	Unload(uid uint64)                          // 卸载指定玩家的条目。
+	DirtyPlayers() []uint64                     // 返回有待存盘条目的玩家。
+	IsDirty(uid uint64) bool                    // 指定玩家条目是否需要存盘。
+	Revision(uid uint64) uint64                 // 指定玩家条目的内存版本号。
+	ClearDirty(uid uint64, revision uint64)     // 存盘快照版本与当前版本一致时清除脏标记。
 }
 
 // ComponentHolder 由持有数据组件的活动行为实现。
