@@ -19,9 +19,7 @@ const (
 
 // registerTriggerTimer 注册触发创建定时器的回调。
 func (actor *Activity) registerTriggerTimer() {
-	actor.wheel.Register(activityTriggerTimerType, func(interface{}) {
-		actor.onTriggerTimer()
-	})
+	actor.wheel.Register(activityTriggerTimerType, actor.onTriggerTimer)
 }
 
 // startTrigger 在活动数据加载完成且收到开服事件后启动：解析配置时间规则，立即检查一次，之后每分钟检查。
@@ -41,7 +39,7 @@ func (actor *Activity) startTrigger() {
 }
 
 // onTriggerTimer 将定时到期回调投递到 Activity Actor 线程执行。
-func (actor *Activity) onTriggerTimer() {
+func (actor *Activity) onTriggerTimer(_ interface{}) {
 	if actor == nil || actor.system == nil {
 		return
 	}
@@ -57,7 +55,7 @@ func (actor *Activity) runTrigger() {
 	if actor.serverClosing {
 		return
 	}
-	created := actor.actvService.CreateDueServerActvs(actor.triggerPlans, time.Now().Unix())
+	created := actor.actvService.CreateDueServerActs(actor.triggerPlans, time.Now().Unix())
 	if len(created) > 0 {
 		tlog.Log.Info("[activity/Activity.runTrigger] 按配置创建活动实例, count=%v", len(created))
 	}

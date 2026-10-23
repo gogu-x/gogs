@@ -746,32 +746,32 @@ func TestCreateDueServerActvs(t *testing.T) {
 
 	start, _ := time.ParseInLocation("2006-01-02 15:04:05", "2026-10-15 00:00:00", loc) // 第 3 轮开始
 	now := start.Unix() + 3600
-	created := svc.CreateDueServerActvs(plans, now)
-	if len(created) != 1 {
-		t.Fatalf("created = %d, want 1", len(created))
+	created := svc.CreateDueServerActs(plans, now)
+	if len(created) != 3 {
+		t.Fatalf("created = %d, want 3 (including settlement rounds)", len(created))
 	}
-	meta := created[0].GetMeta()
+	meta := created[2].GetMeta()
 	if meta.GetActvID() != plans[0].InstanceID(3) || meta.GetOwnerScope() != service.ScopeServer || meta.GetOwnerID() != 1 ||
 		meta.GetStartTs() != start.Unix() || meta.GetEndTs() != start.Unix()+3*86400 || !meta.IsDirty() {
 		t.Fatalf("meta = %+v", meta)
 	}
-	if b := created[0].GetExt().(*testBehavior); !b.loaded {
+	if b := created[2].GetExt().(*testBehavior); !b.loaded {
 		t.Fatal("OnLoaded should be called on new instance")
 	}
-	if len(svc.CreateDueServerActvs(plans, now+60)) != 0 {
+	if len(svc.CreateDueServerActs(plans, now+60)) != 0 {
 		t.Fatal("existing instance must not be recreated")
 	}
 
 	svc.EndDueActivities(meta.GetEndTs() - 1)
-	if created[0].IsEnded() {
+	if created[2].IsEnded() {
 		t.Fatal("should not end before EndTs")
 	}
 	svc.EndDueActivities(meta.GetEndTs())
-	if !created[0].IsEnded() {
+	if !created[2].IsEnded() {
 		t.Fatal("should end at EndTs")
 	}
-	// 结束后到保留期结束前（本例无保留期）不再创建同一轮；下一轮到期时创建新实例。
-	next := svc.CreateDueServerActvs(plans, start.Unix()+7*86400)
+	// 十四天结算期内不重复创建同一轮；下一轮到期时创建新实例。
+	next := svc.CreateDueServerActs(plans, start.Unix()+7*86400)
 	if len(next) != 1 || next[0].GetMeta().GetActvID() != plans[0].InstanceID(4) {
 		t.Fatal("next round should be created")
 	}

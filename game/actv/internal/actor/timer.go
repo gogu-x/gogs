@@ -52,6 +52,7 @@ func (actor *Activity) onLifecycleTick(ctx tree.Context) {
 		now := time.Now().Unix()
 		actor.actvService.StartDueActivities(now)
 		actor.actvService.EndDueActivities(now)
+		actor.actvService.RemoveExpiredActivities(now)
 		actor.actvService.HandleTicker()
 	}
 	actor.scheduleLifecycleTick()

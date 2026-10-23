@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"time"
 
 	activityconf "github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/pb/sspb"
@@ -193,28 +194,49 @@ func (as *ActvService) NewActv(meta *ActvMeta, config activityconf.ActivityConfi
 
 // RemoveActv 从内存索引中移除活动实例，不修改存盘数据。
 func (as *ActvService) RemoveActv(activityID int64) {
-	if as == nil {
-		return
-	}
-	actv, found := as.actvs[activityID]
-	if !found {
-		return
-	}
-	delete(as.actvs, activityID)
-	owner := actv.ownerKey()
-	if remaining := withoutActv(as.ownerActvs[owner], actv); len(remaining) > 0 {
-		as.ownerActvs[owner] = remaining
-	} else {
-		delete(as.ownerActvs, owner)
-	}
-	as.orderedActvs = withoutActv(as.orderedActvs, actv)
+	as.RemoveActvs([]int64{activityID})
 }
 
-// withoutActv 返回去掉指定实例后的新切片，不修改原切片，保证进行中的遍历安全。
-func withoutActv(list []*Actv, target *Actv) []*Actv {
-	result := make([]*Actv, 0, len(list))
+// RemoveActvs 批量移除实例，每个受影响的归属列表和全局列表仅过滤一次。
+// 使用新切片保留已有遍历视图，不修改存盘数据。
+func (as *ActvService) RemoveActvs(activityIDs []int64) {
+	if as == nil || len(activityIDs) == 0 {
+		return
+	}
+	activities := as.actvs
+	owners := make(map[ownerKey]int)
+	removed := 0
+	for _, activityID := range activityIDs {
+		if actv := activities[activityID]; actv != nil {
+			owners[actv.ownerKey()]++
+			delete(activities, activityID)
+			removed++
+		}
+	}
+	if removed == 0 {
+		return
+	}
+	ownerActivities := as.ownerActvs
+	for owner, count := range owners {
+		if remaining := as.retainedActvs(ownerActivities[owner], count); len(remaining) > 0 {
+			ownerActivities[owner] = remaining
+		} else {
+			delete(ownerActivities, owner)
+		}
+	}
+	as.orderedActvs = as.retainedActvs(as.orderedActvs, removed)
+	tlog.Log.Info("[activity/ActvService.RemoveActvs] 批量移除活动实例, count=%v", removed)
+}
+
+// retainedActvs 按原顺序返回主索引中仍存在的实例，保持旧切片及其内容不变。
+func (as *ActvService) retainedActvs(list []*Actv, removed int) []*Actv {
+	if len(list) == removed {
+		return nil
+	}
+	result := make([]*Actv, 0, len(list)-removed)
+	activities := as.actvs
 	for _, actv := range list {
-		if actv != target {
+		if activities[actv.GetMeta().GetActvID()] == actv {
 			result = append(result, actv)
 		}
 	}
@@ -308,11 +330,7 @@ func (as *ActvService) ListAllActvs() []*Actv {
 	return as.orderedActvs
 }
 
-// HandleRequest 将玩家请求转发给活动模板，uid 透传给模板。归属校验规则：
-//   - 玩家独有活动：只接受归属玩家本人的请求；
-//   - 服务器活动：本服已加载的服务器活动接受任意玩家请求；
-//   - 联盟活动：活动 Actor 尚无联盟成员信息，暂不接受玩家请求；
-//   - 已结束活动：不再接受请求，结算由 Settler 处理。
+// HandleRequest 将玩家请求转发给活动模板，uid 透传给模板
 func (as *ActvService) HandleRequest(uid uint64, activityID int64, request proto.Message) error {
 	if as == nil || uid == 0 || request == nil {
 		return fmt.Errorf("activity request requires a player and a message")
@@ -321,7 +339,7 @@ func (as *ActvService) HandleRequest(uid uint64, activityID int64, request proto
 	if actv == nil || actv.GetExt() == nil {
 		return fmt.Errorf("activity %d not found", activityID)
 	}
-	if actv.IsEnded() {
+	if actv.IsEnded() || actv.GetMeta().IsExpired(time.Now().Unix()) {
 		return fmt.Errorf("activity %d has ended", activityID)
 	}
 	actv.GetExt().HandleRequest(uid, request)
@@ -333,8 +351,9 @@ func (as *ActvService) HandleEvent(event *sspb.Event) {
 	if as == nil || event == nil {
 		return
 	}
+	now := time.Now().Unix()
 	for _, actv := range as.orderedActvs {
-		if actv.GetExt() == nil || actv.IsEnded() {
+		if actv.GetExt() == nil || actv.IsEnded() || actv.GetMeta().IsExpired(now) {
 			continue
 		}
 		actv.GetExt().HandleEvent(event)
@@ -351,7 +370,7 @@ func (as *ActvService) StartDueActivities(now int64) {
 			continue
 		}
 		meta := actv.GetMeta()
-		if meta.Started || (meta.GetStartTs() > 0 && now < meta.GetStartTs()) {
+		if meta.IsExpired(now) || meta.Started || (meta.GetStartTs() > 0 && now < meta.GetStartTs()) {
 			continue
 		}
 		actv.GetExt().OnStart()
@@ -364,8 +383,10 @@ func (as *ActvService) StartDueActivities(now int64) {
 
 // HandleTicker 将生命周期定时回调分发给已启动的活动模板。
 func (as *ActvService) HandleTicker() {
+	now := time.Now().Unix()
 	for _, actv := range as.ListAllActvs() {
-		if actv == nil || actv.GetMeta() == nil || !actv.GetMeta().Started || actv.GetExt() == nil || actv.IsEnded() {
+		meta := actv.GetMeta()
+		if meta == nil || !meta.Started || actv.GetExt() == nil || actv.IsEnded() || meta.IsExpired(now) {
 			continue
 		}
 		actv.GetExt().OnTicker()
@@ -378,7 +399,7 @@ func (actv *Actv) IsEnded() bool {
 }
 
 // EndActv 结束活动实例：调用模板 OnClosed（模板在此固定全服结果、结算在线玩家），
-// 然后标记为已结束。实例继续常驻内存，供离线玩家上线时补结算。
+// 然后标记为已结束。实例保留十四天供离线玩家补结算，过期且存盘完成后移除。
 func (as *ActvService) EndActv(activityID int64) bool {
 	actv := as.GetActvByID(activityID)
 	if actv == nil || actv.GetExt() == nil || actv.IsEnded() {

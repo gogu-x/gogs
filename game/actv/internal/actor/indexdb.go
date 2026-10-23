@@ -24,13 +24,21 @@ func (actor *Activity) activityIndexes() []activityIndex {
 			model: actor.model,
 			indexes: []mongo.IndexModel{
 				{Keys: ownerKeys, Options: options.Index().SetName("idx_owner")},
+				{
+					Keys:    bson.D{{Key: "owner_scope", Value: 1}, {Key: "owner_id", Value: 1}, {Key: "end_ts", Value: 1}},
+					Options: options.Index().SetName("idx_owner_end_ts"),
+				},
 			},
 		},
 		{
 			model: actor.dataModel,
 			indexes: []mongo.IndexModel{
-				// activity_data：玩家上线按归属者加载组件数据。
+				// activity_data：玩家上线按归属者及有效活动编号加载组件数据。
 				{Keys: ownerKeys, Options: options.Index().SetName("idx_owner")},
+				{
+					Keys:    bson.D{{Key: "owner_scope", Value: 1}, {Key: "owner_id", Value: 1}, {Key: "actv_id", Value: 1}},
+					Options: options.Index().SetName("idx_owner_actv"),
+				},
 				// activity_data：启动按活动实例加载服务器/联盟单条数据，也用于按活动清理数据。
 				{
 					Keys:    bson.D{{Key: "actv_id", Value: 1}, {Key: "owner_scope", Value: 1}},

@@ -1,4 +1,5 @@
 //go:generate go run ../../../../../tools/activity-router-gen -dir .
+//go:generate go run ../../../../../tools/deepcopy-gen -dir .
 
 // Package online 实现在线活动行为和独立状态组件。
 package online

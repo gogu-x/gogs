@@ -65,7 +65,7 @@ func main() {
 			}
 			system := tree.Default()
 			system.Spawn(
-				mongorpc.NewActor(def.Mongo, db),
+				mongorpc.NewActor(def.Mongo, db, mongorpc.WithWorkers(16)),
 				natsrpc.NewNats(natsrpc.Game, conf.ServerID, conf.NodeId, conf.NatsURL),
 				battle.New(nil, nil, conf.ServerID, conf.NodeId),
 				guild.NewGuild(),

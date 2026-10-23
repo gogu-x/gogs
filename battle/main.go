@@ -48,7 +48,7 @@ func main() {
 			}
 
 			tree.Default().Spawn(
-				mongorpc.NewActor(def.Mongo, db),
+				mongorpc.NewActor(def.Mongo, db, mongorpc.WithWorkers(16)),
 				service.New(),
 				natsrpc.NewNats(natsrpc.Battle, conf.ServerID, conf.NodeId, conf.NatsURL),
 			)

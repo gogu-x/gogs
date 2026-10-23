@@ -26,8 +26,8 @@ const (
 const (
 	// dateLayout 是绝对日期类型的时间格式。
 	dateLayout = "2006-01-02 15:04:05"
-	// maxActiveRoundScan 限制回溯仍在有效期内的历史轮次数量，防止配置异常时无限循环。
-	maxActiveRoundScan = 64
+	// SettlementRetentionSeconds 是活动实例统一保留的十四天结算窗口，单位为秒。
+	SettlementRetentionSeconds int64 = 14 * 24 * 60 * 60
 	// maxRoundsPerConfig 是单个配置的最大轮次数，保证实例编号不冲突。
 	maxRoundsPerConfig = 10000
 )
@@ -171,6 +171,13 @@ func (plan *Plan) RoundAt(index int64) Round {
 	}
 }
 
+// SettlementRounds 返回统一十四天结算窗口内的轮次，不修改原配置的展示保留期。
+func (plan *Plan) SettlementRounds(now int64) []Round {
+	settlementPlan := *plan
+	settlementPlan.CloseAfterEnd = SettlementRetentionSeconds
+	return settlementPlan.ActiveRounds(now)
+}
+
 // ActiveRounds 返回 now 时刻已到预告时间且尚未过期的轮次（按轮次升序），用于创建或恢复实例。
 // 循环活动的结束保留期可能与下一轮重叠，因此可能返回多轮。
 func (plan *Plan) ActiveRounds(now int64) []Round {
@@ -180,12 +187,16 @@ func (plan *Plan) ActiveRounds(now int64) []Round {
 	}
 	first := plan.firstIndex()
 	var rounds []Round
-	for index, scanned := last, 0; index >= first && scanned < maxActiveRoundScan; index, scanned = index-1, scanned+1 {
+	// lastShownIndex 已按实例编号上限限制轮次，支持十四天内超过六十四轮的短周期活动。
+	for index := last; index >= first; index-- {
 		round := plan.RoundAt(index)
 		if round.ExpireTs <= now {
 			break // 更早的轮次结束得更早，同样已过期。
 		}
-		rounds = append([]Round{round}, rounds...)
+		rounds = append(rounds, round)
+	}
+	for left, right := 0, len(rounds)-1; left < right; left, right = left+1, right-1 {
+		rounds[left], rounds[right] = rounds[right], rounds[left]
 	}
 	return rounds
 }

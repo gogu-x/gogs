@@ -48,12 +48,12 @@ func (as *ActvService) FilterServerPlans(plans []*trigger.Plan) []*trigger.Plan 
 	return result
 }
 
-// CreateDueServerActvs 按时间规则创建 now 时刻处于有效期内、尚未存在的服务器活动实例。
+// CreateDueServerActs 按时间规则创建 now 时刻处于有效期内、尚未存在的服务器活动实例。
 // 实例编号由配置和轮次确定，已存在（含启动时从库中恢复）的实例不会重复创建。返回新创建的实例。
-func (as *ActvService) CreateDueServerActvs(plans []*trigger.Plan, now int64) []*Actv {
+func (as *ActvService) CreateDueServerActs(plans []*trigger.Plan, now int64) []*Actv {
 	var created []*Actv
 	for _, plan := range plans {
-		for _, round := range plan.ActiveRounds(now) {
+		for _, round := range plan.SettlementRounds(now) {
 			activityID := plan.InstanceID(round.Round)
 			if as.GetActvByID(activityID) != nil {
 				continue
@@ -87,6 +87,12 @@ func (as *ActvService) EndDueActivities(now int64) {
 	for _, actv := range as.orderedActvs {
 		meta := actv.GetMeta()
 		if actv.IsEnded() || meta.GetEndTs() <= 0 || now < meta.GetEndTs() {
+			continue
+		}
+		if meta.IsExpired(now) {
+			meta.State = StateEnded
+			meta.MarkDirty()
+			tlog.Log.Info("[activity/ActvService.EndDueActivities] 活动已过结算期，关闭并等待存盘清理, activity=%v", meta.GetActvID())
 			continue
 		}
 		as.EndActv(meta.GetActvID())

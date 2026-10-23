@@ -88,9 +88,9 @@ func (actor *Activity) OnInit(ctx tree.Context) {
 		}
 	}
 	actor.ensureIndexes(ctx)
-	if !actor.lifecycle.LoadAll(ctx, (*service.ActvMeta)(nil), bson.M{
+	if !actor.lifecycle.LoadAll(ctx, (*service.ActvMeta)(nil), retainedActivityFilter(bson.M{
 		"owner_scope": bson.M{"$in": bson.A{int32(service.ScopeServer), int32(service.ScopeGuild)}},
-	}, actor.onActivitiesLoaded) {
+	}, time.Now().Unix()), actor.onActivitiesLoaded) {
 		actor.failLoad(ctx, nil)
 		return
 	}

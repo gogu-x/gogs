@@ -2,6 +2,7 @@ package actor
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/glconf"
@@ -84,6 +85,10 @@ func (actor *Activity) finishStartupLoad(ctx tree.Context) {
 
 func (actor *Activity) restoreActivity(meta *service.ActvMeta) bool {
 	if actor == nil || actor.actvService == nil || meta == nil || meta.GetActvID() <= 0 || meta.GetCfgID() <= 0 || meta.GetOwnerID() <= 0 {
+		return false
+	}
+	if meta.IsExpired(time.Now().Unix()) {
+		tlog.Log.Info("[activity/Activity.restoreActivity] 活动超过十四天结算期，跳过恢复, activity=%v end=%v", meta.GetActvID(), meta.GetEndTs())
 		return false
 	}
 	configRow := glconf.GetActvOnlineCfgNoErr(meta.GetCfgID())

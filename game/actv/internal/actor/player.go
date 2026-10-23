@@ -2,6 +2,7 @@ package actor
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/ipb"
@@ -23,8 +24,6 @@ type playerLoadState struct {
 	pending   []pendingActivityRequest // 玩家数据就绪前暂存的请求。
 	metas     *[]service.ActvMeta      // 已返回的玩家独有活动元数据。
 	docs      *[]service.ActvDataDoc   // 已返回的随玩家加载的组件数据。
-	remaining int                      // 尚未返回的加载请求数。
-	loadErr   error                    // 首个加载错误。
 }
 
 // onPlayerSessionOpened 玩家上线时加载其活动数据。
@@ -58,56 +57,94 @@ func (actor *Activity) ensurePlayerLoaded(ctx tree.Context, uid uint64) *playerL
 	return state
 }
 
-// startPlayerLoad 并行加载玩家独有活动元数据和随玩家加载的全部组件数据。
+// startPlayerLoad 先加载结算期内的玩家独有活动元数据，再限定组件数据的加载范围。
 func (actor *Activity) startPlayerLoad(ctx tree.Context, uid uint64, state *playerLoadState) {
 	state.loading = true
-	state.remaining = 2
-	state.loadErr = nil
-	metaFilter := bson.M{"owner_scope": int32(service.ScopePlayer), "owner_id": int64(uid)}
-	if !actor.lifecycle.LoadAll(ctx, (*service.ActvMeta)(nil), metaFilter, func(callbackCtx tree.Context, value interface{}, err error) {
-		if err == nil {
+	metaFilter := retainedActivityFilter(bson.M{
+		"owner_scope": int32(service.ScopePlayer), "owner_id": int64(uid),
+	}, time.Now().Unix())
+	if !actor.lifecycle.LoadAll(
+		ctx, (*service.ActvMeta)(nil), metaFilter,
+		func(callbackCtx tree.Context, value interface{}, err error) {
+			if actor.players[uid] != state || !state.loading {
+				return
+			}
+			if err != nil {
+				actor.onPlayerLoadFinished(
+					callbackCtx, uid, state, err,
+				)
+				return
+			}
 			metas, ok := value.(*[]service.ActvMeta)
-			if !ok {
-				err = fmt.Errorf("invalid player activity load result %T", value)
+			if !ok || metas == nil {
+				actor.onPlayerLoadFinished(
+					callbackCtx, uid, state, fmt.Errorf("invalid player activity load result %T", value),
+				)
+				return
 			}
 			state.metas = metas
-		}
-		actor.onPlayerPartLoaded(callbackCtx, uid, state, err)
-	}) {
-		actor.onPlayerPartLoaded(ctx, uid, state, fmt.Errorf("player activity load request could not be sent"))
-	}
-	dataFilter := bson.M{"owner_scope": int32(service.ScopePlayer), "owner_id": int64(uid)}
-	if !actor.lifecycle.LoadAll(ctx, (*service.ActvDataDoc)(nil), dataFilter, func(callbackCtx tree.Context, value interface{}, err error) {
-		if err == nil {
-			docs, ok := value.(*[]service.ActvDataDoc)
-			if !ok {
-				err = fmt.Errorf("invalid player activity data load result %T", value)
-			}
-			state.docs = docs
-		}
-		actor.onPlayerPartLoaded(callbackCtx, uid, state, err)
-	}) {
-		actor.onPlayerPartLoaded(ctx, uid, state, fmt.Errorf("player activity data load request could not be sent"))
+			actor.loadPlayerComponents(callbackCtx, uid, state)
+		},
+	) {
+		actor.onPlayerLoadFinished(
+			ctx, uid, state, fmt.Errorf("player activity load request could not be sent"),
+		)
 	}
 }
 
-// onPlayerPartLoaded 汇总两段加载结果，全部返回后恢复玩家数据并放行暂存请求。
-func (actor *Activity) onPlayerPartLoaded(ctx tree.Context, uid uint64, state *playerLoadState, err error) {
-	if err != nil && state.loadErr == nil {
-		state.loadErr = err
+// loadPlayerComponents 只读取有效个人活动及相关共享活动中的玩家条目，避免加载过期历史数据。
+func (actor *Activity) loadPlayerComponents(ctx tree.Context, uid uint64, state *playerLoadState) {
+	now := time.Now().Unix()
+	activityIDs := actor.actvService.SharedActivityIDs(actor.playerGuildID(uid), now)
+	for index := range *state.metas {
+		meta := &(*state.metas)[index]
+		if !meta.IsExpired(now) {
+			activityIDs = append(activityIDs, meta.GetActvID())
+		}
 	}
-	state.remaining--
-	if state.remaining > 0 {
+	if len(activityIDs) == 0 {
+		actor.onPlayerLoadFinished(
+			ctx, uid, state, nil,
+		)
 		return
 	}
+	dataFilter := bson.M{
+		"owner_scope": int32(service.ScopePlayer), "owner_id": int64(uid),
+		"actv_id": bson.M{"$in": activityIDs},
+	}
+	if !actor.lifecycle.LoadAll(
+		ctx, (*service.ActvDataDoc)(nil), dataFilter,
+		func(callbackCtx tree.Context, value interface{}, err error) {
+			if err == nil {
+				docs, ok := value.(*[]service.ActvDataDoc)
+				if !ok || docs == nil {
+					err = fmt.Errorf("invalid player activity data load result %T", value)
+				}
+				state.docs = docs
+			}
+			actor.onPlayerLoadFinished(
+				callbackCtx, uid, state, err,
+			)
+		},
+	) {
+		actor.onPlayerLoadFinished(
+			ctx, uid, state, fmt.Errorf("player activity data load request could not be sent"),
+		)
+	}
+}
+
+// onPlayerLoadFinished 在加载结束后恢复玩家数据并放行暂存请求。
+func (actor *Activity) onPlayerLoadFinished(
+	ctx tree.Context, uid uint64, state *playerLoadState, err error,
+) {
 	if actor.players[uid] != state || !state.loading {
 		return // 加载期间玩家已释放，结果作废。
 	}
 	state.loading = false
-	if state.loadErr != nil {
-		tlog.Log.Error("[activity/Activity.onPlayerPartLoaded] 玩家活动数据加载失败, pid=%v err=%v", uid, state.loadErr)
+	if err != nil {
+		tlog.Log.Error("[activity/Activity.onPlayerLoadFinished] 玩家活动数据加载失败, pid=%v err=%v", uid, err)
 		delete(actor.players, uid)
-		respondPending(state.pending, state.loadErr)
+		respondPending(state.pending, err)
 		return
 	}
 	actor.applyPlayerData(uid, state)

@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/gogu-x/tree/tlog"
 )
@@ -172,7 +173,7 @@ func (as *ActvService) SetPlayerLoaded(uid uint64) {
 // canCreatePlayerEntry 返回活动的玩家列表组件能否为玩家新建条目：玩家已加载且活动未结束。
 func (as *ActvService) canCreatePlayerEntry(actv *Actv) func(uid uint64) bool {
 	return func(uid uint64) bool {
-		return as.loadedPlayers[uid] && !actv.IsEnded()
+		return as.loadedPlayers[uid] && !actv.IsEnded() && !actv.GetMeta().IsExpired(time.Now().Unix())
 	}
 }
 
@@ -182,8 +183,9 @@ func (as *ActvService) IsPlayerLoaded(uid uint64) bool { return as.loadedPlayers
 // NotifyPlayerLoaded 通知玩家相关的进行中共享活动（本服活动 + 所属联盟活动）：该玩家的组件数据已恢复。
 // 玩家独有活动通过 OnLoaded 获知数据恢复，不重复通知。
 func (as *ActvService) NotifyPlayerLoaded(uid uint64, guildID OwnerID) {
+	now := time.Now().Unix()
 	as.rangePlayerShared(guildID, func(actv *Actv) {
-		if !actv.IsEnded() {
+		if !actv.IsEnded() && !actv.GetMeta().IsExpired(now) {
 			actv.GetExt().OnPlayerLoaded(uid)
 		}
 	})
@@ -192,8 +194,9 @@ func (as *ActvService) NotifyPlayerLoaded(uid uint64, guildID OwnerID) {
 // NotifyPlayerUnload 通知玩家相关的进行中共享活动：该玩家即将卸载。
 // 调用发生在取存盘快照之前，模板在钩子中的修改会随释放一起存盘。
 func (as *ActvService) NotifyPlayerUnload(uid uint64, guildID OwnerID) {
+	now := time.Now().Unix()
 	as.rangePlayerShared(guildID, func(actv *Actv) {
-		if !actv.IsEnded() {
+		if !actv.IsEnded() && !actv.GetMeta().IsExpired(now) {
 			actv.GetExt().OnPlayerUnload(uid)
 		}
 	})
@@ -228,9 +231,13 @@ func (as *ActvService) isPlayerShared(actv *Actv, guildID OwnerID) bool {
 // 调用方需先取走该玩家的脏数据快照。
 func (as *ActvService) UnloadPlayer(uid uint64, guildID OwnerID) {
 	delete(as.loadedPlayers, uid)
-	for _, actv := range as.ListActvs(ScopePlayer, OwnerID(uid)) {
-		as.RemoveActv(actv.GetMeta().GetActvID())
+	activities := as.ListActvs(ScopePlayer, OwnerID(uid))
+	ids := make([]int64, 0, len(activities))
+	for _, actv := range activities {
+		ids = append(ids, actv.GetMeta().GetActvID())
 	}
+	as.RemoveActvs(ids)
+	tlog.Log.Info("[activity/ActvService.UnloadPlayer] 卸载玩家活动数据, pid=%v activities=%v", uid, len(ids))
 	as.rangePlayerShared(guildID, func(actv *Actv) {
 		actv.unloadPlayer(uid)
 	})
@@ -240,12 +247,16 @@ func (as *ActvService) UnloadPlayer(uid uint64, guildID OwnerID) {
 // guildID 为玩家所属联盟：玩家列表条目只挂入与该玩家相关的共享活动，其他联盟活动的条目跳过，
 // 保证释放时按同一索引能完整卸载。启动加载不含玩家条目，传 0 即可。
 func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc, guildID OwnerID) {
+	now := time.Now().Unix()
 	for index := range docs {
 		doc := &docs[index]
 		actv := as.GetActvByID(doc.ActvID)
 		if actv == nil {
 			tlog.Log.Error("[activity/ActvService.ApplyDataDocs] 组件数据所属活动实例未加载，跳过, activity=%v comp=%v owner=%v/%v",
 				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID)
+			continue
+		}
+		if actv.GetMeta().IsExpired(now) {
 			continue
 		}
 		if _, isPlayerComp := actv.playerComps[doc.Comp]; isPlayerComp && !as.isPlayerShared(actv, guildID) {
@@ -266,8 +277,9 @@ func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc, guildID OwnerID) {
 func (as *ActvService) SettleEndedPlayer(uid uint64, guildID OwnerID) ([]*ActvDataDoc, []int64) {
 	var docs []*ActvDataDoc
 	var settled []int64
+	now := time.Now().Unix()
 	as.rangePlayerShared(guildID, func(actv *Actv) {
-		if !actv.IsEnded() || len(actv.playerComps) == 0 {
+		if !actv.IsEnded() || actv.GetMeta().IsExpired(now) || len(actv.playerComps) == 0 {
 			return
 		}
 		settler, ok := actv.GetExt().(Settler)
