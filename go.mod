@@ -3,7 +3,7 @@ module github.com/gogu-x/gogs
 go 1.26.0
 
 require (
-	github.com/gogu-x/tree v0.3.2
+	github.com/gogu-x/tree v0.4.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
@@ -39,5 +39,3 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260921155816-b14227669459 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260921155816-b14227669459 // indirect
 )
-
-replace github.com/gogu-x/tree => ../tree
