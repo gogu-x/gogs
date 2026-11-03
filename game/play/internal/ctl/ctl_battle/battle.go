@@ -9,6 +9,7 @@ import (
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/game/play/internal/player"
 	"github.com/gogu-x/gogs/game/play/internal/player/role"
+	"github.com/gogu-x/gogs/game/play/internal/player/souljade"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/tree"
@@ -110,13 +111,14 @@ func battleRoleMessage(currentPlayer *player.Player, selectedRole *role.Role) (*
 		})
 	}
 	message := &pb_battle.Role{
-		RoleId:       roleID,
-		RoleConfigId: roleConfigID,
-		Level:        selectedRole.GetLevel(),
-		Star:         selectedRole.GetStar(),
-		Breakthrough: selectedRole.GetBreakthrough(),
-		Skills:       roleSkills,
-		Equips:       roleEquips,
+		RoleId:                 roleID,
+		RoleConfigId:           roleConfigID,
+		Level:                  selectedRole.GetLevel(),
+		Star:                   selectedRole.GetStar(),
+		Breakthrough:           selectedRole.GetBreakthrough(),
+		Skills:                 roleSkills,
+		Equips:                 roleEquips,
+		SoulJadeEffectAffixIds: souljade.EffectAffixIDs(currentPlayer.GetSoulJadeMgr()),
 	}
 	return message, nil
 }

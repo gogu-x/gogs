@@ -110,3 +110,58 @@ func TestBuildSkillUsesConfiguredTiming(t *testing.T) {
 		t.Fatalf("skill timing = %d/%d, want configured values 3/3", skill.WindupTicks, skill.RecoveryTicks)
 	}
 }
+
+func TestBuildSkillCompilesIceAndThunderCharges(t *testing.T) {
+	installFactoryConfigs(t)
+	config := glconf.GetBattleSkillCfg(1)
+	config.Effects = []*cspb.TypIDVal{
+		{Typ: "battle_damage", Pro: 1000},
+		{Typ: "battle_ice_burst", Id: 3, Val: 1, Pro: 1500},
+		{Typ: "battle_thunder_charge", Id: 4, Val: 2},
+	}
+	skill, err := buildSkill(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(skill.Effects) != 1 || len(skill.Charges) != 2 {
+		t.Fatalf("普通效果/积攒效果数量错误: %d/%d", len(skill.Effects), len(skill.Charges))
+	}
+	if skill.Charges[0].Threshold != 3 || skill.Charges[0].Gain != 1 || !skill.Charges[0].Trigger || skill.Charges[0].TriggerEffect.CoefficientPermille != 1500 {
+		t.Fatalf("冰爆编译错误: %#v", skill.Charges[0])
+	}
+	if skill.Charges[1].Trigger || skill.Charges[1].Gain != 2 || skill.Charges[1].Threshold != 4 {
+		t.Fatalf("雷积攒编译错误: %#v", skill.Charges[1])
+	}
+}
+
+func TestConfiguredIceBurstRunsThroughBattle(t *testing.T) {
+	installFactoryConfigs(t)
+	config := glconf.GetBattleSkillCfg(1)
+	config.Effects = []*cspb.TypIDVal{
+		{Typ: "battle_damage", Pro: 1000},
+		{Typ: "battle_ice_burst", Id: 2, Val: 1, Pro: 1000},
+	}
+	request := &pb.StartBattleReq{
+		BattleType:           pb.BattleType_BATTLE_TYPE_TOWER,
+		AttackerRoles:        []*pb.Role{battleRole("attacker", 1)},
+		MonsterGroupConfigId: 1,
+	}
+	battle, err := newBattleFromRequest("ice-burst-config", 7, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := battle.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	triggered := false
+	for _, event := range result.Events {
+		if event.GetActorId() == "attacker" && event.GetEffectType() == pb.EffectType_EFFECT_TYPE_ICE_BURST {
+			triggered = true
+			break
+		}
+	}
+	if !triggered {
+		t.Fatal("配置的冰爆未在战斗中触发")
+	}
+}

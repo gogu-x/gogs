@@ -4,16 +4,16 @@ import (
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/battle/battle/internal/statushandler/dot"
 	"github.com/gogu-x/gogs/battle/battle/internal/statushandler/hot"
-	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
+	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
 // Registry routes each status kind to its own lifecycle policy.
-type Registry map[statuskind.Kind]engine.StatusPolicy
+type Registry map[pb.StatusType]engine.StatusPolicy
 
 func Default() Registry {
 	return Registry{
-		statuskind.DOT: dot.Handler{},
-		statuskind.HOT: hot.Handler{},
+		pb.StatusType_STATUS_TYPE_DOT: dot.Handler{},
+		pb.StatusType_STATUS_TYPE_HOT: hot.Handler{},
 	}
 }
 

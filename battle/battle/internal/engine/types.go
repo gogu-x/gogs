@@ -3,8 +3,6 @@ package engine
 import (
 	"fmt"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/effectkind"
-	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
@@ -18,7 +16,7 @@ type AttributeModifier struct {
 // StatusConfig contains the resolved runtime data for one status.
 type StatusConfig struct {
 	ID            string
-	Kind          statuskind.Kind
+	Kind          pb.StatusType
 	DurationTurns int
 	Potency       int64
 	Modifier      AttributeModifier
@@ -26,7 +24,7 @@ type StatusConfig struct {
 
 // EffectConfig contains the resolved runtime data for one skill effect.
 type EffectConfig struct {
-	Kind                effectkind.Kind
+	Kind                pb.EffectType
 	CoefficientPermille int64
 	Flat                int64
 	StatusID            string
@@ -42,22 +40,34 @@ type SkillConfig struct {
 	Cooldown      int
 	TargetRule    pb.TargetRule
 	Effects       []EffectConfig
+	Charges       []ChargeEffectConfig // 本技能每次有效命中对出手单位积攒值的贡献。
 	WindupTicks   int64
 	RecoveryTicks int64
 }
 
+// ChargeEffectConfig 表示一次有效命中对出手单位积攒值的贡献和满值效果。
+type ChargeEffectConfig struct {
+	Kind          pb.EffectType // 冰爆或天雷效果类型。
+	Threshold     int64         // 触发所需的积攒值。
+	Gain          int64         // 每命中一个目标增加的积攒值。
+	Trigger       bool          // 当前技能是否能在满值时触发。
+	TargetRule    pb.TargetRule // 满值效果的目标规则；未指定时为敌方全体。
+	TriggerEffect EffectConfig  // 积攒满值时执行的效果配置。
+}
+
 // UnitConfig 表示 BattleActor 已从 glconf 还原的运行时单位。
 type UnitConfig struct {
-	InstanceID    string
-	Team          pb.BattleTeam
-	Position      int32
-	MaxHP         int64
-	Attack        int64
-	Defense       int64
-	Speed         int64
-	BasicSkill    SkillConfig
-	ActiveSkills  []SkillConfig
-	InitialStatus []StatusConfig
+	InstanceID     string
+	Team           pb.BattleTeam
+	Position       int32
+	MaxHP          int64
+	Attack         int64
+	Defense        int64
+	Speed          int64
+	BasicSkill     SkillConfig
+	ActiveSkills   []SkillConfig
+	InitialStatus  []StatusConfig
+	PassiveCharges []ChargeEffectConfig // 该角色装备魂玉提供的积攒效果。
 }
 
 // Rules 表示 BattleActor 已从 glconf 读取的本场规则。
@@ -134,14 +144,73 @@ func (s Setup) validate() error {
 			return invalid("unit.basic_skill", "required")
 		}
 		allSkills := append([]SkillConfig{unit.BasicSkill}, unit.ActiveSkills...)
+		thresholds := make(map[pb.EffectType]int64)
+		seenPassive := make(map[pb.EffectType]bool)
+		for _, charge := range unit.PassiveCharges {
+			if err := validateChargeEffect(charge); err != nil {
+				return err
+			}
+			if seenPassive[charge.Kind] {
+				return invalid("unit.passive_charge.kind", "duplicate kind")
+			}
+			seenPassive[charge.Kind] = true
+			thresholds[charge.Kind] = charge.Threshold
+		}
 		for _, skill := range allSkills {
 			if skill.WindupTicks < 0 || skill.RecoveryTicks < 0 {
 				return invalid("unit.skill.timing", "windup and recovery ticks cannot be negative")
+			}
+			if len(skill.Charges) > 0 {
+				hasDamage := false
+				for _, effect := range skill.Effects {
+					if effect.Kind == pb.EffectType_EFFECT_TYPE_DAMAGE {
+						hasDamage = true
+						break
+					}
+				}
+				if !hasDamage {
+					return invalid("unit.skill.charge", "charged skill requires a damage effect")
+				}
+			}
+			seenCharges := make(map[pb.EffectType]bool)
+			for _, charge := range skill.Charges {
+				kind, threshold := charge.Kind, charge.Threshold
+				if err := validateChargeEffect(charge); err != nil {
+					return err
+				}
+				if seenCharges[kind] {
+					return invalid("unit.skill.charge.kind", "duplicate kind in one skill")
+				}
+				seenCharges[kind] = true
+				if existing := thresholds[kind]; existing != 0 && existing != threshold {
+					return invalid("unit.skill.charge.threshold", "same kind must share one threshold per unit")
+				}
+				thresholds[kind] = threshold
 			}
 		}
 	}
 	if !teams[pb.BattleTeam_BATTLE_TEAM_ATTACKER] || !teams[pb.BattleTeam_BATTLE_TEAM_DEFENDER] {
 		return invalid("units", "both teams required")
+	}
+	return nil
+}
+
+func validateChargeEffect(charge ChargeEffectConfig) error {
+	if charge.Kind != pb.EffectType_EFFECT_TYPE_ICE_BURST && charge.Kind != pb.EffectType_EFFECT_TYPE_THUNDER {
+		return invalid("unit.charge.kind", "must be ice burst or thunder")
+	}
+	if charge.Threshold <= 0 || charge.Gain < 0 || (!charge.Trigger && charge.Gain == 0) {
+		return invalid("unit.charge", "threshold must be positive and charge must gain or trigger")
+	}
+	if charge.Trigger && (charge.TriggerEffect.Kind != charge.Kind || charge.TriggerEffect.CoefficientPermille <= 0) {
+		return invalid("unit.charge.trigger_effect", "trigger requires a matching effect and positive coefficient")
+	}
+	switch charge.TargetRule {
+	case pb.TargetRule_TARGET_RULE_UNSPECIFIED:
+	case pb.TargetRule_TARGET_RULE_ENEMY_SINGLE:
+	case pb.TargetRule_TARGET_RULE_ENEMY_ALL:
+	default:
+		return invalid("unit.charge.target_rule", "must target enemies")
 	}
 	return nil
 }

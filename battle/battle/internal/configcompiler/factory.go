@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
-	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
 	"github.com/gogu-x/gogs/glconf"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	cspb "github.com/gogu-x/gogs/pb/cspb/pb_common"
@@ -36,7 +35,11 @@ func (c *Compiler) buildRoleUnit(role *pb.Role, team pb.BattleTeam) (engine.Unit
 	if err != nil {
 		return engine.UnitConfig{}, err
 	}
-	return engine.UnitConfig{InstanceID: role.GetRoleId(), Team: team, Position: config.DefaultPosition, MaxHP: attributes.MaxHP, Attack: attributes.Attack, Defense: attributes.Defense, Speed: attributes.Speed, BasicSkill: basic, ActiveSkills: active, InitialStatus: statuses}, nil
+	charges, err := buildSoulJadeCharges(role)
+	if err != nil {
+		return engine.UnitConfig{}, err
+	}
+	return engine.UnitConfig{InstanceID: role.GetRoleId(), Team: team, Position: config.DefaultPosition, MaxHP: attributes.MaxHP, Attack: attributes.Attack, Defense: attributes.Defense, Speed: attributes.Speed, BasicSkill: basic, ActiveSkills: active, InitialStatus: statuses, PassiveCharges: charges}, nil
 }
 
 func (c *Compiler) buildRoleSkills(role *pb.Role, config *glconf.BattleRoleCfg) ([]engine.SkillConfig, error) {
@@ -158,6 +161,7 @@ func (c *Compiler) buildSkill(id int32) (engine.SkillConfig, error) {
 		return engine.SkillConfig{}, fmt.Errorf("skill battle config not found: skill_config_id=%d", id)
 	}
 	effects := make([]engine.EffectConfig, 0, len(config.Effects))
+	charges := make([]engine.ChargeEffectConfig, 0)
 	for index, effect := range config.Effects {
 		if effect == nil {
 			return engine.SkillConfig{}, fmt.Errorf("skill battle config id=%d has nil effect at index=%d", id, index)
@@ -165,6 +169,19 @@ func (c *Compiler) buildSkill(id int32) (engine.SkillConfig, error) {
 		definition, exists := c.effectDefinitions[effect.Typ]
 		if !exists {
 			return engine.SkillConfig{}, fmt.Errorf("skill battle config id=%d has unknown effect type=%q", id, effect.Typ)
+		}
+		if definition.Charge {
+			threshold, gain, coefficient := effect.GetId(), effect.GetVal(), effect.GetPro()
+			triggers := definition.Triggers
+			if threshold <= 0 || gain < 0 || (!triggers && gain == 0) || (triggers && coefficient <= 0) {
+				return engine.SkillConfig{}, fmt.Errorf("skill battle config id=%d has invalid charge effect at index=%d", id, index)
+			}
+			charges = append(charges, engine.ChargeEffectConfig{
+				Kind: definition.Kind, Threshold: int64(threshold), Gain: gain,
+				Trigger:       triggers,
+				TriggerEffect: engine.EffectConfig{Kind: definition.Kind, CoefficientPermille: int64(coefficient)},
+			})
+			continue
 		}
 		compiledEffect := engine.EffectConfig{Kind: definition.Kind, CoefficientPermille: int64(effect.Pro), Flat: effect.Val, StatusID: strconv.Itoa(int(effect.Id))}
 		if definition.RequiresStatus {
@@ -179,7 +196,7 @@ func (c *Compiler) buildSkill(id int32) (engine.SkillConfig, error) {
 	if config.WindupTicks <= 0 || config.RecoveryTicks <= 0 {
 		return engine.SkillConfig{}, fmt.Errorf("skill battle config id=%d requires positive windup_ticks and recovery_ticks", id)
 	}
-	return engine.SkillConfig{ID: strconv.Itoa(int(config.CfgID)), Cooldown: int(config.Cooldown), TargetRule: pb.TargetRule(config.TargetRule), Effects: effects, WindupTicks: int64(config.WindupTicks), RecoveryTicks: int64(config.RecoveryTicks)}, nil
+	return engine.SkillConfig{ID: strconv.Itoa(int(config.CfgID)), Cooldown: int(config.Cooldown), TargetRule: pb.TargetRule(config.TargetRule), Effects: effects, Charges: charges, WindupTicks: int64(config.WindupTicks), RecoveryTicks: int64(config.RecoveryTicks)}, nil
 }
 
 func (c *Compiler) buildInitialStatuses(ids []int32) ([]engine.StatusConfig, error) {
@@ -201,7 +218,7 @@ func (c *Compiler) buildStatus(id int32) (engine.StatusConfig, error) {
 	}
 	modifiers := battleAttributeValues(config.Modifier)
 	return engine.StatusConfig{
-		ID: strconv.Itoa(int(config.CfgID)), Kind: statuskind.Kind(config.Kind),
+		ID: strconv.Itoa(int(config.CfgID)), Kind: pb.StatusType(config.Kind),
 		DurationTurns: int(config.DurationTurns), Potency: config.Potency,
 		Modifier: engine.AttributeModifier{AttackFlat: modifiers[1], DefenseFlat: modifiers[2], SpeedFlat: modifiers[3]},
 	}, nil

@@ -21,6 +21,13 @@ func interfacesOf[T any](values []*T) []interface{} {
 	return records
 }
 
+// SetSoulJadeEffectAffixCfgForTest 安装魂玉效果词条测试配置。
+func SetSoulJadeEffectAffixCfgForTest(records []*SoulJadeEffectAffixCfg) error {
+	return installRecordsForTest(&SoulJadeEffectAffixCfg{}, interfacesOf(records), func(table *CsvConf) {
+		csvSoulJadeEffectAffixCfg.Store(table)
+	})
+}
+
 // SetBattleConfigsForTest 安装战斗工厂测试所需的核心配置。
 func SetBattleConfigsForTest(
 	roles []*BattleRoleCfg,

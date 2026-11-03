@@ -2,7 +2,6 @@ package souljade
 
 import (
 	"crypto/rand"
-	"math/big"
 	"sort"
 
 	"github.com/gogu-x/gogs/game/play/internal/player/growth"
@@ -112,7 +111,14 @@ func validItem(item *Item) bool {
 	seen := make(map[int32]bool)
 	for _, affix := range affixes {
 		attribute, value := affix.GetAttribute(), affix.GetPermille()
-		if affix == nil || !allowed[attribute] || value <= 0 || value > level.GetRefineMaxPermille() || seen[attribute] {
+		if affix == nil || seen[attribute] {
+			return false
+		}
+		if effect := glconf.GetSoulJadeEffectAffixCfgNoErr(attribute); effect != nil {
+			if !glconf.ValidSoulJadeEffectAffixCfg(effect) || value != 0 {
+				return false
+			}
+		} else if !allowed[attribute] || value <= 0 || value > level.GetRefineMaxPermille() {
 			return false
 		}
 		seen[attribute] = true
@@ -223,6 +229,9 @@ func Upgrade(mgr *Mgr, instanceID string) pb_common.ErrCode {
 	updated := item.DeepCopy()
 	updated.SetLevel(next.GetCfgID())
 	for _, affix := range updated.GetAffixes() {
+		if glconf.GetSoulJadeEffectAffixCfgNoErr(affix.GetAttribute()) != nil {
+			continue
+		}
 		value := int64(affix.GetPermille()) + int64(next.GetUpgradePermille())
 		if value > int64(next.GetRefineMaxPermille()) {
 			return pb_common.ErrCode_CONFIG_UNAVAILABLE
@@ -256,21 +265,18 @@ func Refine(mgr *Mgr, instanceID string) pb_common.ErrCode {
 	if mgr.GetEssence() < cost {
 		return pb_common.ErrCode_INSUFFICIENT_ESSENCE
 	}
-	attributes := append([]int32(nil), level.GetAllowedAttributes()...)
-	affixes := make([]*Affix, 0, level.GetAffixCount())
-	minimum, maximum := level.GetRefineMinPermille(), level.GetRefineMaxPermille()
-	for index := int32(0); index < level.GetAffixCount(); index++ {
-		pick, err := rand.Int(rand.Reader, big.NewInt(int64(len(attributes))))
-		if err != nil {
-			return pb_common.ErrCode_AFFIX_GENERATION_FAILED
-		}
-		value, err := rand.Int(rand.Reader, big.NewInt(int64(maximum)-int64(minimum)+1))
-		if err != nil {
-			return pb_common.ErrCode_AFFIX_GENERATION_FAILED
-		}
-		chosen := int(pick.Int64())
-		affixes = append(affixes, &Affix{Attribute: attributes[chosen], Permille: minimum + int32(value.Int64())})
-		attributes = append(attributes[:chosen], attributes[chosen+1:]...)
+	pool, ok := refinePool(level)
+	if !ok {
+		return pb_common.ErrCode_CONFIG_UNAVAILABLE
+	}
+	affixes, err := rollRefineAffixes(pool, level, rand.Reader)
+	if err != nil {
+		return pb_common.ErrCode_AFFIX_GENERATION_FAILED
+	}
+	updated := item.DeepCopy()
+	updated.SetAffixes(affixes)
+	if !validItem(updated) {
+		return pb_common.ErrCode_CONFIG_UNAVAILABLE
 	}
 	item.SetAffixes(affixes)
 	mgr.SetEssence(mgr.GetEssence() - cost)
@@ -298,7 +304,9 @@ func Bonuses(mgr *Mgr) *pb_common.GrowthBonuses {
 		}
 		seen[configID] = true
 		for _, affix := range item.GetAffixes() {
-			growth.Add(result, growth.Attribute(affix.GetAttribute(), affix.GetPermille()))
+			if glconf.GetSoulJadeEffectAffixCfgNoErr(affix.GetAttribute()) == nil {
+				growth.Add(result, growth.Attribute(affix.GetAttribute(), affix.GetPermille()))
+			}
 		}
 	}
 	return result

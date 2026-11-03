@@ -255,7 +255,13 @@ func (a *BattleActor) logEvent(event *pb.BattleEvent) {
 	if tlog.Log == nil {
 		return
 	}
-	tlog.Log.Info("[战斗/过程] battleID=%v seq=%v action=%v tick=%v type=%v actor=%v target=%v skill=%v status=%v amount=%v hp=%v->%v detail=%v", a.p.BattleID, event.GetSequence(), event.GetAction(), event.GetTick(), event.GetType(), event.GetActorId(), event.GetTargetId(), event.GetSkillId(), event.GetStatusId(), event.GetAmount(), event.GetHpBefore(), event.GetHpAfter(), event.GetDetail())
+	tlog.Log.Info(
+		"[战斗/过程] battleID=%v seq=%v action=%v tick=%v type=%v actor=%v target=%v skill=%v status=%v amount=%v hp=%v->%v effect=%v statusType=%v critical=%v basic=%v reason=%v outcome=%v",
+		a.p.BattleID, event.GetSequence(), event.GetAction(), event.GetTick(), event.GetType(),
+		event.GetActorId(), event.GetTargetId(), event.GetSkillId(), event.GetStatusId(),
+		event.GetAmount(), event.GetHpBefore(), event.GetHpAfter(), event.GetEffectType(),
+		event.GetStatusType(), event.GetCritical(), event.GetBasicAttack(), event.GetReason(), event.GetOutcome(),
+	)
 	if event.GetType() == pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE && event.GetHpBefore() > 0 && event.GetHpAfter() == 0 {
 		tlog.Log.Info("[战斗/死亡] battleID=%v unit=%v killer=%v skill=%v action=%v tick=%v", a.p.BattleID, event.GetTargetId(), event.GetActorId(), event.GetSkillId(), event.GetAction(), event.GetTick())
 	}

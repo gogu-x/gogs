@@ -2,9 +2,7 @@ package engine
 
 import (
 	"container/heap"
-	"fmt"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
@@ -15,9 +13,16 @@ type unit struct {
 	HP        int64
 	Cooldowns map[string]int
 	Statuses  []activeStatus
+	charges   map[pb.EffectType]int64
 }
 
 func (u *unit) alive() bool { return u.HP > 0 }
+
+func (u *unit) getCharge(kind pb.EffectType) int64 { return u.charges[kind] }
+
+func (u *unit) setCharge(kind pb.EffectType, value int64) { u.charges[kind] = value }
+
+func (u *unit) resetCharge(kind pb.EffectType) { u.charges[kind] = 0 }
 
 // Battle 是不依赖外部服务的确定性战斗实例。
 // 全部可变状态都在本结构体上，因此可以按 tick 挂起推进（Advance）而不丢状态。
@@ -56,7 +61,7 @@ func NewBattle(setup Setup) (*Battle, error) {
 		for _, status := range config.InitialStatus {
 			statuses = append(statuses, activeStatus{Config: status, Remaining: status.DurationTurns})
 		}
-		battle.units = append(battle.units, &unit{Config: config, HP: config.MaxHP, Cooldowns: make(map[string]int), Statuses: statuses})
+		battle.units = append(battle.units, &unit{Config: config, HP: config.MaxHP, Cooldowns: make(map[string]int), Statuses: statuses, charges: make(map[pb.EffectType]int64)})
 	}
 	for _, actor := range battle.units {
 		battle.schedule(&timelineItem{Tick: battle.attackInterval(actor), Phase: phaseStart, Actor: actor})
@@ -71,11 +76,26 @@ func (b *Battle) ID() string { return b.setup.BattleID }
 // TickDurationMS 返回客户端播放时间轴使用的权威 tick 时长。
 func (b *Battle) TickDurationMS() int32 { return b.setup.Rules.TickDurationMS }
 
-func (b *Battle) emit(kind pb.BattleEventType, actor, target, skill, status string, amount, before, after int64, detail string, targetIDs []string) *pb.BattleEvent {
+// eventInfo 承载战斗事件的结构化效果、状态和原因信息。
+type eventInfo struct {
+	EffectType  pb.EffectType
+	StatusType  pb.StatusType
+	Critical    bool
+	BasicAttack bool
+	Reason      pb.BattleEventReason
+	Outcome     pb.BattleOutcome
+}
+
+func (b *Battle) emit(
+	kind pb.BattleEventType, actor, target, skill, status string,
+	amount, before, after int64, info eventInfo, targetIDs []string,
+) *pb.BattleEvent {
 	event := &pb.BattleEvent{
 		Sequence: uint64(len(b.events) + 1), Action: b.action, Tick: b.tick, Type: kind,
 		ActorId: actor, TargetId: target, SkillId: skill, StatusId: status,
-		Amount: amount, HpBefore: before, HpAfter: after, Detail: detail,
+		Amount: amount, HpBefore: before, HpAfter: after,
+		EffectType: info.EffectType, StatusType: info.StatusType, Critical: info.Critical,
+		BasicAttack: info.BasicAttack, Reason: info.Reason, Outcome: info.Outcome,
 		TargetIds: append([]string(nil), targetIDs...),
 	}
 	b.events = append(b.events, event)
@@ -126,7 +146,7 @@ func (b *Battle) unitSpeed(u *unit) int64 { return max(1, u.Config.Speed+b.unitM
 func (b *Battle) unitModifier(u *unit) AttributeModifier {
 	return b.strategies.Statuses.Modifier(u.Statuses)
 }
-func (b *Battle) hasStatus(u *unit, kind statuskind.Kind) bool {
+func (b *Battle) hasStatus(u *unit, kind pb.StatusType) bool {
 	return b.strategies.Statuses.Has(u.Statuses, kind)
 }
 
@@ -150,11 +170,21 @@ func (b *Battle) tickPeriodic(actor *unit) {
 		if result.Damage > 0 {
 			result.Damage = min(result.Damage, actor.HP)
 			actor.HP -= result.Damage
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID, result.Damage, before, actor.HP, result.Event, nil)
+			b.emit(
+				pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE,
+				actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID,
+				result.Damage, before, actor.HP,
+				eventInfo{StatusType: status.Config.Kind}, nil,
+			)
 		}
 		if result.Heal > 0 {
 			actor.HP = min(actor.Config.MaxHP, actor.HP+result.Heal)
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL, actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID, actor.HP-before, before, actor.HP, result.Event, nil)
+			b.emit(
+				pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL,
+				actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID,
+				actor.HP-before, before, actor.HP,
+				eventInfo{StatusType: status.Config.Kind}, nil,
+			)
 		}
 	}
 }
@@ -164,7 +194,7 @@ func (b *Battle) expireStatuses(actor *unit) {
 }
 
 func (b *Battle) chooseSkill(actor *unit) SkillConfig {
-	if !b.hasStatus(actor, statuskind.Silence) {
+	if !b.hasStatus(actor, pb.StatusType_STATUS_TYPE_SILENCE) {
 		for _, skill := range actor.Config.ActiveSkills {
 			if actor.Cooldowns[skill.ID] == 0 {
 				return skill
@@ -212,32 +242,48 @@ func (b *Battle) startAction(actor *unit) {
 	b.action = b.nextAction
 	b.tickCooldowns(actor)
 	skill := b.chooseSkill(actor)
-	stunned := b.hasStatus(actor, statuskind.Stun)
+	stunned := b.hasStatus(actor, pb.StatusType_STATUS_TYPE_STUN)
 	var targets []*unit
 	if !stunned {
 		targets = b.targets(actor, skill.TargetRule)
 	}
 	ids := targetIDs(targets)
-	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED, actor.Config.InstanceID, firstTarget(ids), skill.ID, "", 0, actor.HP, actor.HP, "", ids)
+	b.emit(
+		pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED,
+		actor.Config.InstanceID, firstTarget(ids), skill.ID, "",
+		0, actor.HP, actor.HP,
+		eventInfo{}, ids,
+	)
 	b.tickPeriodic(actor)
 
 	action := &scheduledAction{ID: b.action, Actor: actor, Skill: skill, Targets: targets, TargetIDs: ids, StartTick: b.tick, Basic: skill.ID == actor.Config.BasicSkill.ID}
 	if !actor.alive() {
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED, actor.Config.InstanceID, "", skill.ID, "", 0, actor.HP, actor.HP, "dead_at_start", ids)
+		b.emit(
+			pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED,
+			actor.Config.InstanceID, "", skill.ID, "",
+			0, actor.HP, actor.HP,
+			eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_ACTOR_DEAD}, ids,
+		)
 		action.ImpactTick, action.EndTick = b.tick, b.tick
 	} else if stunned {
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED, actor.Config.InstanceID, "", skill.ID, "", 0, actor.HP, actor.HP, "stun", ids)
+		b.emit(
+			pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED,
+			actor.Config.InstanceID, "", skill.ID, "",
+			0, actor.HP, actor.HP,
+			eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_STUNNED}, ids,
+		)
 		action.ImpactTick, action.EndTick = b.tick, b.tick+skill.RecoveryTicks
 	} else {
-		detail := "skill"
-		if action.Basic {
-			detail = "basic"
-		}
 		// 先算出动作窗口，再随 SKILL_USED 一起下发：客户端收到这一条事件就能确定
 		// windup/impact/recovery 并立即起播，不必等待动作结束时的 ACTION_ENDED。
 		action.ImpactTick = b.tick + skill.WindupTicks
 		action.EndTick = action.ImpactTick + skill.RecoveryTicks
-		skillEvent := b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED, actor.Config.InstanceID, firstTarget(ids), skill.ID, "", 0, actor.HP, actor.HP, detail, ids)
+		skillEvent := b.emit(
+			pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED,
+			actor.Config.InstanceID, firstTarget(ids), skill.ID, "",
+			0, actor.HP, actor.HP,
+			eventInfo{BasicAttack: action.Basic}, ids,
+		)
 		skillEvent.StartTick = action.StartTick
 		skillEvent.ImpactTick = action.ImpactTick
 		skillEvent.EndTick = action.EndTick
@@ -257,16 +303,32 @@ func (b *Battle) startAction(actor *unit) {
 func (b *Battle) impactAction(action *scheduledAction) {
 	actor := action.Actor
 	if !actor.alive() {
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, firstTarget(action.TargetIDs), action.Skill.ID, "", 0, actor.HP, actor.HP, "attacker_dead", action.TargetIDs)
+		b.emit(
+			pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED,
+			actor.Config.InstanceID, firstTarget(action.TargetIDs), action.Skill.ID, "",
+			0, actor.HP, actor.HP,
+			eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_ACTOR_DEAD}, action.TargetIDs,
+		)
 		return
 	}
 	if len(action.Targets) == 0 {
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, "", action.Skill.ID, "", 0, actor.HP, actor.HP, "target_dead", action.TargetIDs)
+		b.emit(
+			pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED,
+			actor.Config.InstanceID, "", action.Skill.ID, "",
+			0, actor.HP, actor.HP,
+			eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_TARGET_DEAD}, action.TargetIDs,
+		)
 		return
 	}
+	successfulHits := 0
 	for _, target := range action.Targets {
 		if !target.alive() {
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, target.Config.InstanceID, action.Skill.ID, "", 0, target.HP, target.HP, "target_dead", []string{target.Config.InstanceID})
+			b.emit(
+				pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED,
+				actor.Config.InstanceID, target.Config.InstanceID, action.Skill.ID, "",
+				0, target.HP, target.HP,
+				eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_TARGET_DEAD}, []string{target.Config.InstanceID},
+			)
 			continue
 		}
 		results, err := b.strategies.Skills.Execute(SkillExecutionContext{
@@ -274,27 +336,140 @@ func (b *Battle) impactAction(action *scheduledAction) {
 			Rules: b.setup.Rules, Effects: b.strategies.Effects, Damage: b.strategies.Damage, RNG: b.rng,
 		})
 		if err != nil {
-			b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, target.Config.InstanceID, action.Skill.ID, "", 0, target.HP, target.HP, err.Error(), nil)
+			b.emit(
+				pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED,
+				actor.Config.InstanceID, target.Config.InstanceID, action.Skill.ID, "",
+				0, target.HP, target.HP,
+				eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_EFFECT_ERROR}, nil,
+			)
 			continue
 		}
+		damaged := false
 		for _, result := range results {
-			b.applyResolution(actor, target, action.Skill, result)
+			if b.applyResolution(
+				actor, target, action.Skill, result,
+			) > 0 {
+				damaged = true
+			}
+		}
+		if damaged {
+			successfulHits++
+		}
+	}
+	if successfulHits > 0 {
+		b.applyCharges(actor, action.Skill, successfulHits)
+	}
+}
+
+func (b *Battle) applyResolution(
+	actor, target *unit, skill SkillConfig, resolution EffectResolution,
+) int64 {
+	if !target.alive() {
+		return 0
+	}
+	before := target.HP
+	err := b.strategies.Effects.Apply(EffectApplyContext{
+		ActorID: actor.Config.InstanceID, SkillID: skill.ID, Target: effectTarget{unit: target}, Statuses: b.strategies.Statuses,
+		Emit: func(
+			kind pb.BattleEventType, statusID string, amount, before, after int64,
+			result EffectResolution,
+		) {
+			info := eventInfo{EffectType: result.Kind, Critical: result.Critical}
+			if result.Status != nil {
+				info.StatusType = result.Status.Kind
+			}
+			b.emit(
+				kind,
+				actor.Config.InstanceID, target.Config.InstanceID, skill.ID, statusID,
+				amount, before, after,
+				info, nil,
+			)
+		},
+	}, resolution)
+	if err != nil {
+		b.emit(
+			pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED,
+			actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "",
+			0, target.HP, target.HP,
+			eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_EFFECT_ERROR}, nil,
+		)
+		return 0
+	}
+	if resolution.Kind == pb.EffectType_EFFECT_TYPE_DAMAGE && target.HP < before {
+		return before - target.HP
+	}
+	return 0
+}
+
+// applyCharges 在原技能的全部目标结算后，按有效命中数积攒并触发效果。
+func (b *Battle) applyCharges(actor *unit, skill SkillConfig, successfulHits int) {
+	configured := make(map[pb.EffectType]bool, len(skill.Charges))
+	for _, charge := range skill.Charges {
+		configured[charge.Kind] = true
+		b.applyCharge(actor, skill, charge, successfulHits)
+	}
+	for _, charge := range actor.Config.PassiveCharges {
+		if !configured[charge.Kind] {
+			b.applyCharge(actor, skill, charge, successfulHits)
 		}
 	}
 }
 
-func (b *Battle) applyResolution(actor, target *unit, skill SkillConfig, resolution EffectResolution) {
-	if !target.alive() {
+func (b *Battle) applyCharge(actor *unit, skill SkillConfig, charge ChargeEffectConfig, successfulHits int) {
+	kind, threshold, gain := charge.Kind, charge.Threshold, charge.Gain
+	current := actor.getCharge(kind)
+	for hit := 0; hit < successfulHits && current < threshold; hit++ {
+		remaining := threshold - current
+		if gain >= remaining {
+			current = threshold
+		} else {
+			current += gain
+		}
+	}
+	actor.setCharge(kind, current)
+	if !charge.Trigger || current < threshold {
 		return
 	}
-	err := b.strategies.Effects.Apply(EffectApplyContext{
-		ActorID: actor.Config.InstanceID, SkillID: skill.ID, Target: effectTarget{unit: target}, Statuses: b.strategies.Statuses,
-		Emit: func(kind pb.BattleEventType, statusID string, amount, before, after int64, detail string) {
-			b.emit(kind, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, statusID, amount, before, after, detail, nil)
-		},
-	}, resolution)
-	if err != nil {
-		b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED, actor.Config.InstanceID, target.Config.InstanceID, skill.ID, "", 0, target.HP, target.HP, err.Error(), nil)
+	rule := charge.TargetRule
+	if rule == pb.TargetRule_TARGET_RULE_UNSPECIFIED {
+		rule = pb.TargetRule_TARGET_RULE_ENEMY_ALL
+	}
+	targets := b.targets(actor, rule)
+	if len(targets) == 0 {
+		return
+	}
+	actor.resetCharge(kind)
+	b.triggerCharge(
+		actor, skill, charge, targets,
+	)
+}
+
+// triggerCharge 对当前存活的敌方全体结算冰爆或天雷，二次伤害不再积攒。
+func (b *Battle) triggerCharge(
+	actor *unit, skill SkillConfig, charge ChargeEffectConfig, targets []*unit,
+) {
+	actorID, skillID := actor.Config.InstanceID, skill.ID
+	for _, target := range targets {
+		if !target.alive() {
+			continue
+		}
+		targetID := target.Config.InstanceID
+		result, err := b.strategies.Effects.Resolve(EffectContext{
+			Actor: b.unitView(actor), Target: b.unitView(target), Skill: skill,
+			Effect: charge.TriggerEffect, Rules: b.setup.Rules, Damage: b.strategies.Damage, RNG: b.rng,
+		})
+		if err != nil {
+			b.emit(
+				pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED,
+				actorID, targetID, skillID, "",
+				0, target.HP, target.HP,
+				eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_EFFECT_ERROR}, nil,
+			)
+			continue
+		}
+		b.applyResolution(
+			actor, target, skill, result,
+		)
 	}
 }
 
@@ -309,7 +484,12 @@ func (t effectTarget) SetStatuses(value []StatusInstance) { t.unit.Statuses = va
 
 func (b *Battle) endAction(action *scheduledAction) {
 	b.expireStatuses(action.Actor)
-	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED, action.Actor.Config.InstanceID, firstTarget(action.TargetIDs), action.Skill.ID, "", 0, action.Actor.HP, action.Actor.HP, "", action.TargetIDs)
+	b.emit(
+		pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED,
+		action.Actor.Config.InstanceID, firstTarget(action.TargetIDs), action.Skill.ID, "",
+		0, action.Actor.HP, action.Actor.HP,
+		eventInfo{}, action.TargetIDs,
+	)
 	b.activeActions--
 }
 
@@ -390,7 +570,12 @@ func (b *Battle) Finalize() (Result, error) {
 		}
 	}
 	b.action = 0
-	b.emit(pb.BattleEventType_BATTLE_EVENT_TYPE_BATTLE_ENDED, "", "", "", "", 0, 0, 0, fmt.Sprintf("outcome=%d", b.finalOutcome), nil)
+	b.emit(
+		pb.BattleEventType_BATTLE_EVENT_TYPE_BATTLE_ENDED,
+		"", "", "", "",
+		0, 0, 0,
+		eventInfo{Outcome: b.finalOutcome}, nil,
+	)
 	result := Result{BattleID: b.setup.BattleID, BattleType: b.setup.BattleType, Outcome: b.finalOutcome, Tick: b.tick, TickDurationMS: b.setup.Rules.TickDurationMS, Units: b.UnitResults(), Events: append([]*pb.BattleEvent(nil), b.events...)}
 	checksum, err := resultChecksum(result)
 	if err != nil {

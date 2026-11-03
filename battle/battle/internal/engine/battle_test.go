@@ -5,13 +5,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/effectkind"
-	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
 func testSetup() Setup {
-	basic := SkillConfig{ID: "basic", TargetRule: pb.TargetRule_TARGET_RULE_ENEMY_SINGLE, Effects: []EffectConfig{{Kind: effectkind.Damage, CoefficientPermille: 1000}}}
+	basic := SkillConfig{ID: "basic", TargetRule: pb.TargetRule_TARGET_RULE_ENEMY_SINGLE, Effects: []EffectConfig{{Kind: pb.EffectType_EFFECT_TYPE_DAMAGE, CoefficientPermille: 1000}}}
 	return Setup{BattleID: "battle-1", Seed: 42, Rules: Rules{ATBThreshold: 1000, MaxActions: 20, CritMultiplierPermille: 1500}, Units: []UnitConfig{
 		{InstanceID: "a", Team: pb.BattleTeam_BATTLE_TEAM_ATTACKER, MaxHP: 100, Attack: 30, Defense: 10, Speed: 100, BasicSkill: basic},
 		{InstanceID: "d", Team: pb.BattleTeam_BATTLE_TEAM_DEFENDER, MaxHP: 100, Attack: 20, Defense: 10, Speed: 50, BasicSkill: basic},
@@ -73,14 +71,17 @@ type testEffects struct{}
 
 func (testEffects) Resolve(context EffectContext) (EffectResolution, error) {
 	result := context.Damage.Calculate(DamageInput{Attack: context.Actor.Attack, Defense: context.Target.Defense, CoefficientPermille: context.Effect.CoefficientPermille, Flat: context.Effect.Flat}, context.RNG)
-	return EffectResolution{Kind: effectkind.Damage, Amount: result.Amount}, nil
+	return EffectResolution{Kind: pb.EffectType_EFFECT_TYPE_DAMAGE, Amount: result.Amount}, nil
 }
 
 func (testEffects) Apply(context EffectApplyContext, result EffectResolution) error {
 	before := context.Target.HP()
 	amount := min(result.Amount, before)
 	context.Target.SetHP(before - amount)
-	context.Emit(pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, "", amount, before, context.Target.HP(), "")
+	context.Emit(
+		pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE, "", amount,
+		before, context.Target.HP(), result,
+	)
 	return nil
 }
 
@@ -96,7 +97,7 @@ func (testDamage) Calculate(input DamageInput, _ *RNG) DamageResult {
 
 type testStatuses struct{}
 
-func (testStatuses) Has(statuses []StatusInstance, kind statuskind.Kind) bool {
+func (testStatuses) Has(statuses []StatusInstance, kind pb.StatusType) bool {
 	for _, status := range statuses {
 		if status.Remaining > 0 && status.Config.Kind == kind {
 			return true
@@ -140,6 +141,10 @@ func TestBattleDeterministicResult(t *testing.T) {
 	}
 	if firstResult.Checksum != secondResult.Checksum || !reflect.DeepEqual(firstResult.Events, secondResult.Events) {
 		t.Fatalf("results are not deterministic: %#v %#v", firstResult, secondResult)
+	}
+	ended := firstResult.Events[len(firstResult.Events)-1]
+	if ended.GetType() != pb.BattleEventType_BATTLE_EVENT_TYPE_BATTLE_ENDED || ended.GetOutcome() != firstResult.Outcome {
+		t.Fatalf("战斗结束事件未携带协议胜负结果: %#v", ended)
 	}
 }
 
@@ -295,8 +300,8 @@ func TestBasicAttackEventMarkedForCollisionPresentation(t *testing.T) {
 	}
 	for _, event := range result.Events {
 		if event.GetType() == pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED {
-			if event.GetDetail() != "basic" {
-				t.Fatalf("basic attack detail = %q, want basic", event.GetDetail())
+			if !event.GetBasicAttack() {
+				t.Fatalf("普攻事件缺少 basic_attack 标识: %#v", event)
 			}
 			return
 		}
@@ -384,7 +389,7 @@ func TestMeleeImpactCancelledWhenAttackerDiesDuringWindup(t *testing.T) {
 		t.Fatal(err)
 	}
 	cancelled := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED)
-	if cancelled == nil || cancelled.Detail != "attacker_dead" || cancelled.Tick != 15 {
+	if cancelled == nil || cancelled.GetReason() != pb.BattleEventReason_BATTLE_EVENT_REASON_ACTOR_DEAD || cancelled.Tick != 15 {
 		t.Fatalf("attacker cancellation = %#v", cancelled)
 	}
 	if damage := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE); damage != nil {
@@ -417,7 +422,7 @@ func TestImpactCancelledWhenSnapshottedTargetDies(t *testing.T) {
 		t.Fatal(err)
 	}
 	cancelled := eventOfType(result.Events, 2, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED)
-	if cancelled == nil || cancelled.Detail != "target_dead" || cancelled.TargetId != "d" {
+	if cancelled == nil || cancelled.GetReason() != pb.BattleEventReason_BATTLE_EVENT_REASON_TARGET_DEAD || cancelled.TargetId != "d" {
 		t.Fatalf("target cancellation = %#v", cancelled)
 	}
 }
@@ -455,7 +460,7 @@ func TestActiveSkillImpactCancelledWhenAttackerDiesDuringWindup(t *testing.T) {
 		t.Fatal(err)
 	}
 	cancelled := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED)
-	if cancelled == nil || cancelled.Detail != "attacker_dead" || cancelled.SkillId != "active" {
+	if cancelled == nil || cancelled.GetReason() != pb.BattleEventReason_BATTLE_EVENT_REASON_ACTOR_DEAD || cancelled.SkillId != "active" {
 		t.Fatalf("active skill cancellation = %#v", cancelled)
 	}
 	if damage := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE); damage != nil {

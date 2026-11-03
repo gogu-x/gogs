@@ -3,11 +3,9 @@ package configcompiler
 import (
 	"fmt"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/damageformula"
 	"github.com/gogu-x/gogs/battle/battle/internal/effectresolver"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/battle/battle/internal/mode"
-	"github.com/gogu-x/gogs/battle/battle/internal/skillexecutor"
 	"github.com/gogu-x/gogs/battle/battle/internal/statushandler"
 	"github.com/gogu-x/gogs/battle/battle/internal/targetselector"
 	"github.com/gogu-x/gogs/glconf"
@@ -35,7 +33,7 @@ func New(modes mode.Registry) *Compiler {
 }
 
 func defaultStrategies() engine.Strategies {
-	return engine.Strategies{Targets: targetselector.Default(), Skills: skillexecutor.Default{}, Effects: effectresolver.Default(), Damage: damageformula.Default{}, Statuses: statushandler.Default()}
+	return engine.Strategies{Targets: targetselector.Default(), Skills: engine.DefaultSkillExecutor{}, Effects: effectresolver.Default(), Damage: engine.DefaultDamageFormula{}, Statuses: statushandler.Default()}
 }
 
 func DefaultStrategies() engine.Strategies { return defaultStrategies() }

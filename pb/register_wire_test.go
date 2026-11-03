@@ -25,13 +25,13 @@ func TestUnityRegisterReqWireCompatibility(t *testing.T) {
 	if req.Account != "unity-account" || req.Password != "pw" || req.ServerId != 1 {
 		t.Fatalf("decoded RegisterReq = account:%q password:%q server:%d", req.Account, req.Password, req.ServerId)
 	}
-	if req.UID != 0 || req.ServerID != 0 || req.SessionID != "" {
-		t.Fatalf("client unexpectedly supplied internal header: uid:%d server:%d session:%q", req.UID, req.ServerID, req.SessionID)
+	if req.UID != 0 || req.SessionID != "" {
+		t.Fatalf("client unexpectedly supplied internal header: uid:%d session:%q", req.UID, req.SessionID)
 	}
 
 	codec.WriteHeader(req, codec.ReqHeader{UID: 99, ServerID: 7, SessionID: "session"})
-	if req.UID != 99 || req.ServerID != 7 || req.SessionID != "session" {
-		t.Fatalf("server header was not written: uid:%d server:%d session:%q", req.UID, req.ServerID, req.SessionID)
+	if req.UID != 99 || req.SessionID != "session" {
+		t.Fatalf("server header was not written: uid:%d session:%q", req.UID, req.SessionID)
 	}
 	if req.Account != "unity-account" || req.Password != "pw" || req.ServerId != 1 {
 		t.Fatalf("writing header changed business fields: account:%q password:%q server:%d", req.Account, req.Password, req.ServerId)
@@ -40,7 +40,7 @@ func TestUnityRegisterReqWireCompatibility(t *testing.T) {
 	fields := req.ProtoReflect().Descriptor().Fields()
 	wantNumbers := map[string]int32{
 		"account": 1, "password": 2, "server_id": 3,
-		"uID": 101, "serverID": 102, "sessionID": 103,
+		"uID": 101, "sessionID": 103,
 	}
 	for name, want := range wantNumbers {
 		field := fields.ByName(protoreflectName(name))
@@ -50,6 +50,15 @@ func TestUnityRegisterReqWireCompatibility(t *testing.T) {
 			}
 			t.Fatalf("field %q number = %d, want %d", name, field.Number(), want)
 		}
+	}
+}
+
+func TestGatewayRequestWithoutServerSelectionHasRouteServerID(t *testing.T) {
+	// 没有业务 server_id 的请求仍携带服务端写入的路由服编号。
+	req := &pb_gateway.GetServerListReq{Account: "unity-account"}
+	codec.WriteHeader(req, codec.ReqHeader{UID: 99, ServerID: 7, SessionID: "session"})
+	if req.GetServerID() != 7 {
+		t.Fatalf("route server id = %d, want 7", req.GetServerID())
 	}
 }
 

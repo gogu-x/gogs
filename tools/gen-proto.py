@@ -2,7 +2,8 @@
 # gen-proto.py <proto_dir> <go_out> <module>
 #
 # 在调用 protoc 之前，自动向每个以 Req 结尾的 message 内联公共头字段。
-# 公共头使用 101-103；业务字段保留源 .proto 中声明的字段号。
+# 公共头使用 101-103；若业务字段 server_id 与内部 serverID 冲突，则跳过 102。
+# 业务字段保留源 .proto 中声明的字段号。
 # 源 .proto 文件保持干净，注入仅发生在服务端生成期。
 import re, subprocess, sys, tempfile
 from pathlib import Path
@@ -30,16 +31,20 @@ def _transform_req_block(body, name):
     head, inner, tail = m.groups()
     if re.search(r"\buID\s*=", inner):
         return body  # 已注入过，跳过
+    header_fields = list(REQ_HEADER_FIELDS)
+    if re.search(r"\bserver_id\s*=", inner):
+        # proto3 禁止 server_id 与 serverID 共存；保留客户端业务字段及其字段号。
+        header_fields.pop(1)
     lines = inner.split("\n")
     out = []
     inserted = False
     for ln in lines:
         if not inserted and ln.strip() and not ln.strip().startswith("//"):
-            out.extend(REQ_HEADER_FIELDS)
+            out.extend(header_fields)
             inserted = True
         out.append(ln)
     if not inserted:
-        out.extend(REQ_HEADER_FIELDS)
+        out.extend(header_fields)
     return head + "\n" + "\n".join(out) + "\n" + tail
 
 

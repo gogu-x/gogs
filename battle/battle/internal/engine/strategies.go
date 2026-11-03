@@ -3,8 +3,6 @@ package engine
 import (
 	"fmt"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/effectkind"
-	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
@@ -47,12 +45,11 @@ type StatusInstance struct {
 }
 type StatusTickResult struct {
 	Damage, Heal int64
-	Event        string
 }
 
 // StatusHandler owns status lookup, application, periodic ticks and expiry.
 type StatusHandler interface {
-	Has([]StatusInstance, statuskind.Kind) bool
+	Has([]StatusInstance, pb.StatusType) bool
 	Modifier([]StatusInstance) AttributeModifier
 	Apply([]StatusInstance, StatusConfig) ([]StatusInstance, error)
 	Tick(StatusInstance) StatusTickResult
@@ -74,11 +71,10 @@ type EffectContext struct {
 	RNG           *RNG
 }
 type EffectResolution struct {
-	Kind     effectkind.Kind
+	Kind     pb.EffectType
 	Amount   int64
 	Critical bool
 	Status   *StatusConfig
-	Detail   string
 }
 
 // EffectResolver calculates one effect; Battle remains responsible for state
@@ -102,7 +98,9 @@ type EffectApplyContext struct {
 	SkillID  string
 	Target   EffectTarget
 	Statuses StatusHandler
-	Emit     func(pb.BattleEventType, string, int64, int64, int64, string)
+	Emit     func(
+		pb.BattleEventType, string, int64, int64, int64, EffectResolution,
+	)
 }
 
 type SkillExecutionContext struct {

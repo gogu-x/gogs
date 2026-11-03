@@ -2,10 +2,10 @@ package statushandler
 
 import (
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
-	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
+	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
-func (Registry) Has(statuses []engine.StatusInstance, kind statuskind.Kind) bool {
+func (Registry) Has(statuses []engine.StatusInstance, kind pb.StatusType) bool {
 	for _, status := range statuses {
 		if status.Remaining > 0 && status.Config.Kind == kind {
 			return true

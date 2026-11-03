@@ -27,6 +27,7 @@ func InitGameCfg() {
 	confs = append(confs, &confMeta{source: BattleStatusCfgKey, loader: loadBattleStatusCfg})
 	confs = append(confs, &confMeta{source: D2DailyGiftCfgKey, loader: loadD2DailyGiftCfg})
 	confs = append(confs, &confMeta{source: PlayerInitRoleCfgKey, loader: loadPlayerInitRoleCfg})
+	confs = append(confs, &confMeta{source: SoulJadeEffectAffixCfgKey, loader: loadSoulJadeEffectAffixCfg})
 }
 
 // LoadAllConfs 从 MongoDB 加载全部配置表。

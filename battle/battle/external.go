@@ -3,12 +3,10 @@ package battle
 import (
 	"github.com/gogu-x/gogs/battle/battle/internal"
 	"github.com/gogu-x/gogs/battle/battle/internal/configcompiler"
-	"github.com/gogu-x/gogs/battle/battle/internal/effectkind"
 	"github.com/gogu-x/gogs/battle/battle/internal/effectresolver"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/battle/battle/internal/mode"
 	"github.com/gogu-x/gogs/battle/battle/internal/statushandler"
-	"github.com/gogu-x/gogs/battle/battle/internal/statuskind"
 	"github.com/gogu-x/gogs/battle/battle/internal/targetselector"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/tree"
@@ -31,8 +29,6 @@ type TargetQuery = engine.TargetQuery
 type BattleUnitView = engine.UnitView
 type EffectResolver = engine.EffectResolver
 
-// EffectKind 表示技能效果执行的操作类型。
-type EffectKind = effectkind.Kind
 type EffectHandler = effectresolver.Handler
 type EffectHandlerFunc = effectresolver.HandlerFunc
 type EffectHandlerFuncs = effectresolver.HandlerFuncs
@@ -50,8 +46,6 @@ type DamageInput = engine.DamageInput
 type DamageResult = engine.DamageResult
 type StatusHandler = engine.StatusHandler
 
-// StatusKind 表示已施加状态的行为类型。
-type StatusKind = statuskind.Kind
 type StatusRegistry = statushandler.Registry
 type StatusPolicy = engine.StatusPolicy
 type StatusInstance = engine.StatusInstance
@@ -68,6 +62,9 @@ func New(p Params) tree.Actor { return internal.NewBattleActor(p) }
 
 // NewDefaultConfigCompiler 创建使用默认玩法规则和战斗策略的配置编译器。
 func NewDefaultConfigCompiler() *ConfigCompiler { return configcompiler.NewDefault() }
+
+// NewDefaultSkillExecutor 返回按配置顺序解析普通技能效果的公共执行器。
+func NewDefaultSkillExecutor() SkillExecutor { return engine.DefaultSkillExecutor{} }
 
 // NewConfigCompiler 创建使用指定战斗模式的配置编译器。
 func NewConfigCompiler(modes map[pb.BattleType]BattleMode) *ConfigCompiler {

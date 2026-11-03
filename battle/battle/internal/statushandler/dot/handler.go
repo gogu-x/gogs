@@ -9,5 +9,5 @@ func (Handler) Apply(statuses []engine.StatusInstance, config engine.StatusConfi
 }
 
 func (Handler) Tick(status engine.StatusInstance) engine.StatusTickResult {
-	return engine.StatusTickResult{Damage: status.Config.Potency, Event: "dot"}
+	return engine.StatusTickResult{Damage: status.Config.Potency}
 }
