@@ -1,8 +1,6 @@
 package ctl_guild
 
 import (
-	"fmt"
-
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/ipb"
@@ -22,12 +20,12 @@ func CreateGuild(ctx *core.Context, req *pb_guild.CreateGuildReq) {
 	if !ctx.CastCall(def.Guild, req, func(callbackCtx tree.Context, value interface{}, err error) {
 		ack, ok := value.(*pb_guild.CreateGuildAck)
 		if err != nil || !ok || ack == nil {
-			ack = &pb_guild.CreateGuildAck{Code: pb_common.ErrCode_INTERNAL, Msg: callError(err, value)}
+			ack = &pb_guild.CreateGuildAck{Code: pb_common.ErrCode_INTERNAL}
 			tlog.Log.Error("[guild/CreateGuild] 创建联盟请求失败, pid=%v err=%v responseType=%T", uid, err, value)
 		}
 		pushAck(callbackCtx, uid, ack)
 	}) {
-		ctx.CastPlayerMsg(uid, &pb_guild.CreateGuildAck{Code: pb_common.ErrCode_INTERNAL, Msg: "guild actor is unavailable"})
+		ctx.CastPlayerMsg(uid, &pb_guild.CreateGuildAck{Code: pb_common.ErrCode_INTERNAL})
 		tlog.Log.Error("[guild/CreateGuild] 联盟 Actor 不可用, pid=%v", uid)
 	}
 }
@@ -42,12 +40,12 @@ func JoinGuild(ctx *core.Context, req *pb_guild.JoinGuildReq) {
 	if !ctx.CastCall(def.Guild, req, func(callbackCtx tree.Context, value interface{}, err error) {
 		ack, ok := value.(*pb_guild.JoinGuildAck)
 		if err != nil || !ok || ack == nil {
-			ack = &pb_guild.JoinGuildAck{Code: pb_common.ErrCode_INTERNAL, Msg: callError(err, value)}
+			ack = &pb_guild.JoinGuildAck{Code: pb_common.ErrCode_INTERNAL}
 			tlog.Log.Error("[guild/JoinGuild] 加入联盟请求失败, pid=%v err=%v responseType=%T", uid, err, value)
 		}
 		pushAck(callbackCtx, uid, ack)
 	}) {
-		ctx.CastPlayerMsg(uid, &pb_guild.JoinGuildAck{Code: pb_common.ErrCode_INTERNAL, Msg: "guild actor is unavailable"})
+		ctx.CastPlayerMsg(uid, &pb_guild.JoinGuildAck{Code: pb_common.ErrCode_INTERNAL})
 		tlog.Log.Error("[guild/JoinGuild] 联盟 Actor 不可用, pid=%v", uid)
 	}
 }
@@ -62,12 +60,12 @@ func LeaveGuild(ctx *core.Context, req *pb_guild.LeaveGuildReq) {
 	if !ctx.CastCall(def.Guild, req, func(callbackCtx tree.Context, value interface{}, err error) {
 		ack, ok := value.(*pb_guild.LeaveGuildAck)
 		if err != nil || !ok || ack == nil {
-			ack = &pb_guild.LeaveGuildAck{Code: pb_common.ErrCode_INTERNAL, Msg: callError(err, value)}
+			ack = &pb_guild.LeaveGuildAck{Code: pb_common.ErrCode_INTERNAL}
 			tlog.Log.Error("[guild/LeaveGuild] 离开联盟请求失败, pid=%v err=%v responseType=%T", uid, err, value)
 		}
 		pushAck(callbackCtx, uid, ack)
 	}) {
-		ctx.CastPlayerMsg(uid, &pb_guild.LeaveGuildAck{Code: pb_common.ErrCode_INTERNAL, Msg: "guild actor is unavailable"})
+		ctx.CastPlayerMsg(uid, &pb_guild.LeaveGuildAck{Code: pb_common.ErrCode_INTERNAL})
 		tlog.Log.Error("[guild/LeaveGuild] 联盟 Actor 不可用, pid=%v", uid)
 	}
 }
@@ -90,13 +88,6 @@ func GetGuild(ctx *core.Context, req *pb_guild.GetGuildReq) {
 		ctx.CastPlayerMsg(uid, &pb_guild.GetGuildAck{Code: pb_common.ErrCode_INTERNAL})
 		tlog.Log.Error("[guild/GetGuild] 联盟 Actor 不可用, pid=%v", uid)
 	}
-}
-
-func callError(err error, value interface{}) string {
-	if err != nil {
-		return err.Error()
-	}
-	return fmt.Sprintf("invalid guild response %T", value)
 }
 
 func pushAck(ctx tree.Context, uid uint64, ack interface{}) {

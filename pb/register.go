@@ -8,9 +8,12 @@ import (
 	pb_auth "github.com/gogu-x/gogs/pb/cspb/pb_auth"
 	pb_battle "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	pb_chat "github.com/gogu-x/gogs/pb/cspb/pb_chat"
+	pb_common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	pb_equipment "github.com/gogu-x/gogs/pb/cspb/pb_equipment"
 	pb_gateway "github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	pb_guild "github.com/gogu-x/gogs/pb/cspb/pb_guild"
+	pb_souljade "github.com/gogu-x/gogs/pb/cspb/pb_souljade"
+	pb_talent "github.com/gogu-x/gogs/pb/cspb/pb_talent"
 	pb_pf "github.com/gogu-x/gogs/pb/pfpb/pb_pf"
 	sspb "github.com/gogu-x/gogs/pb/sspb"
 )
@@ -35,6 +38,8 @@ func init() {
 		&pb_battle.BattleResultConfirmedNtf{},
 		&pb_chat.ChatAck{},
 		&pb_chat.ChatReq{},
+		&pb_common.GetRoleCombatStatsReq{},
+		&pb_common.GetRoleCombatStatsAck{},
 		&pb_equipment.GetRoleEquipmentReq{},
 		&pb_equipment.GetRoleEquipmentAck{},
 		&pb_equipment.ChangeRoleEquipmentReq{},
@@ -54,6 +59,20 @@ func init() {
 		&pb_guild.JoinGuildReq{},
 		&pb_guild.LeaveGuildReq{},
 		&pb_guild.GetGuildReq{},
+		&pb_souljade.GetRoleSoulJadeReq{},
+		&pb_souljade.ChangeRoleSoulJadeReq{},
+		&pb_souljade.UpgradeRoleSoulJadeReq{},
+		&pb_souljade.RefineRoleSoulJadeReq{},
+		&pb_souljade.GetRoleSoulJadeAck{},
+		&pb_souljade.ChangeRoleSoulJadeAck{},
+		&pb_souljade.UpgradeRoleSoulJadeAck{},
+		&pb_souljade.RefineRoleSoulJadeAck{},
+		&pb_talent.GetRoleTalentReq{},
+		&pb_talent.LearnRoleTalentReq{},
+		&pb_talent.ResetRoleTalentReq{},
+		&pb_talent.GetRoleTalentAck{},
+		&pb_talent.LearnRoleTalentAck{},
+		&pb_talent.ResetRoleTalentAck{},
 		&pb_pf.RegisterReq{},
 		&pb_pf.AuthLoginReq{},
 		&pb_pf.AuthAck{},

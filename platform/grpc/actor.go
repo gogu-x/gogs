@@ -36,6 +36,7 @@ func (a *Platform) OnInit(ctx tree.Context) {
 	a.router.Register(&pb_pf.GetServerListReq{}, a.onGetServerList)
 	a.router.Register(&pb_pf.CreateOrderReq{}, a.onCreateOrder)
 	a.router.Register(&pb_pf.QueryOrderReq{}, a.onQueryOrder)
+	a.router.Register(&deliverReq{}, a.onDeliver)
 
 	lis, err := net.Listen("tcp", conf.PlatformAddr)
 	if err != nil {
@@ -76,48 +77,60 @@ func (s *svcHandler) call(msg interface{}) (interface{}, error) {
 
 func (s *svcHandler) Register(_ context.Context, req *pb_pf.RegisterReq) (*pb_pf.AuthAck, error) {
 	v, err := s.call(req)
-	if err != nil {
-		return nil, err
+	ack, valid := v.(*pb_pf.AuthAck)
+	if err != nil || !valid || ack == nil {
+		log.Printf("platform Register failed: err=%v response=%T", err, v)
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
-	return v.(*pb_pf.AuthAck), nil
+	return ack, nil
 }
 
 func (s *svcHandler) Login(_ context.Context, req *pb_pf.AuthLoginReq) (*pb_pf.AuthAck, error) {
 	v, err := s.call(req)
-	if err != nil {
-		return nil, err
+	ack, valid := v.(*pb_pf.AuthAck)
+	if err != nil || !valid || ack == nil {
+		log.Printf("platform Login failed: err=%v response=%T", err, v)
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
-	return v.(*pb_pf.AuthAck), nil
+	return ack, nil
 }
 
 func (s *svcHandler) VerifyToken(_ context.Context, req *pb_pf.VerifyTokenReq) (*pb_pf.VerifyAck, error) {
 	v, err := s.call(req)
-	if err != nil {
-		return nil, err
+	ack, valid := v.(*pb_pf.VerifyAck)
+	if err != nil || !valid || ack == nil {
+		log.Printf("platform VerifyToken failed: err=%v response=%T", err, v)
+		return &pb_pf.VerifyAck{Code: pb_pf.ErrCode_INTERNAL.Enum()}, nil
 	}
-	return v.(*pb_pf.VerifyAck), nil
+	return ack, nil
 }
 
 func (s *svcHandler) GetServerList(_ context.Context, req *pb_pf.GetServerListReq) (*pb_pf.ServerListAck, error) {
 	v, err := s.call(req)
-	if err != nil {
-		return nil, err
+	ack, valid := v.(*pb_pf.ServerListAck)
+	if err != nil || !valid || ack == nil {
+		log.Printf("platform GetServerList failed: err=%v response=%T", err, v)
+		return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
-	return v.(*pb_pf.ServerListAck), nil
+	return ack, nil
 }
 
 func (s *svcHandler) CreateOrder(_ context.Context, req *pb_pf.CreateOrderReq) (*pb_pf.OrderAck, error) {
 	v, err := s.call(req)
-	if err != nil {
-		return nil, err
+	ack, valid := v.(*pb_pf.OrderAck)
+	if err != nil || !valid || ack == nil {
+		log.Printf("platform CreateOrder failed: err=%v response=%T", err, v)
+		return &pb_pf.OrderAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
-	return v.(*pb_pf.OrderAck), nil
+	return ack, nil
 }
 
 func (s *svcHandler) QueryOrder(_ context.Context, req *pb_pf.QueryOrderReq) (*pb_pf.OrderDetail, error) {
 	v, err := s.call(req)
-	if err != nil {
-		return nil, err
+	ack, valid := v.(*pb_pf.OrderDetail)
+	if err != nil || !valid || ack == nil {
+		log.Printf("platform QueryOrder failed: err=%v response=%T", err, v)
+		return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_INTERNAL.Enum()}, nil
 	}
-	return v.(*pb_pf.OrderDetail), nil
+	return ack, nil
 }

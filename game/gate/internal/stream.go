@@ -30,10 +30,11 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 		return err
 	}
 
-	//解码消息
+	// Decode the first session frame before opening an actor session.
 	msg, err := s.codec.Unmarshal(frame.Payload)
 	if err != nil {
-		return err
+		tlog.Log.Error("[gate/gatewayService.Stream] 初始网关消息解码失败, err=%v", err)
+		return status.Error(codes.InvalidArgument, "")
 	}
 	tlog.Log.Debug("[gate/gatewayService.Stream] 收到初始网关消息, type=%T", msg)
 
@@ -43,11 +44,13 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 	).AwaitTimeout(5 * time.Second)
 
 	if err != nil {
-		return status.Errorf(codes.PermissionDenied, "open gateway session: %v", err)
+		tlog.Log.Error("[gate/gatewayService.Stream] 创建网关会话失败, err=%v", err)
+		return status.Error(codes.PermissionDenied, "")
 	}
 	opened, ok := result.(*openedSession)
 	if !ok {
-		return status.Error(codes.Internal, "invalid gateway session response")
+		tlog.Log.Error("[gate/gatewayService.Stream] 网关会话响应类型无效, type=%T", result)
+		return status.Error(codes.Internal, "")
 	}
 
 	defer s.system.Send(s.actorPID, &closeSession{
@@ -66,16 +69,19 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 			return err
 		}
 		if err := validateFrame(frame); err != nil {
-			return status.Error(codes.InvalidArgument, err.Error())
+			tlog.Log.Error("[gate/gatewayService.Stream] 网关消息校验失败, err=%v pid=%v", err, opened.uid)
+			return status.Error(codes.InvalidArgument, "")
 		}
-		//解码消息
+		// Decode only validated transport frames.
 		msg, err := s.codec.Unmarshal(frame.Payload)
 		if err != nil {
-			return err
+			tlog.Log.Error("[gate/gatewayService.Stream] 网关消息解码失败, err=%v pid=%v", err, opened.uid)
+			return status.Error(codes.InvalidArgument, "")
 		}
 		tlog.Log.Debug("[gate/gatewayService.Stream] 收到网关消息, type=%T", msg)
 		if !s.system.TrySend(opened.pid, &inboundFrame{msg: msg}) {
-			return status.Error(codes.ResourceExhausted, "gateway connection is overloaded")
+			tlog.Log.Error("[gate/gatewayService.Stream] 网关会话队列已满, pid=%v", opened.uid)
+			return status.Error(codes.ResourceExhausted, "")
 		}
 	}
 }

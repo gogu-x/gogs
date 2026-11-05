@@ -11,8 +11,12 @@ import (
 	"github.com/gogu-x/gogs/game/play/internal/player/equipment"
 	"github.com/gogu-x/gogs/game/play/internal/player/role"
 	"github.com/gogu-x/gogs/game/play/internal/player/shop"
+	"github.com/gogu-x/gogs/game/play/internal/player/souljade"
+	"github.com/gogu-x/gogs/game/play/internal/player/talent"
 	"github.com/gogu-x/gogs/game/play/internal/player/tower"
 	"github.com/gogu-x/gogs/glconf"
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
+	"github.com/gogu-x/tree/tlog"
 )
 
 // Player 保存玩家持久化数据和运行期各模块数据。
@@ -28,6 +32,8 @@ type Player struct {
 	CardGroupMgr *cardgroup.Mgr `bson:"card_group"` // 卡组模块数据。
 	RoleMgr      *role.Mgr      `bson:"role"`       // 角色模块数据。
 	EquipmentMgr *equipment.Mgr `bson:"equipment"`  // 装备模块数据。
+	SoulJadeMgr  *souljade.Mgr  `bson:"soul_jade"`  // Owned soul jades and slot assignments.
+	TalentMgr    *talent.Mgr    `bson:"talent"`     // Learned talent state.
 	ShopMgr      *shop.Mgr      `bson:"shop"`       // 商店模块数据。
 	TowerMgr     *tower.Mgr     `bson:"tower"`      // 塔模块数据。
 	TestMsgMap   map[int]int32  `bson:"-"`          // 测试期间使用的临时消息数据。
@@ -44,6 +50,8 @@ func NewPlayerData(uid uint64) *Player {
 		CardGroupMgr: cardgroup.New(),
 		RoleMgr:      role.New(),
 		EquipmentMgr: equipment.New(),
+		SoulJadeMgr:  souljade.New(uid),
+		TalentMgr:    talent.New(),
 		ShopMgr:      &shop.Mgr{},
 		TowerMgr:     tower.NewTowerMgr(),
 	}
@@ -117,6 +125,52 @@ func (p *Player) GetTowerMgr() *tower.Mgr {
 	return p.TowerMgr
 }
 
+// GetSoulJadeMgr returns the owned soul jade module.
+func (p *Player) GetSoulJadeMgr() *souljade.Mgr {
+	if p == nil {
+		return nil
+	}
+	return p.SoulJadeMgr
+}
+
+// GetTalentMgr returns the owned talent module.
+func (p *Player) GetTalentMgr() *talent.Mgr {
+	if p == nil {
+		return nil
+	}
+	return p.TalentMgr
+}
+
+// EnsureLoadoutModules initializes missing modules once during login loading.
+func (p *Player) EnsureLoadoutModules() bool {
+	if p == nil {
+		return false
+	}
+	changed := false
+	if p.GetSoulJadeMgr() == nil {
+		if module := souljade.New(p.GetUID()); module != nil {
+			p.SoulJadeMgr = module
+			changed = true
+		}
+	}
+	if p.GetTalentMgr() == nil {
+		if module := talent.New(); module != nil {
+			p.TalentMgr = module
+			changed = true
+		}
+	}
+	if souljade.NormalizeSlots(p.GetSoulJadeMgr()) {
+		changed = true
+	}
+	if talent.EnsureRoots(p.GetTalentMgr()) {
+		changed = true
+	}
+	if changed {
+		p.MarkDirty()
+	}
+	return changed
+}
+
 func (p *Player) initDefaultCharacter() {
 	if p == nil {
 		return
@@ -132,15 +186,14 @@ func (p *Player) initDefaultCharacter() {
 	roleID := fmt.Sprintf("%d", p.GetUID())
 	roleMgr.SetCharacter(&role.Role{
 		ID:           roleID,
-		ConfigID:     config.RoleConfigID,
-		Level:        config.Level,
-		Star:         config.Star,
-		Breakthrough: config.Breakthrough,
+		ConfigID:     config.GetRoleConfigID(),
+		Level:        config.GetLevel(),
+		Star:         config.GetStar(),
+		Breakthrough: config.GetBreakthrough(),
 	})
 }
 
-// initStarterEquipment 为新角色的每个槽位配置一件装备，并额外配置一件备用装备，
-// 使开发环境和新账号可以立即使用装备界面。
+// initStarterEquipment initializes inventory and equipped items from the role profile.
 func (p *Player) initStarterEquipment() {
 	if p == nil {
 		return
@@ -157,17 +210,13 @@ func (p *Player) initStarterEquipment() {
 	if len(equipmentMgr.GetItems()) > 0 {
 		return
 	}
-	for configID := int32(1); configID <= 12; configID++ {
-		slot := (configID-1)%6 + 1
-		id := fmt.Sprintf("%d-gear-%02d", p.GetUID(), configID)
-		item := &equipment.Item{
-			ID: id, ConfigID: configID, Slot: slot, Level: 1,
-		}
-		if !equipmentMgr.AddItem(item) {
-			continue
-		}
-		if configID <= 6 {
-			character.AddEquipmentID(id)
-		}
+	items, equippedIDs, code := equipment.InitialLoadout(p.GetUID(), glconf.GetPlayerInitRoleCfg(1))
+	if code != pb_common.ErrCode_OK {
+		tlog.Log.Error("[player/initStarterEquipment] 初始装备配置无效, pid=%v code=%v", p.GetUID(), code)
+		return
 	}
+	for _, item := range items {
+		equipmentMgr.AddItem(item)
+	}
+	character.SetEquipmentIDs(equippedIDs)
 }

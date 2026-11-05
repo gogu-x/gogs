@@ -9,14 +9,14 @@ import (
 	"github.com/gogu-x/gogs/pb/cspb/pb_equipment"
 )
 
-// ChangeRoleEquipment 校验并更新角色内存中的装备穿戴关系。
+// ChangeRoleEquipment validates configured slots and updates the in-memory loadout.
 func ChangeRoleEquipment(
 	roleMgr *role.Mgr,
 	equipmentMgr *Mgr,
 	slot int32,
 	equipmentID string,
 ) pb_common.ErrCode {
-	if slot < 1 || slot > 6 {
+	if glconf.GetEquipmentSlotCfg(slot) == nil {
 		return pb_common.ErrCode_PARAM
 	}
 	character, ok := roleMgr.GetCharacter()
@@ -25,7 +25,14 @@ func ChangeRoleEquipment(
 	}
 	if equipmentID != "" {
 		item, exists := equipmentMgr.Get(equipmentID)
-		if !exists || item.GetSlot() != slot {
+		if !exists {
+			return pb_common.ErrCode_PARAM
+		}
+		config := glconf.GetBattleEquipCfg(item.GetConfigID())
+		if config == nil {
+			return pb_common.ErrCode_INTERNAL
+		}
+		if config.GetSlot() != slot {
 			return pb_common.ErrCode_PARAM
 		}
 	}
@@ -33,7 +40,15 @@ func ChangeRoleEquipment(
 	updatedIDs := make([]string, 0, len(currentIDs)+1)
 	for _, currentID := range currentIDs {
 		item, exists := equipmentMgr.Get(currentID)
-		if !exists || item.GetSlot() != slot {
+		if !exists {
+			updatedIDs = append(updatedIDs, currentID)
+			continue
+		}
+		config := glconf.GetBattleEquipCfg(item.GetConfigID())
+		if config == nil {
+			return pb_common.ErrCode_INTERNAL
+		}
+		if config.GetSlot() != slot {
 			updatedIDs = append(updatedIDs, currentID)
 		}
 	}
@@ -44,7 +59,7 @@ func ChangeRoleEquipment(
 	return pb_common.ErrCode_OK
 }
 
-// BuildRoleEquipmentData 根据玩家内存数据组装客户端装备视图。
+// BuildRoleEquipmentData joins owned instances with the current configuration catalog.
 func BuildRoleEquipmentData(
 	roleMgr *role.Mgr,
 	equipmentMgr *Mgr,
@@ -58,53 +73,68 @@ func BuildRoleEquipmentData(
 		equipped[equipmentID] = struct{}{}
 	}
 	items := equipmentMgr.GetItems()
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].GetSlot() != items[j].GetSlot() {
-			return items[i].GetSlot() < items[j].GetSlot()
-		}
-		return items[i].GetConfigID() < items[j].GetConfigID()
-	})
-	data := &pb_equipment.RoleEquipmentData{
-		RoleId:    character.GetID(),
-		RoleLevel: character.GetLevel(),
+	slots := make([]*pb_equipment.EquipmentSlotDefinition, 0)
+	for _, slot := range glconf.GetAllEquipmentSlotCfg() {
+		slots = append(slots, &pb_equipment.EquipmentSlotDefinition{
+			Slot: pb_equipment.EquipSlot(slot.GetCfgID()), Name: slot.GetName(), IconKey: slot.GetIconKey(),
+		})
 	}
+	if len(slots) == 0 {
+		return nil, pb_common.ErrCode_INTERNAL
+	}
+	sort.Slice(slots, func(i, j int) bool { return slots[i].GetSlot() < slots[j].GetSlot() })
+	data := &pb_equipment.RoleEquipmentData{
+		RoleId: character.GetID(), RoleLevel: character.GetLevel(), Slots: slots,
+	}
+	entries := make([]*pb_equipment.EquipmentItem, 0, len(items))
 	for _, item := range items {
 		configID := item.GetConfigID()
 		config := glconf.GetBattleEquipCfg(configID)
-		if config == nil {
-			return nil, pb_common.ErrCode_PARAM
+		if config == nil || glconf.GetEquipmentSlotCfg(config.GetSlot()) == nil || config.GetName() == "" {
+			return nil, pb_common.ErrCode_INTERNAL
 		}
 		itemID := item.GetID()
 		entry := &pb_equipment.EquipmentItem{
 			InstanceId:  itemID,
 			ConfigId:    configID,
-			Slot:        pb_equipment.EquipSlot(item.GetSlot()),
+			Slot:        pb_equipment.EquipSlot(config.GetSlot()),
 			Level:       item.GetLevel(),
 			RefineLevel: item.GetRefineLevel(),
+			DisplayName: config.GetName(),
+			Rarity:      config.GetRarity(),
+			IconKey:     config.GetIconKey(),
 		}
 		_, entry.Equipped = equipped[itemID]
-		for _, modifier := range config.Modifier {
-			if modifier == nil || modifier.Typ != "battle_attribute" {
+		for _, modifier := range config.GetModifier() {
+			if modifier == nil || modifier.GetTyp() != "battle_attribute" {
 				continue
 			}
-			switch modifier.Id {
+			switch modifier.GetId() {
 			case 1:
-				entry.MaxHp += modifier.Val
+				entry.MaxHp += modifier.GetVal()
 			case 2:
-				entry.Attack += modifier.Val
+				entry.Attack += modifier.GetVal()
 			case 3:
-				entry.Defense += modifier.Val
+				entry.Defense += modifier.GetVal()
 			case 4:
-				entry.Speed += modifier.Val
+				entry.Speed += modifier.GetVal()
 			}
 		}
-		if entry.Equipped {
-			data.MaxHp += entry.MaxHp
-			data.Attack += entry.Attack
-			data.Defense += entry.Defense
-			data.Speed += entry.Speed
+		if entry.GetEquipped() {
+			data.MaxHp += entry.GetMaxHp()
+			data.Attack += entry.GetAttack()
+			data.Defense += entry.GetDefense()
+			data.Speed += entry.GetSpeed()
 		}
-		data.Items = append(data.Items, entry)
+		entries = append(entries, entry)
 	}
+	sort.Slice(entries, func(i, j int) bool {
+		left, right := entries[i], entries[j]
+		if left.GetSlot() != right.GetSlot() {
+			return left.GetSlot() < right.GetSlot()
+		}
+		return left.GetConfigId() < right.GetConfigId()
+	})
+	data.Items = entries
 	return data, pb_common.ErrCode_OK
 }

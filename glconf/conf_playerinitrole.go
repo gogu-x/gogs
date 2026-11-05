@@ -13,11 +13,76 @@ var csvPlayerInitRoleCfg atomic.Value
 
 // PlayerInitRoleCfg 表示 PlayerInitRoleCfg 配置记录。
 type PlayerInitRoleCfg struct {
-	CfgID        int32 `bson:"id"`             // 配置 ID
-	RoleConfigID int32 `bson:"role_config_id"` // 关联的角色战斗配置 ID
-	Level        int32 `bson:"level"`          // 初始等级
-	Star         int32 `bson:"star"`           // 初始星级
-	Breakthrough int32 `bson:"breakthrough"`   // 初始突破/境界等级
+	CfgID              int32   `bson:"id"`                   // 配置 ID
+	RoleConfigID       int32   `bson:"role_config_id"`       // 关联的角色战斗配置 ID
+	Level              int32   `bson:"level"`                // 初始等级
+	Star               int32   `bson:"star"`                 // 初始星级
+	Breakthrough       int32   `bson:"breakthrough"`         // 初始突破/境界等级
+	EquipmentConfigIDs []int32 `bson:"equipment_config_ids"` // 初始装备库存配置ID列表
+	EquippedConfigIDs  []int32 `bson:"equipped_config_ids"`  // 初始默认穿戴配置ID列表
+}
+
+// GetCfgID returns the configured field value.
+func (cfg *PlayerInitRoleCfg) GetCfgID() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.CfgID
+}
+
+// GetRoleConfigID returns the configured field value.
+func (cfg *PlayerInitRoleCfg) GetRoleConfigID() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.RoleConfigID
+}
+
+// GetLevel returns the configured field value.
+func (cfg *PlayerInitRoleCfg) GetLevel() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.Level
+}
+
+// GetStar returns the configured field value.
+func (cfg *PlayerInitRoleCfg) GetStar() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.Star
+}
+
+// GetBreakthrough returns the configured field value.
+func (cfg *PlayerInitRoleCfg) GetBreakthrough() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.Breakthrough
+}
+
+// GetEquipmentConfigIDs returns the configured field value.
+func (cfg *PlayerInitRoleCfg) GetEquipmentConfigIDs() []int32 {
+	if cfg == nil {
+		var zero []int32
+		return zero
+	}
+	return cfg.EquipmentConfigIDs
+}
+
+// GetEquippedConfigIDs returns the configured field value.
+func (cfg *PlayerInitRoleCfg) GetEquippedConfigIDs() []int32 {
+	if cfg == nil {
+		var zero []int32
+		return zero
+	}
+	return cfg.EquippedConfigIDs
 }
 
 func loadPlayerInitRoleCfg(dbURI, dbName, confName string) (*CsvConf, error) {
@@ -68,4 +133,11 @@ func GetPlayerInitRoleCfgInterface(id int32) interface{} {
 		return table.GetNoErr(id)
 	}
 	return nil
+}
+
+// SetPlayerInitRoleCfgForTest installs an in-memory configuration snapshot without database access.
+func SetPlayerInitRoleCfgForTest(records []*PlayerInitRoleCfg) error {
+	return installRecordsForTest(&PlayerInitRoleCfg{}, interfacesOf(records), func(table *CsvConf) {
+		csvPlayerInitRoleCfg.Store(table)
+	})
 }

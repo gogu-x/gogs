@@ -13,6 +13,8 @@ func (in *Player) DeepCopy() *Player {
 	out.CardGroupMgr = in.CardGroupMgr.DeepCopy()
 	out.RoleMgr = in.RoleMgr.DeepCopy()
 	out.EquipmentMgr = in.EquipmentMgr.DeepCopy()
+	out.SoulJadeMgr = in.SoulJadeMgr.DeepCopy()
+	out.TalentMgr = in.TalentMgr.DeepCopy()
 	out.ShopMgr = in.ShopMgr.DeepCopy()
 	out.TowerMgr = in.TowerMgr.DeepCopy()
 	if in.TestMsgMap != nil {

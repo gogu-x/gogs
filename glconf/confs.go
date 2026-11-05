@@ -26,8 +26,15 @@ func InitGameCfg() {
 	confs = append(confs, &confMeta{source: BattleSkillCfgKey, loader: loadBattleSkillCfg})
 	confs = append(confs, &confMeta{source: BattleStatusCfgKey, loader: loadBattleStatusCfg})
 	confs = append(confs, &confMeta{source: D2DailyGiftCfgKey, loader: loadD2DailyGiftCfg})
+	confs = append(confs, &confMeta{source: EquipmentSlotCfgKey, loader: loadEquipmentSlotCfg})
+	confs = append(confs, &confMeta{source: LoadoutInitCfgKey, loader: loadLoadoutInitCfg})
 	confs = append(confs, &confMeta{source: PlayerInitRoleCfgKey, loader: loadPlayerInitRoleCfg})
+	confs = append(confs, &confMeta{source: SoulJadeCfgKey, loader: loadSoulJadeCfg})
 	confs = append(confs, &confMeta{source: SoulJadeEffectAffixCfgKey, loader: loadSoulJadeEffectAffixCfg})
+	confs = append(confs, &confMeta{source: SoulJadeLevelCfgKey, loader: loadSoulJadeLevelCfg})
+	confs = append(confs, &confMeta{source: TalentBranchCfgKey, loader: loadTalentBranchCfg})
+	confs = append(confs, &confMeta{source: TalentNodeCfgKey, loader: loadTalentNodeCfg})
+	confs = append(confs, &confMeta{source: TalentRuleCfgKey, loader: loadTalentRuleCfg})
 }
 
 // LoadAllConfs 从 MongoDB 加载全部配置表。

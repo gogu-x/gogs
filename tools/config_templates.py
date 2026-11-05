@@ -41,6 +41,17 @@ type {{struct_name}} struct {
 {% for value in value_list %}    {{"%-20s\t%-18s"|format(value[0], value[1])}} `bson:"{{value[2]}}"` // {{value[3]}}
 {% endfor %}}
 
+{% if generate_accessors %}{% for value in value_list %}
+// Get{{value[0]}} returns the configured field value.
+func (cfg *{{struct_name}}) Get{{value[0]}}() {{value[1]}} {
+    if cfg == nil {
+        var zero {{value[1]}}
+        return zero
+    }
+    return cfg.{{value[0]}}
+}
+{% endfor %}{% endif %}
+
 func load{{struct_name}}(dbURI, dbName, confName string) (*CsvConf, error) {
     table, err := readCsv(dbURI, dbName, confName, &{{struct_name}}{})
     if err != nil {
@@ -72,7 +83,15 @@ func GetAll{{struct_name}}() []*{{struct_name}} {
     }
     return configs
 }
-''' + interface_getter
+''' + interface_getter + '''
+{% if generate_accessors %}// Set{{struct_name}}ForTest installs an in-memory configuration snapshot without database access.
+func Set{{struct_name}}ForTest(records []*{{struct_name}}) error {
+    return installRecordsForTest(&{{struct_name}}{}, interfacesOf(records), func(table *CsvConf) {
+        csv{{struct_name}}.Store(table)
+    })
+}
+{% endif %}
+'''
 
 
 def get_registry_template():

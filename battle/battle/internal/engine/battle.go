@@ -131,6 +131,17 @@ func (b *Battle) attackInterval(actor *unit) int64 {
 	return max(1, (b.setup.Rules.ATBThreshold+speed-1)/speed)
 }
 
+// actionWindow 在行动间隔短于动作窗口时等比压缩前后摇，保留至少一个 tick 的前摇与后摇。
+func actionWindow(windup, recovery, interval int64) (int64, int64) {
+	total := windup + recovery
+	if windup <= 0 || recovery <= 0 || total <= interval {
+		return windup, recovery
+	}
+	window := max(2, interval)
+	windup = max(1, min(window-1, windup*window/total))
+	return windup, window - windup
+}
+
 func (b *Battle) unitView(u *unit) UnitView {
 	return UnitView{ID: u.Config.InstanceID, Team: u.Config.Team, Position: u.Config.Position, HP: u.HP, MaxHP: u.Config.MaxHP,
 		Attack: b.unitAttack(u), Defense: b.unitDefense(u), Alive: u.alive()}
@@ -276,8 +287,9 @@ func (b *Battle) startAction(actor *unit) {
 	} else {
 		// 先算出动作窗口，再随 SKILL_USED 一起下发：客户端收到这一条事件就能确定
 		// windup/impact/recovery 并立即起播，不必等待动作结束时的 ACTION_ENDED。
-		action.ImpactTick = b.tick + skill.WindupTicks
-		action.EndTick = action.ImpactTick + skill.RecoveryTicks
+		windup, recovery := actionWindow(skill.WindupTicks, skill.RecoveryTicks, b.attackInterval(actor))
+		action.ImpactTick = b.tick + windup
+		action.EndTick = action.ImpactTick + recovery
 		skillEvent := b.emit(
 			pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED,
 			actor.Config.InstanceID, firstTarget(ids), skill.ID, "",

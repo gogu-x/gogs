@@ -22,15 +22,15 @@ func bg() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), dbTimeout)
 }
 
-// Register 注册账号
+// Register creates an account.
 func Register(db *mongo.Database, req *pb_pf.RegisterReq) (*pb_pf.AuthAck, error) {
 	if req == nil {
 		tlog.Log.Warn("Register rejected: nil request")
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_PARAM, Msg: "request required"}, nil
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_PARAM}, nil
 	}
-	if req.ServerId == 0 {
+	if req.ServerId == 0 || req.Account == "" || req.Password == "" {
 		tlog.Log.Warn("Register rejected: server_id required")
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_PARAM, Msg: "server_id required"}, nil
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_PARAM}, nil
 	}
 
 	ctx, cancel := bg()
@@ -39,17 +39,17 @@ func Register(db *mongo.Database, req *pb_pf.RegisterReq) (*pb_pf.AuthAck, error
 	err := db.Collection(store.ColAccounts).FindOne(ctx, bson.M{"account": req.Account, "server_id": req.ServerId}).Decode(acc)
 	if err == nil {
 		tlog.Log.Warn("Register rejected: account already exists, server_id=%d", req.ServerId)
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_USERNAME_EXISTS, Msg: "account already exists"}, nil
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_USERNAME_EXISTS}, nil
 	}
 	if !errors.Is(err, mongo.ErrNoDocuments) {
 		tlog.Log.Error("Register account lookup failed: server_id=%d err=%v", req.ServerId, err)
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_UNKNOWN, Msg: err.Error()}, nil
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.MinCost)
 	if err != nil {
 		tlog.Log.Error("Register password hash failed: server_id=%d err=%v", req.ServerId, err)
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL, Msg: "internal error"}, nil
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	uid := store.NextUID()
 	newAcc := &store.Account{
@@ -61,23 +61,26 @@ func Register(db *mongo.Database, req *pb_pf.RegisterReq) (*pb_pf.AuthAck, error
 	defer cancel2()
 	if _, err := db.Collection(store.ColAccounts).InsertOne(ctx2, newAcc); err != nil {
 		tlog.Log.Error("Register account creation failed: server_id=%d uid=%d err=%v", req.ServerId, uid, err)
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL, Msg: err.Error()}, nil
+		if mongo.IsDuplicateKeyError(err) {
+			return &pb_pf.AuthAck{Code: pb_pf.ErrCode_USERNAME_EXISTS}, nil
+		}
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 
 	token, err := auth.Sign(uid)
 	if err != nil {
 		tlog.Log.Error("Register token signing failed: server_id=%d uid=%d err=%v", req.ServerId, uid, err)
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL, Msg: "sign error"}, nil
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	tlog.Log.Info("Register succeeded: server_id=%d uid=%d", req.ServerId, uid)
-	return &pb_pf.AuthAck{Code: pb_pf.ErrCode_OK, Uid: uid, Token: token}, nil
+	return &pb_pf.AuthAck{Code: pb_pf.ErrCode_OK, Uid: uid, Token: token, ServerId: req.GetServerId()}, nil
 }
 
-// Login 登录账号
+// Login verifies account credentials.
 func Login(db *mongo.Database, req *pb_pf.AuthLoginReq) (*pb_pf.AuthAck, error) {
-	if req == nil {
+	if req == nil || req.GetServerId() == 0 || req.GetAccount() == "" || req.GetPassword() == "" {
 		tlog.Log.Warn("Login rejected: nil request")
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_PARAM, Msg: "request required"}, nil
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_PARAM}, nil
 	}
 
 	ctx, cancel := bg()
@@ -85,17 +88,24 @@ func Login(db *mongo.Database, req *pb_pf.AuthLoginReq) (*pb_pf.AuthAck, error) 
 	acc := &store.Account{}
 	if err := db.Collection(store.ColAccounts).FindOne(ctx, bson.M{"account": req.Account, "server_id": req.ServerId}).Decode(acc); err != nil {
 		tlog.Log.Error("Login account lookup failed: server_id=%d err=%v", req.ServerId, err)
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_UNKNOWN, Msg: "user not found"}, nil
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return &pb_pf.AuthAck{Code: pb_pf.ErrCode_ACCOUNT_NOT_FOUND}, nil
+		}
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(acc.PasswordHash), []byte(req.Password)); err != nil {
+		if !errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			tlog.Log.Error("Login password verification failed: server_id=%d uid=%d err=%v", req.ServerId, acc.UID, err)
+			return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
+		}
 		tlog.Log.Warn("Login rejected: invalid password, server_id=%d uid=%d", req.ServerId, acc.UID)
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_WRONG_PASSWORD, Msg: "wrong password"}, nil
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_WRONG_PASSWORD}, nil
 	}
 
 	token, err := auth.Sign(acc.UID)
 	if err != nil {
 		tlog.Log.Error("Login token signing failed: server_id=%d uid=%d err=%v", req.ServerId, acc.UID, err)
-		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL, Msg: "sign error"}, nil
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	tlog.Log.Info("Login succeeded: server_id=%d uid=%d", acc.ServerId, acc.UID)
 	return &pb_pf.AuthAck{Code: pb_pf.ErrCode_OK, Uid: acc.UID, Token: token, ServerId: acc.ServerId}, nil
@@ -105,7 +115,7 @@ func Login(db *mongo.Database, req *pb_pf.AuthLoginReq) (*pb_pf.AuthAck, error) 
 func GetServerList(db *mongo.Database, req *pb_pf.GetServerListReq) (*pb_pf.ServerListAck, error) {
 	if req == nil || req.Account == "" {
 		tlog.Log.Warn("GetServerList rejected: account required")
-		return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_PARAM, Msg: "account required"}, nil
+		return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_PARAM}, nil
 	}
 
 	ctx, cancel := bg()
@@ -117,7 +127,7 @@ func GetServerList(db *mongo.Database, req *pb_pf.GetServerListReq) (*pb_pf.Serv
 	)
 	if err != nil {
 		tlog.Log.Error("GetServerList lookup failed: err=%v", err)
-		return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_INTERNAL, Msg: err.Error()}, nil
+		return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	defer cursor.Close(ctx)
 
@@ -126,13 +136,13 @@ func GetServerList(db *mongo.Database, req *pb_pf.GetServerListReq) (*pb_pf.Serv
 		var account store.Account
 		if err := cursor.Decode(&account); err != nil {
 			tlog.Log.Error("GetServerList decode failed: err=%v", err)
-			return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_INTERNAL, Msg: err.Error()}, nil
+			return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 		}
 		accounts = append(accounts, &pb_pf.ServerAccount{ServerId: account.ServerId, Uid: account.UID})
 	}
 	if err := cursor.Err(); err != nil {
 		tlog.Log.Error("GetServerList cursor failed: err=%v", err)
-		return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_INTERNAL, Msg: err.Error()}, nil
+		return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	tlog.Log.Info("GetServerList succeeded: accounts=%v", accounts)
 	return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_OK, Accounts: accounts}, nil
@@ -141,19 +151,19 @@ func GetServerList(db *mongo.Database, req *pb_pf.GetServerListReq) (*pb_pf.Serv
 func VerifyToken(req *pb_pf.VerifyTokenReq) (*pb_pf.VerifyAck, error) {
 	if req == nil {
 		tlog.Log.Warn("VerifyToken rejected: nil request")
-		return &pb_pf.VerifyAck{Valid: false}, nil
+		return &pb_pf.VerifyAck{Valid: false, Code: pb_pf.ErrCode_PARAM.Enum()}, nil
 	}
 
 	uid, err := auth.Verify(req.Token)
 	if err != nil {
-		tlog.Log.Warn("VerifyToken rejected: verification failed")
-		return &pb_pf.VerifyAck{Valid: false}, nil
+		tlog.Log.Warn("VerifyToken rejected: verification failed, err=%v", err)
+		return &pb_pf.VerifyAck{Valid: false, Code: pb_pf.ErrCode_INVALID_TOKEN.Enum()}, nil
 	}
 	tlog.Log.Info("VerifyToken succeeded: uid=%d", uid)
-	return &pb_pf.VerifyAck{Valid: true, Uid: uid}, nil
+	return &pb_pf.VerifyAck{Valid: true, Uid: uid, Code: pb_pf.ErrCode_OK.Enum()}, nil
 }
 
-// EnsureIndexes 在启动时建立必要的索引。
+// EnsureIndexes creates account indexes during startup.
 func EnsureIndexes(db *mongo.Database) error {
 	ctx, cancel := bg()
 	defer cancel()

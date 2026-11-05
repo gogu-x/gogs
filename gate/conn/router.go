@@ -36,11 +36,11 @@ func (c *Conn) onWsMsg(ctx tree.Context, msg interface{}) {
 	}
 
 	if c.state == StateLoggIng {
-		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_LOGIN_IN_PROGRESS, Msg: "login in progress"})
+		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_LOGIN_IN_PROGRESS})
 		return
 	}
 	if c.state != StateAuthed {
-		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_UNAUTHORIZED, Msg: "unauthorized"})
+		c.WriteWsMsg(&pb_gateway.LoginAck{Code: pb_common.ErrCode_UNAUTHORIZED})
 		return
 	}
 	c.router.SetFallback(func(ctx tree.Context, _ interface{}) {

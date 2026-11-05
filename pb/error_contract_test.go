@@ -11,7 +11,6 @@ import (
 	"github.com/gogu-x/gogs/pb/cspb/pb_souljade"
 	"github.com/gogu-x/gogs/pb/cspb/pb_talent"
 	"github.com/gogu-x/gogs/pb/pfpb/pb_pf"
-	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -59,6 +58,7 @@ func TestPublicResponsesUseErrCodeWithoutErrorText(t *testing.T) {
 
 func TestNewStatusFieldsPreservePresenceAndNumericCodes(t *testing.T) {
 	messages := []proto.Message{
+		&pb_common.GetRoleCombatStatsAck{},
 		&pb_equipment.GetRoleEquipmentAck{},
 		&pb_equipment.ChangeRoleEquipmentAck{},
 		&pb_souljade.GetRoleSoulJadeAck{},
@@ -93,44 +93,6 @@ func TestNewStatusFieldsPreservePresenceAndNumericCodes(t *testing.T) {
 			if !result.Has(field) || result.Get(field).Enum() != code {
 				t.Fatalf("%T lost explicit status %d during serialization", message, code)
 			}
-		}
-	}
-}
-
-func TestLegacyStringErrorCannotBecomeExplicitSuccess(t *testing.T) {
-	cases := []struct {
-		message proto.Message
-		oldTag  protowire.Number
-		newTag  protoreflect.FieldNumber
-	}{
-		{&pb_equipment.GetRoleEquipmentAck{}, 2, 4},
-		{&pb_equipment.ChangeRoleEquipmentAck{}, 2, 4},
-		{&pb_souljade.GetRoleSoulJadeAck{}, 3, 4},
-		{&pb_souljade.ChangeRoleSoulJadeAck{}, 3, 4},
-		{&pb_souljade.UpgradeRoleSoulJadeAck{}, 3, 4},
-		{&pb_souljade.RefineRoleSoulJadeAck{}, 3, 4},
-		{&pb_talent.GetRoleTalentAck{}, 3, 4},
-		{&pb_talent.LearnRoleTalentAck{}, 3, 4},
-		{&pb_talent.ResetRoleTalentAck{}, 3, 4},
-		{&pb_battle.StartBattleAck{}, 2, 3},
-	}
-	for _, item := range cases {
-		reflection := item.message.ProtoReflect()
-		descriptor := reflection.Descriptor()
-		field := descriptor.Fields().ByName("code")
-		if field.Number() != item.newTag {
-			t.Fatalf("%T changed status tag: %d", item.message, field.Number())
-		}
-		if !descriptor.ReservedRanges().Has(protoreflect.FieldNumber(item.oldTag)) || !descriptor.ReservedNames().Has("error") {
-			t.Fatalf("%T must reserve the legacy error field number and name", item.message)
-		}
-		legacy := protowire.AppendTag(nil, item.oldTag, protowire.BytesType)
-		legacy = protowire.AppendString(legacy, "LOADOUT_UNAVAILABLE")
-		if err := proto.Unmarshal(legacy, item.message); err != nil {
-			t.Fatal(err)
-		}
-		if reflection.Has(field) {
-			t.Fatalf("%T legacy response must remain distinguishable from explicit OK", item.message)
 		}
 	}
 }

@@ -8,6 +8,7 @@ import (
 	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/tlog"
@@ -67,11 +68,26 @@ func (actor *Activity) handlePlayerActivityMessage(message *ipb.PlayerActivityMe
 		tlog.Log.Error("[activity/Activity.onPlayerActivityMessage] 活动服务不可用, pid=%v activity=%v err=%v", uid, activityID, err)
 		return nil, err
 	}
-	if err := actor.actvService.HandleRequest(uid, int64(activityID), request); err != nil {
-		tlog.Log.Error("[activity/Activity.onPlayerActivityMessage] 活动请求被拒绝, pid=%v activity=%v type=%T err=%v", uid, activityID, request, err)
-		return nil, err
+	if _, ok := request.(*pb_activity.GetActivityListReq); ok {
+		return actor.activityList(uid), nil
 	}
-	return nil, nil
+	code := pb_common.ErrCode_PARAM
+	if activityID <= maxActivityInstanceID {
+		code = actor.actvService.HandleClientRequest(uid, int64(activityID), request)
+	}
+	if code != pb_common.ErrCode_OK {
+		tlog.Log.Error("[activity/Activity.onPlayerActivityMessage] 活动请求被拒绝, pid=%v activity=%v type=%T code=%v", uid, activityID, request, code)
+	}
+	switch request.(type) {
+	case *pb_activity.JoinActivityReq:
+		return &pb_activity.JoinActivityAck{Code: code}, nil
+	case *pb_activity.GetProgressReq:
+		return &pb_activity.GetProgressAck{Code: code}, nil
+	case *pb_activity.ClaimRewardReq:
+		return &pb_activity.ClaimRewardAck{Code: code}, nil
+	default:
+		return nil, fmt.Errorf("unsupported activity request %T", request)
+	}
 }
 
 // onSaveAllActivities 保存所有活动实例的脏元数据。
@@ -94,7 +110,7 @@ func (actor *Activity) saveAll(ctx tree.Context) {
 
 // activityList 将玩家当前已加载活动实例打包为客户端活动列表。
 func (actor *Activity) activityList(uid uint64) *pb_activity.GetActivityListAck {
-	ack := &pb_activity.GetActivityListAck{}
+	ack := &pb_activity.GetActivityListAck{Code: pb_common.ErrCode_OK.Enum()}
 	activities := actor.actvService.ListActvs(service.ScopePlayer, service.OwnerID(uid))
 	activityInfos := make([]*pb_activity.ActivityInfo, 0, len(activities))
 	for _, actv := range activities {

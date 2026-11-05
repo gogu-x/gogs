@@ -245,14 +245,13 @@ func (guild *Guild) respondUnavailable(ctx tree.Context, message interface{}) {
 }
 
 func (guild *Guild) unavailableResponse(message interface{}) interface{} {
-	const reason = "guild data is unavailable"
 	switch message.(type) {
 	case *pb_guild.CreateGuildReq:
-		return &pb_guild.CreateGuildAck{Code: pb_common.ErrCode_INTERNAL, Msg: reason}
+		return &pb_guild.CreateGuildAck{Code: pb_common.ErrCode_INTERNAL}
 	case *pb_guild.JoinGuildReq:
-		return &pb_guild.JoinGuildAck{Code: pb_common.ErrCode_INTERNAL, Msg: reason}
+		return &pb_guild.JoinGuildAck{Code: pb_common.ErrCode_INTERNAL}
 	case *pb_guild.LeaveGuildReq:
-		return &pb_guild.LeaveGuildAck{Code: pb_common.ErrCode_INTERNAL, Msg: reason}
+		return &pb_guild.LeaveGuildAck{Code: pb_common.ErrCode_INTERNAL}
 	case *pb_guild.GetGuildReq:
 		return &pb_guild.GetGuildAck{Code: pb_common.ErrCode_INTERNAL}
 	default:

@@ -962,31 +962,31 @@ const file_cspb_souljade_souljade_proto_rawDesc = "" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\x04R\x10expectedRevision\x12\x1f\n" +
 	"\vinstance_id\x18\x03 \x01(\tR\n" +
-	"instanceId\"\x93\x01\n" +
+	"instanceId\"\x86\x01\n" +
 	"\x12GetRoleSoulJadeAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12%\n" +
 	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12!\n" +
 	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeJ\x04\b\x03\x10\x04R\x05error\"\x96\x01\n" +
+	"\x05_code\"\x89\x01\n" +
 	"\x15ChangeRoleSoulJadeAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12%\n" +
 	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12!\n" +
 	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeJ\x04\b\x03\x10\x04R\x05error\"\x97\x01\n" +
+	"\x05_code\"\x8a\x01\n" +
 	"\x16UpgradeRoleSoulJadeAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12%\n" +
 	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12!\n" +
 	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeJ\x04\b\x03\x10\x04R\x05error\"\x96\x01\n" +
+	"\x05_code\"\x89\x01\n" +
 	"\x15RefineRoleSoulJadeAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12%\n" +
 	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12!\n" +
 	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeJ\x04\b\x03\x10\x04R\x05errorB,Z*github.com/gogu-x/gogs/pb/cspb/pb_souljadeb\x06proto3"
+	"\x05_codeB,Z*github.com/gogu-x/gogs/pb/cspb/pb_souljadeb\x06proto3"
 
 var (
 	file_cspb_souljade_souljade_proto_rawDescOnce sync.Once

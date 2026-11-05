@@ -1,6 +1,8 @@
 package ctl_battle
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gogu-x/gogs/conf"
@@ -12,63 +14,98 @@ import (
 	"github.com/gogu-x/gogs/game/play/internal/player/souljade"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 )
 
-// OnCreateBattle 从玩家内存数据组装权威战斗请求并发送给战斗服务。
+// OnCreateBattle submits an authoritative request assembled from loaded player state.
 func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 	uid := ctx.PlayerID()
-	request, err := buildBattleRequest(ctx.GetPlayer(), req)
-	if err != nil {
-		tlog.Log.Error("[ctl_battle/OnCreateBattle] 组装战斗请求失败, pid=%v err=%v", uid, err)
-		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Error: err.Error()})
+	request, code := buildBattleRequest(ctx.GetPlayer(), req)
+	if code != pb_common.ErrCode_OK {
+		tlog.Log.Error("[ctl_battle/OnCreateBattle] 组装战斗请求失败, pid=%v code=%v", uid, code)
+		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Code: code.Enum()})
 		return
 	}
 
 	ok := ctx.CastCall(def.BattleClient, &battle.Begin{Request: request}, func(callbackCtx tree.Context, value interface{}, err error) {
-		ack := &pb_battle.StartBattleAck{}
-		if state, valid := value.(battle.State); valid {
-			ack.BattleId = state.BattleID
-		}
-		if err != nil {
-			ack.Error = err.Error()
+		ack := battleStartAck(value, err)
+		if ack.GetCode() != pb_common.ErrCode_OK {
+			tlog.Log.Error("[ctl_battle/OnCreateBattle] 创建战斗失败, pid=%v code=%v err=%v response=%T", uid, ack.GetCode(), err, value)
 		}
 		pushBattleAck(callbackCtx, uid, ack)
 	})
 	if !ok {
-		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Error: "battle client is unavailable"})
+		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Code: pb_common.ErrCode_BATTLE_UNAVAILABLE.Enum()})
 	}
 }
 
-// buildBattleRequest 从玩家当前角色、装备和爬塔数据组装战斗请求。
-func buildBattleRequest(currentPlayer *player.Player, incoming *pb_battle.StartBattleReq) (*pb_battle.StartBattleReq, error) {
+func battleStartAck(value interface{}, err error) *pb_battle.StartBattleAck {
+	ack := &pb_battle.StartBattleAck{Code: pb_common.ErrCode_OK.Enum()}
+	state, valid := value.(battle.State)
+	if valid {
+		ack.BattleId = state.BattleID
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		ack.Code = pb_common.ErrCode_BATTLE_TIMEOUT.Enum()
+		return ack
+	}
+	if errors.Is(err, tree.ErrTimeout) {
+		ack.Code = pb_common.ErrCode_BATTLE_TIMEOUT.Enum()
+		return ack
+	}
+	if errors.Is(err, battle.ErrUnavailable) {
+		ack.Code = pb_common.ErrCode_BATTLE_UNAVAILABLE.Enum()
+		return ack
+	}
+	if errors.Is(err, battle.ErrInvalidRequest) {
+		ack.Code = pb_common.ErrCode_INVALID_BATTLE_REQUEST.Enum()
+		return ack
+	}
+	if errors.Is(err, battle.ErrInProgress) {
+		ack.Code = pb_common.ErrCode_BATTLE_IN_PROGRESS.Enum()
+		return ack
+	}
+	if err != nil {
+		ack.Code = pb_common.ErrCode_BATTLE_CREATE_FAILED.Enum()
+		return ack
+	}
+	if !valid {
+		ack.Code = pb_common.ErrCode_BATTLE_CREATE_FAILED.Enum()
+		return ack
+	}
+	return ack
+}
+
+// buildBattleRequest reads the current character, loadout, and tower state.
+func buildBattleRequest(currentPlayer *player.Player, incoming *pb_battle.StartBattleReq) (*pb_battle.StartBattleReq, pb_common.ErrCode) {
 	if currentPlayer == nil {
-		return nil, fmt.Errorf("battle request requires a valid player")
+		return nil, pb_common.ErrCode_INVALID_BATTLE_REQUEST
 	}
 	uid := currentPlayer.GetUID()
 	if uid == 0 {
-		return nil, fmt.Errorf("battle request requires a valid player")
+		return nil, pb_common.ErrCode_INVALID_BATTLE_REQUEST
 	}
 	towerMgr := currentPlayer.GetTowerMgr()
 	if towerMgr == nil {
-		return nil, fmt.Errorf("player %d has no tower state", uid)
+		return nil, pb_common.ErrCode_BATTLE_UNAVAILABLE
 	}
 	if incoming == nil {
-		return nil, fmt.Errorf("battle request is required")
+		return nil, pb_common.ErrCode_INVALID_BATTLE_REQUEST
 	}
 	roleMgr := currentPlayer.GetRoleMgr()
 	if roleMgr == nil {
-		return nil, fmt.Errorf("player %d has no role state", uid)
+		return nil, pb_common.ErrCode_BATTLE_UNAVAILABLE
 	}
 	character, ok := roleMgr.BattleCharacter()
 	if !ok {
-		return nil, fmt.Errorf("player %d has no configured character", uid)
+		return nil, pb_common.ErrCode_CONFIG_UNAVAILABLE
 	}
-	characterMessage, err := battleRoleMessage(currentPlayer, character)
-	if err != nil {
-		return nil, err
+	characterMessage, code := battleRoleMessage(currentPlayer, character)
+	if code != pb_common.ErrCode_OK {
+		return nil, code
 	}
 	towerLayer := towerMgr.GetLayer()
 
@@ -80,12 +117,15 @@ func buildBattleRequest(currentPlayer *player.Player, incoming *pb_battle.StartB
 		BusinessId:           fmt.Sprintf("tower-%d-%d", uid, towerLayer),
 		AttackerRoles:        []*pb_battle.Role{characterMessage},
 		MonsterGroupConfigId: towerLayer,
-	}, nil
+	}, pb_common.ErrCode_OK
 }
 
-func battleRoleMessage(currentPlayer *player.Player, selectedRole *role.Role) (*pb_battle.Role, error) {
-	if currentPlayer == nil || selectedRole == nil {
-		return nil, fmt.Errorf("battle role and player are required")
+func battleRoleMessage(currentPlayer *player.Player, selectedRole *role.Role) (*pb_battle.Role, pb_common.ErrCode) {
+	if currentPlayer == nil {
+		return nil, pb_common.ErrCode_INVALID_BATTLE_REQUEST
+	}
+	if selectedRole == nil {
+		return nil, pb_common.ErrCode_INVALID_BATTLE_REQUEST
 	}
 	roleID := selectedRole.GetID()
 	roleConfigID := selectedRole.GetConfigID()
@@ -93,7 +133,7 @@ func battleRoleMessage(currentPlayer *player.Player, selectedRole *role.Role) (*
 	equipmentIDs := selectedRole.GetEquipmentIDs()
 	equipmentMgr := currentPlayer.GetEquipmentMgr()
 	if equipmentMgr == nil {
-		return nil, fmt.Errorf("player %d has no equipment state", currentPlayer.GetUID())
+		return nil, pb_common.ErrCode_EQUIPMENT_UNAVAILABLE
 	}
 	roleSkills := make([]*pb_battle.RoleSkill, 0, len(skills))
 	for _, skill := range skills {
@@ -103,7 +143,8 @@ func battleRoleMessage(currentPlayer *player.Player, selectedRole *role.Role) (*
 	for _, equipmentID := range equipmentIDs {
 		equip, ok := equipmentMgr.Get(equipmentID)
 		if !ok {
-			return nil, fmt.Errorf("role %q references missing equipment %q", roleID, equipmentID)
+			tlog.Log.Error("[ctl_battle/battleRoleMessage] 角色装备不存在, pid=%v role=%v equipment=%v", currentPlayer.GetUID(), roleID, equipmentID)
+			return nil, pb_common.ErrCode_EQUIPMENT_UNAVAILABLE
 		}
 		roleEquips = append(roleEquips, &pb_battle.RoleEquip{
 			EquipId: equip.GetID(), EquipConfigId: equip.GetConfigID(),
@@ -119,8 +160,9 @@ func battleRoleMessage(currentPlayer *player.Player, selectedRole *role.Role) (*
 		Skills:                 roleSkills,
 		Equips:                 roleEquips,
 		SoulJadeEffectAffixIds: souljade.EffectAffixIDs(currentPlayer.GetSoulJadeMgr()),
+		GrowthBonus:            currentPlayer.BattleBonuses(),
 	}
-	return message, nil
+	return message, pb_common.ErrCode_OK
 }
 
 // OnBattleFinished 在当前玩家角色中处理结算并触发玩家级业务事件。

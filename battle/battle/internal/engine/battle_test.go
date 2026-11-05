@@ -467,3 +467,44 @@ func TestActiveSkillImpactCancelledWhenAttackerDiesDuringWindup(t *testing.T) {
 		t.Fatalf("dead active-skill attacker still dealt damage: %#v", damage)
 	}
 }
+
+// TestAttackSpeedShortensMotionWindow 验证高速度缩短行动间隔及对应动作窗口。
+func TestAttackSpeedShortensMotionWindow(t *testing.T) {
+	setup := testSetup()
+	setup.Rules.MaxActions = 8
+	setup.Units[0].Speed = 500
+	setup.Units[0].BasicSkill.WindupTicks = 3
+	setup.Units[0].BasicSkill.RecoveryTicks = 3
+	setup.Units[0].Attack = 1
+	setup.Units[1].Attack = 1
+	setup.Units[1].MaxHP = 10000
+	battle, err := NewBattle(setup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := battle.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var previous *pb.BattleEvent
+	count := 0
+	for _, event := range result.Events {
+		if event.GetType() != pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED || event.GetActorId() != setup.Units[0].InstanceID {
+			continue
+		}
+		if event.GetImpactTick() <= event.GetStartTick() || event.GetEndTick() <= event.GetImpactTick() {
+			t.Fatalf("动作窗口非法: %v", event)
+		}
+		if event.GetEndTick()-event.GetStartTick() != 2 {
+			t.Fatalf("动作窗口未压缩: %v", event)
+		}
+		if previous != nil && event.GetStartTick()-previous.GetStartTick() != 2 {
+			t.Fatalf("攻速未生效: %v -> %v", previous, event)
+		}
+		previous = event
+		count++
+	}
+	if count < 2 {
+		t.Fatalf("攻击次数不足: %d", count)
+	}
+}

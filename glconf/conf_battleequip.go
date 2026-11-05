@@ -14,8 +14,86 @@ var csvBattleEquipCfg atomic.Value
 
 // BattleEquipCfg 表示 BattleEquipCfg 配置记录。
 type BattleEquipCfg struct {
-	CfgID    int32            `bson:"id"`       // 装备配置 ID
-	Modifier []*cspb.TypIDVal `bson:"modifier"` // attribute modifiers (Typ=battle_attribute; IDs 1..4=max_hp/attack/defense/speed)
+	CfgID              int32            `bson:"id"`                   // 装备配置 ID
+	Modifier           []*cspb.TypIDVal `bson:"modifier"`             // attribute modifiers (Typ=battle_attribute; IDs 1..4=max_hp/attack/defense/speed)
+	Slot               int32            `bson:"slot"`                 // 装备槽位，关联EquipmentSlotCfg
+	Name               string           `bson:"name"`                 // 装备名称
+	Rarity             string           `bson:"rarity"`               // 装备品质显示
+	IconKey            string           `bson:"icon_key"`             // 客户端资源图标键
+	InitialLevel       int32            `bson:"initial_level"`        // 首次发放等级
+	InitialRefineLevel int32            `bson:"initial_refine_level"` // 首次发放精炼等级
+}
+
+// GetCfgID returns the configured field value.
+func (cfg *BattleEquipCfg) GetCfgID() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.CfgID
+}
+
+// GetModifier returns the configured field value.
+func (cfg *BattleEquipCfg) GetModifier() []*cspb.TypIDVal {
+	if cfg == nil {
+		var zero []*cspb.TypIDVal
+		return zero
+	}
+	return cfg.Modifier
+}
+
+// GetSlot returns the configured field value.
+func (cfg *BattleEquipCfg) GetSlot() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.Slot
+}
+
+// GetName returns the configured field value.
+func (cfg *BattleEquipCfg) GetName() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.Name
+}
+
+// GetRarity returns the configured field value.
+func (cfg *BattleEquipCfg) GetRarity() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.Rarity
+}
+
+// GetIconKey returns the configured field value.
+func (cfg *BattleEquipCfg) GetIconKey() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.IconKey
+}
+
+// GetInitialLevel returns the configured field value.
+func (cfg *BattleEquipCfg) GetInitialLevel() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.InitialLevel
+}
+
+// GetInitialRefineLevel returns the configured field value.
+func (cfg *BattleEquipCfg) GetInitialRefineLevel() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.InitialRefineLevel
 }
 
 func loadBattleEquipCfg(dbURI, dbName, confName string) (*CsvConf, error) {
@@ -66,4 +144,11 @@ func GetBattleEquipCfgInterface(id int32) interface{} {
 		return table.GetNoErr(id)
 	}
 	return nil
+}
+
+// SetBattleEquipCfgForTest installs an in-memory configuration snapshot without database access.
+func SetBattleEquipCfgForTest(records []*BattleEquipCfg) error {
+	return installRecordsForTest(&BattleEquipCfg{}, interfacesOf(records), func(table *CsvConf) {
+		csvBattleEquipCfg.Store(table)
+	})
 }

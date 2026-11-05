@@ -1,5 +1,7 @@
 *.exe
 *.test
+*.pyc
+__pycache__/
 nul
 .idea/
 tree/

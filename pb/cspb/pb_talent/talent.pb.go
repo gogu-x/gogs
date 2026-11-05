@@ -776,25 +776,25 @@ const file_cspb_talent_talent_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\x04R\x10expectedRevision\x12\x16\n" +
-	"\x06branch\x18\x03 \x01(\x05R\x06branch\"\x8f\x01\n" +
+	"\x06branch\x18\x03 \x01(\x05R\x06branch\"\x82\x01\n" +
 	"\x10GetRoleTalentAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12#\n" +
 	"\x04data\x18\x02 \x01(\v2\x0f.RoleTalentDataR\x04data\x12!\n" +
 	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeJ\x04\b\x03\x10\x04R\x05error\"\x91\x01\n" +
+	"\x05_code\"\x84\x01\n" +
 	"\x12LearnRoleTalentAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12#\n" +
 	"\x04data\x18\x02 \x01(\v2\x0f.RoleTalentDataR\x04data\x12!\n" +
 	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeJ\x04\b\x03\x10\x04R\x05error\"\x91\x01\n" +
+	"\x05_code\"\x84\x01\n" +
 	"\x12ResetRoleTalentAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12#\n" +
 	"\x04data\x18\x02 \x01(\v2\x0f.RoleTalentDataR\x04data\x12!\n" +
 	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeJ\x04\b\x03\x10\x04R\x05errorB*Z(github.com/gogu-x/gogs/pb/cspb/pb_talentb\x06proto3"
+	"\x05_codeB*Z(github.com/gogu-x/gogs/pb/cspb/pb_talentb\x06proto3"
 
 var (
 	file_cspb_talent_talent_proto_rawDescOnce sync.Once

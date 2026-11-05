@@ -27,7 +27,7 @@ func (c *Compiler) buildRoleUnit(role *pb.Role, team pb.BattleTeam) (engine.Unit
 	if err != nil {
 		return engine.UnitConfig{}, err
 	}
-	attributes, err := c.applyRoleEquips(role, config)
+	attributes, err := c.CalculateRoleAttributes(role)
 	if err != nil {
 		return engine.UnitConfig{}, err
 	}

@@ -3,6 +3,8 @@ package ctl_battle
 import (
 	"testing"
 
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
+
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/game/battle"
 	"github.com/gogu-x/gogs/game/play/internal/core"
@@ -41,9 +43,9 @@ func TestBuildBattleRequestCopiesLoadout(t *testing.T) {
 		MonsterGroupConfigId: 999,
 	}
 
-	request, err := buildBattleRequest(p, incoming)
-	if err != nil {
-		t.Fatal(err)
+	request, code := buildBattleRequest(p, incoming)
+	if code != pb_common.ErrCode_OK {
+		t.Fatal(code)
 	}
 
 	if request.GetUID() != 99 || request.GetServerID() != 3 || request.GetSourceNodeId() != 4 {
