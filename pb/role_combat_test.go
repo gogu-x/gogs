@@ -22,7 +22,7 @@ func TestRoleCombatMessagesRoundTripWithAuthoritativeHeaders(t *testing.T) {
 				RoleId: "role-42", MaxHp: 9007199254740993,
 				Attack: 1234, Defense: 5678, Speed: 9012,
 			},
-			Code: pb_common.ErrCode_OK.Enum(),
+			Code: pb_common.ErrCode_OK,
 		},
 	}
 	for _, message := range messages {

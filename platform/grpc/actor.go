@@ -100,7 +100,7 @@ func (s *svcHandler) VerifyToken(_ context.Context, req *pb_pf.VerifyTokenReq) (
 	ack, valid := v.(*pb_pf.VerifyAck)
 	if err != nil || !valid || ack == nil {
 		log.Printf("platform VerifyToken failed: err=%v response=%T", err, v)
-		return &pb_pf.VerifyAck{Code: pb_pf.ErrCode_INTERNAL.Enum()}, nil
+		return &pb_pf.VerifyAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	return ack, nil
 }
@@ -130,7 +130,7 @@ func (s *svcHandler) QueryOrder(_ context.Context, req *pb_pf.QueryOrderReq) (*p
 	ack, valid := v.(*pb_pf.OrderDetail)
 	if err != nil || !valid || ack == nil {
 		log.Printf("platform QueryOrder failed: err=%v response=%T", err, v)
-		return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_INTERNAL.Enum()}, nil
+		return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	return ack, nil
 }

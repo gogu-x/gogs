@@ -660,7 +660,7 @@ type GetRoleSoulJadeAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     uint64                 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Data          *RoleSoulJadeData      `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,4,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -709,18 +709,18 @@ func (x *GetRoleSoulJadeAck) GetData() *RoleSoulJadeData {
 	return nil
 }
 
-func (x *GetRoleSoulJadeAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *GetRoleSoulJadeAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type ChangeRoleSoulJadeAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     uint64                 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Data          *RoleSoulJadeData      `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,4,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -769,18 +769,18 @@ func (x *ChangeRoleSoulJadeAck) GetData() *RoleSoulJadeData {
 	return nil
 }
 
-func (x *ChangeRoleSoulJadeAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *ChangeRoleSoulJadeAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type UpgradeRoleSoulJadeAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     uint64                 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Data          *RoleSoulJadeData      `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,4,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -829,18 +829,18 @@ func (x *UpgradeRoleSoulJadeAck) GetData() *RoleSoulJadeData {
 	return nil
 }
 
-func (x *UpgradeRoleSoulJadeAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *UpgradeRoleSoulJadeAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type RefineRoleSoulJadeAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     uint64                 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Data          *RoleSoulJadeData      `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,4,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -889,18 +889,18 @@ func (x *RefineRoleSoulJadeAck) GetData() *RoleSoulJadeData {
 	return nil
 }
 
-func (x *RefineRoleSoulJadeAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *RefineRoleSoulJadeAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 var File_cspb_souljade_souljade_proto protoreflect.FileDescriptor
 
 const file_cspb_souljade_souljade_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccspb/souljade/souljade.proto\x1a\x18cspb/common/growth.proto\x1a\x15cspb/comm/error.proto\"I\n" +
+	"\x1ccspb/souljade/souljade.proto\x1a\x18cspb/common/growth.proto\"I\n" +
 	"\rSoulJadeAffix\x12\x1c\n" +
 	"\tattribute\x18\x01 \x01(\x05R\tattribute\x12\x1a\n" +
 	"\bpermille\x18\x02 \x01(\x05R\bpermille\"\xb4\x02\n" +
@@ -962,31 +962,27 @@ const file_cspb_souljade_souljade_proto_rawDesc = "" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\x04R\x10expectedRevision\x12\x1f\n" +
 	"\vinstance_id\x18\x03 \x01(\tR\n" +
-	"instanceId\"\x86\x01\n" +
+	"instanceId\"n\n" +
 	"\x12GetRoleSoulJadeAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12%\n" +
-	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12!\n" +
-	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code\"\x89\x01\n" +
+	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code\"q\n" +
 	"\x15ChangeRoleSoulJadeAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12%\n" +
-	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12!\n" +
-	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code\"\x8a\x01\n" +
+	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code\"r\n" +
 	"\x16UpgradeRoleSoulJadeAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12%\n" +
-	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12!\n" +
-	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code\"\x89\x01\n" +
+	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code\"q\n" +
 	"\x15RefineRoleSoulJadeAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12%\n" +
-	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12!\n" +
-	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeB,Z*github.com/gogu-x/gogs/pb/cspb/pb_souljadeb\x06proto3"
+	"\x04data\x18\x02 \x01(\v2\x11.RoleSoulJadeDataR\x04data\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04codeB,Z*github.com/gogu-x/gogs/pb/cspb/pb_souljadeb\x06proto3"
 
 var (
 	file_cspb_souljade_souljade_proto_rawDescOnce sync.Once
@@ -1015,7 +1011,6 @@ var file_cspb_souljade_souljade_proto_goTypes = []any{
 	(*UpgradeRoleSoulJadeAck)(nil),  // 10: UpgradeRoleSoulJadeAck
 	(*RefineRoleSoulJadeAck)(nil),   // 11: RefineRoleSoulJadeAck
 	(*pb_common.GrowthBonuses)(nil), // 12: GrowthBonuses
-	(pb_common.ErrCode)(0),          // 13: ErrCode
 }
 var file_cspb_souljade_souljade_proto_depIdxs = []int32{
 	0,  // 0: SoulJadeItem.affixes:type_name -> SoulJadeAffix
@@ -1023,18 +1018,14 @@ var file_cspb_souljade_souljade_proto_depIdxs = []int32{
 	2,  // 2: RoleSoulJadeData.slots:type_name -> SoulJadeSlot
 	12, // 3: RoleSoulJadeData.bonuses:type_name -> GrowthBonuses
 	3,  // 4: GetRoleSoulJadeAck.data:type_name -> RoleSoulJadeData
-	13, // 5: GetRoleSoulJadeAck.code:type_name -> ErrCode
-	3,  // 6: ChangeRoleSoulJadeAck.data:type_name -> RoleSoulJadeData
-	13, // 7: ChangeRoleSoulJadeAck.code:type_name -> ErrCode
-	3,  // 8: UpgradeRoleSoulJadeAck.data:type_name -> RoleSoulJadeData
-	13, // 9: UpgradeRoleSoulJadeAck.code:type_name -> ErrCode
-	3,  // 10: RefineRoleSoulJadeAck.data:type_name -> RoleSoulJadeData
-	13, // 11: RefineRoleSoulJadeAck.code:type_name -> ErrCode
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	3,  // 5: ChangeRoleSoulJadeAck.data:type_name -> RoleSoulJadeData
+	3,  // 6: UpgradeRoleSoulJadeAck.data:type_name -> RoleSoulJadeData
+	3,  // 7: RefineRoleSoulJadeAck.data:type_name -> RoleSoulJadeData
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_cspb_souljade_souljade_proto_init() }
@@ -1042,10 +1033,6 @@ func file_cspb_souljade_souljade_proto_init() {
 	if File_cspb_souljade_souljade_proto != nil {
 		return
 	}
-	file_cspb_souljade_souljade_proto_msgTypes[8].OneofWrappers = []any{}
-	file_cspb_souljade_souljade_proto_msgTypes[9].OneofWrappers = []any{}
-	file_cspb_souljade_souljade_proto_msgTypes[10].OneofWrappers = []any{}
-	file_cspb_souljade_souljade_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

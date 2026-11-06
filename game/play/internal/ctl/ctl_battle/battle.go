@@ -26,7 +26,7 @@ func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 	request, code := buildBattleRequest(ctx.GetPlayer(), req)
 	if code != pb_common.ErrCode_OK {
 		tlog.Log.Error("[ctl_battle/OnCreateBattle] 组装战斗请求失败, pid=%v code=%v", uid, code)
-		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Code: code.Enum()})
+		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Code: code})
 		return
 	}
 
@@ -38,42 +38,42 @@ func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 		pushBattleAck(callbackCtx, uid, ack)
 	})
 	if !ok {
-		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Code: pb_common.ErrCode_BATTLE_UNAVAILABLE.Enum()})
+		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Code: pb_common.ErrCode_BATTLE_UNAVAILABLE})
 	}
 }
 
 func battleStartAck(value interface{}, err error) *pb_battle.StartBattleAck {
-	ack := &pb_battle.StartBattleAck{Code: pb_common.ErrCode_OK.Enum()}
+	ack := &pb_battle.StartBattleAck{Code: pb_common.ErrCode_OK}
 	state, valid := value.(battle.State)
 	if valid {
 		ack.BattleId = state.BattleID
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		ack.Code = pb_common.ErrCode_BATTLE_TIMEOUT.Enum()
+		ack.Code = pb_common.ErrCode_BATTLE_TIMEOUT
 		return ack
 	}
 	if errors.Is(err, tree.ErrTimeout) {
-		ack.Code = pb_common.ErrCode_BATTLE_TIMEOUT.Enum()
+		ack.Code = pb_common.ErrCode_BATTLE_TIMEOUT
 		return ack
 	}
 	if errors.Is(err, battle.ErrUnavailable) {
-		ack.Code = pb_common.ErrCode_BATTLE_UNAVAILABLE.Enum()
+		ack.Code = pb_common.ErrCode_BATTLE_UNAVAILABLE
 		return ack
 	}
 	if errors.Is(err, battle.ErrInvalidRequest) {
-		ack.Code = pb_common.ErrCode_INVALID_BATTLE_REQUEST.Enum()
+		ack.Code = pb_common.ErrCode_INVALID_BATTLE_REQUEST
 		return ack
 	}
 	if errors.Is(err, battle.ErrInProgress) {
-		ack.Code = pb_common.ErrCode_BATTLE_IN_PROGRESS.Enum()
+		ack.Code = pb_common.ErrCode_BATTLE_IN_PROGRESS
 		return ack
 	}
 	if err != nil {
-		ack.Code = pb_common.ErrCode_BATTLE_CREATE_FAILED.Enum()
+		ack.Code = pb_common.ErrCode_BATTLE_CREATE_FAILED
 		return ack
 	}
 	if !valid {
-		ack.Code = pb_common.ErrCode_BATTLE_CREATE_FAILED.Enum()
+		ack.Code = pb_common.ErrCode_BATTLE_CREATE_FAILED
 		return ack
 	}
 	return ack

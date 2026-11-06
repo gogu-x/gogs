@@ -45,8 +45,8 @@ func TestPublicResponsesUseErrCodeWithoutErrorText(t *testing.T) {
 					status = field
 				}
 			}
-			if status == nil || status.Kind() != protoreflect.EnumKind || status.Enum().Name() != "ErrCode" {
-				t.Errorf("%s must expose the predefined ErrCode enum", message.FullName())
+			if status == nil || status.Kind() != protoreflect.Int32Kind {
+				t.Errorf("%s must expose an int32 error code", message.FullName())
 			}
 		}
 		return true
@@ -56,7 +56,7 @@ func TestPublicResponsesUseErrCodeWithoutErrorText(t *testing.T) {
 	}
 }
 
-func TestNewStatusFieldsPreservePresenceAndNumericCodes(t *testing.T) {
+func TestStatusFieldsPreserveNumericCodes(t *testing.T) {
 	messages := []proto.Message{
 		&pb_common.GetRoleCombatStatsAck{},
 		&pb_equipment.GetRoleEquipmentAck{},
@@ -76,11 +76,11 @@ func TestNewStatusFieldsPreservePresenceAndNumericCodes(t *testing.T) {
 	for _, message := range messages {
 		reflection := message.ProtoReflect()
 		field := reflection.Descriptor().Fields().ByName("code")
-		if field == nil || !field.HasPresence() || reflection.Has(field) {
-			t.Fatalf("%T must distinguish missing status from explicit success", message)
+		if field == nil || field.HasPresence() {
+			t.Fatalf("%T must use a non-optional status", message)
 		}
-		for _, code := range []protoreflect.EnumNumber{0, protoreflect.EnumNumber(pb_common.ErrCode_STALE_REVISION), -987654} {
-			reflection.Set(field, protoreflect.ValueOfEnum(code))
+		for _, code := range []int32{0, pb_common.ErrCode_STALE_REVISION, -987654} {
+			reflection.Set(field, protoreflect.ValueOfInt32(code))
 			encoded, err := proto.Marshal(message)
 			if err != nil {
 				t.Fatal(err)
@@ -90,7 +90,7 @@ func TestNewStatusFieldsPreservePresenceAndNumericCodes(t *testing.T) {
 				t.Fatal(err)
 			}
 			result := decoded.ProtoReflect()
-			if !result.Has(field) || result.Get(field).Enum() != code {
+			if result.Get(field).Int() != int64(code) {
 				t.Fatalf("%T lost explicit status %d during serialization", message, code)
 			}
 		}

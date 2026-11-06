@@ -29,7 +29,7 @@ func TestBattleStartAckUsesDeclaredCodes(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ack := battleStartAck(test.value, test.err)
-			if ack.Code == nil || ack.GetCode() != test.code {
+			if ack.GetCode() != test.code {
 				t.Fatalf("ack=%v want code=%v", ack, test.code)
 			}
 		})

@@ -28,7 +28,7 @@ func TestInvalidRequestsReturnCodesBeforeDatabaseAccess(t *testing.T) {
 		t.Fatalf("order=%v err=%v", order, err)
 	}
 	detail, err := QueryOrder(nil, &pb_pf.QueryOrderReq{})
-	if err != nil || detail.Code == nil || detail.GetCode() != pb_pf.ErrCode_PARAM {
+	if err != nil || detail.GetCode() != pb_pf.ErrCode_PARAM {
 		t.Fatalf("detail=%v err=%v", detail, err)
 	}
 	if code := DeliverOrder(nil, ""); code != pb_pf.ErrCode_PARAM {
@@ -38,11 +38,11 @@ func TestInvalidRequestsReturnCodesBeforeDatabaseAccess(t *testing.T) {
 
 func TestVerifyTokenExplicitOutcomes(t *testing.T) {
 	missing, err := VerifyToken(nil)
-	if err != nil || missing.Code == nil || missing.GetCode() != pb_pf.ErrCode_PARAM || missing.GetValid() {
+	if err != nil || missing.GetCode() != pb_pf.ErrCode_PARAM || missing.GetValid() {
 		t.Fatalf("missing=%v err=%v", missing, err)
 	}
 	invalid, err := VerifyToken(&pb_pf.VerifyTokenReq{Token: "invalid"})
-	if err != nil || invalid.Code == nil || invalid.GetCode() != pb_pf.ErrCode_INVALID_TOKEN || invalid.GetValid() {
+	if err != nil || invalid.GetCode() != pb_pf.ErrCode_INVALID_TOKEN || invalid.GetValid() {
 		t.Fatalf("invalid=%v err=%v", invalid, err)
 	}
 	token, err := auth.Sign(42)
@@ -50,7 +50,7 @@ func TestVerifyTokenExplicitOutcomes(t *testing.T) {
 		t.Fatal(err)
 	}
 	valid, err := VerifyToken(&pb_pf.VerifyTokenReq{Token: token})
-	if err != nil || valid.Code == nil || valid.GetCode() != pb_pf.ErrCode_OK || !valid.GetValid() || valid.GetUid() != 42 {
+	if err != nil || valid.GetCode() != pb_pf.ErrCode_OK || !valid.GetValid() || valid.GetUid() != 42 {
 		t.Fatalf("valid=%v err=%v", valid, err)
 	}
 }

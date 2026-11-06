@@ -53,9 +53,6 @@ func TestCombatStatsQueryMatchesBattleAndDoesNotModifyPlayer(t *testing.T) {
 	if ack == nil {
 		t.Fatal("combat stat query did not return an ACK")
 	}
-	if ack.Code == nil {
-		t.Fatal("combat stat query omitted explicit success")
-	}
 	if ack.GetCode() != pb_common.ErrCode_OK {
 		t.Fatalf("combat stat query failed: %v", ack.GetCode())
 	}
@@ -135,9 +132,6 @@ func TestCombatStatsQueryReturnsTypedFailuresWithoutChangingState(t *testing.T) 
 			ack := gate.ack
 			if ack == nil {
 				t.Fatal("rejected query omitted its ACK")
-			}
-			if ack.Code == nil {
-				t.Fatal("rejected query omitted explicit status")
 			}
 			if ack.GetCode() != test.code {
 				t.Fatalf("code = %v, want %v", ack.GetCode(), test.code)

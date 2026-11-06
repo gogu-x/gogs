@@ -35,7 +35,7 @@ func CreateOrder(db *mongo.Database, req *pb_pf.CreateOrderReq) (*pb_pf.OrderAck
 
 func QueryOrder(db *mongo.Database, req *pb_pf.QueryOrderReq) (*pb_pf.OrderDetail, error) {
 	if req == nil || req.GetOrderId() == "" {
-		return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_PARAM.Enum()}, nil
+		return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_PARAM}, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
@@ -43,13 +43,13 @@ func QueryOrder(db *mongo.Database, req *pb_pf.QueryOrderReq) (*pb_pf.OrderDetai
 	if err := db.Collection(store.ColOrders).FindOne(ctx, bson.M{"order_id": req.OrderId}).Decode(o); err != nil {
 		tlog.Log.Error("QueryOrder failed: order=%s err=%v", req.GetOrderId(), err)
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_ORDER_NOT_FOUND.Enum()}, nil
+			return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_ORDER_NOT_FOUND}, nil
 		}
-		return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_INTERNAL.Enum()}, nil
+		return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	return &pb_pf.OrderDetail{
 		OrderId: o.OrderID, Uid: o.UID, ProductId: o.ProductID,
-		ServerId: o.ServerID, Status: o.Status, Code: pb_pf.ErrCode_OK.Enum(),
+		ServerId: o.ServerID, Status: o.Status, Code: pb_pf.ErrCode_OK,
 	}, nil
 }
 

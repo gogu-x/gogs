@@ -195,7 +195,7 @@ func (x *AuthLoginReq) GetServerId() uint32 {
 
 type AuthAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          ErrCode                `protobuf:"varint,1,opt,name=code,proto3,enum=platform.ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Uid           uint64                 `protobuf:"varint,3,opt,name=uid,proto3" json:"uid,omitempty"`
 	Token         string                 `protobuf:"bytes,4,opt,name=token,proto3" json:"token,omitempty"`
 	ServerId      uint32                 `protobuf:"varint,5,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
@@ -233,11 +233,11 @@ func (*AuthAck) Descriptor() ([]byte, []int) {
 	return file_pfpb_platform_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *AuthAck) GetCode() ErrCode {
+func (x *AuthAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return ErrCode_OK
+	return 0
 }
 
 func (x *AuthAck) GetUid() uint64 {
@@ -309,7 +309,7 @@ type VerifyAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
 	Uid           uint64                 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	Code          *ErrCode               `protobuf:"varint,3,opt,name=code,proto3,enum=platform.ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,3,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -358,11 +358,11 @@ func (x *VerifyAck) GetUid() uint64 {
 	return 0
 }
 
-func (x *VerifyAck) GetCode() ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *VerifyAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return ErrCode_OK
+	return 0
 }
 
 // GetServerListReq is used before login to look up all registrations for an account.
@@ -464,7 +464,7 @@ func (x *ServerAccount) GetUid() uint64 {
 
 type ServerListAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          ErrCode                `protobuf:"varint,1,opt,name=code,proto3,enum=platform.ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Accounts      []*ServerAccount       `protobuf:"bytes,3,rep,name=accounts,proto3" json:"accounts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -500,11 +500,11 @@ func (*ServerListAck) Descriptor() ([]byte, []int) {
 	return file_pfpb_platform_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *ServerListAck) GetCode() ErrCode {
+func (x *ServerListAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return ErrCode_OK
+	return 0
 }
 
 func (x *ServerListAck) GetAccounts() []*ServerAccount {
@@ -576,7 +576,7 @@ func (x *CreateOrderReq) GetServerId() string {
 
 type OrderAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          ErrCode                `protobuf:"varint,1,opt,name=code,proto3,enum=platform.ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	OrderId       string                 `protobuf:"bytes,3,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -612,11 +612,11 @@ func (*OrderAck) Descriptor() ([]byte, []int) {
 	return file_pfpb_platform_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *OrderAck) GetCode() ErrCode {
+func (x *OrderAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return ErrCode_OK
+	return 0
 }
 
 func (x *OrderAck) GetOrderId() string {
@@ -677,7 +677,7 @@ type OrderDetail struct {
 	ProductId     string                 `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
 	ServerId      string                 `protobuf:"bytes,4,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
 	Status        OrderStatus            `protobuf:"varint,5,opt,name=status,proto3,enum=platform.OrderStatus" json:"status,omitempty"`
-	Code          *ErrCode               `protobuf:"varint,6,opt,name=code,proto3,enum=platform.ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,6,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -747,11 +747,11 @@ func (x *OrderDetail) GetStatus() OrderStatus {
 	return OrderStatus_PENDING
 }
 
-func (x *OrderDetail) GetCode() ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *OrderDetail) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return ErrCode_OK
+	return 0
 }
 
 type DeliverNotify struct {
@@ -826,7 +826,7 @@ var File_pfpb_platform_proto protoreflect.FileDescriptor
 
 const file_pfpb_platform_proto_rawDesc = "" +
 	"\n" +
-	"\x13pfpb/platform.proto\x12\bplatform\x1a\x10pfpb/error.proto\"`\n" +
+	"\x13pfpb/platform.proto\x12\bplatform\"`\n" +
 	"\vRegisterReq\x12\x18\n" +
 	"\aaccount\x18\x01 \x01(\tR\aaccount\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1b\n" +
@@ -834,46 +834,44 @@ const file_pfpb_platform_proto_rawDesc = "" +
 	"\fAuthLoginReq\x12\x18\n" +
 	"\aaccount\x18\x01 \x01(\tR\aaccount\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1b\n" +
-	"\tserver_id\x18\x03 \x01(\rR\bserverId\"u\n" +
-	"\aAuthAck\x12%\n" +
-	"\x04code\x18\x01 \x01(\x0e2\x11.platform.ErrCodeR\x04code\x12\x10\n" +
+	"\tserver_id\x18\x03 \x01(\rR\bserverId\"b\n" +
+	"\aAuthAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
 	"\x03uid\x18\x03 \x01(\x04R\x03uid\x12\x14\n" +
 	"\x05token\x18\x04 \x01(\tR\x05token\x12\x1b\n" +
 	"\tserver_id\x18\x05 \x01(\rR\bserverId\"&\n" +
 	"\x0eVerifyTokenReq\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"h\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"G\n" +
 	"\tVerifyAck\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12*\n" +
-	"\x04code\x18\x03 \x01(\x0e2\x11.platform.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code\",\n" +
+	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12\x12\n" +
+	"\x04code\x18\x03 \x01(\x05R\x04code\",\n" +
 	"\x10GetServerListReq\x12\x18\n" +
 	"\aaccount\x18\x01 \x01(\tR\aaccount\">\n" +
 	"\rServerAccount\x12\x1b\n" +
 	"\tserver_id\x18\x01 \x01(\rR\bserverId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid\"k\n" +
-	"\rServerListAck\x12%\n" +
-	"\x04code\x18\x01 \x01(\x0e2\x11.platform.ErrCodeR\x04code\x123\n" +
+	"\x03uid\x18\x02 \x01(\x04R\x03uid\"X\n" +
+	"\rServerListAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x123\n" +
 	"\baccounts\x18\x03 \x03(\v2\x17.platform.ServerAccountR\baccounts\"^\n" +
 	"\x0eCreateOrderReq\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x02 \x01(\tR\tproductId\x12\x1b\n" +
-	"\tserver_id\x18\x03 \x01(\tR\bserverId\"L\n" +
-	"\bOrderAck\x12%\n" +
-	"\x04code\x18\x01 \x01(\x0e2\x11.platform.ErrCodeR\x04code\x12\x19\n" +
+	"\tserver_id\x18\x03 \x01(\tR\bserverId\"9\n" +
+	"\bOrderAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x19\n" +
 	"\border_id\x18\x03 \x01(\tR\aorderId\"*\n" +
 	"\rQueryOrderReq\x12\x19\n" +
-	"\border_id\x18\x01 \x01(\tR\aorderId\"\xda\x01\n" +
+	"\border_id\x18\x01 \x01(\tR\aorderId\"\xb9\x01\n" +
 	"\vOrderDetail\x12\x19\n" +
 	"\border_id\x18\x01 \x01(\tR\aorderId\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x03 \x01(\tR\tproductId\x12\x1b\n" +
 	"\tserver_id\x18\x04 \x01(\tR\bserverId\x12-\n" +
-	"\x06status\x18\x05 \x01(\x0e2\x15.platform.OrderStatusR\x06status\x12*\n" +
-	"\x04code\x18\x06 \x01(\x0e2\x11.platform.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code\"x\n" +
+	"\x06status\x18\x05 \x01(\x0e2\x15.platform.OrderStatusR\x06status\x12\x12\n" +
+	"\x04code\x18\x06 \x01(\x05R\x04code\"x\n" +
 	"\rDeliverNotify\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x19\n" +
 	"\border_id\x18\x02 \x01(\tR\aorderId\x12\x1d\n" +
@@ -925,33 +923,27 @@ var file_pfpb_platform_proto_goTypes = []any{
 	(*QueryOrderReq)(nil),    // 11: platform.QueryOrderReq
 	(*OrderDetail)(nil),      // 12: platform.OrderDetail
 	(*DeliverNotify)(nil),    // 13: platform.DeliverNotify
-	(ErrCode)(0),             // 14: platform.ErrCode
 }
 var file_pfpb_platform_proto_depIdxs = []int32{
-	14, // 0: platform.AuthAck.code:type_name -> platform.ErrCode
-	14, // 1: platform.VerifyAck.code:type_name -> platform.ErrCode
-	14, // 2: platform.ServerListAck.code:type_name -> platform.ErrCode
-	7,  // 3: platform.ServerListAck.accounts:type_name -> platform.ServerAccount
-	14, // 4: platform.OrderAck.code:type_name -> platform.ErrCode
-	0,  // 5: platform.OrderDetail.status:type_name -> platform.OrderStatus
-	14, // 6: platform.OrderDetail.code:type_name -> platform.ErrCode
-	1,  // 7: platform.AuthService.Register:input_type -> platform.RegisterReq
-	2,  // 8: platform.AuthService.Login:input_type -> platform.AuthLoginReq
-	4,  // 9: platform.AuthService.VerifyToken:input_type -> platform.VerifyTokenReq
-	6,  // 10: platform.AuthService.GetServerList:input_type -> platform.GetServerListReq
-	9,  // 11: platform.OrderService.CreateOrder:input_type -> platform.CreateOrderReq
-	11, // 12: platform.OrderService.QueryOrder:input_type -> platform.QueryOrderReq
-	3,  // 13: platform.AuthService.Register:output_type -> platform.AuthAck
-	3,  // 14: platform.AuthService.Login:output_type -> platform.AuthAck
-	5,  // 15: platform.AuthService.VerifyToken:output_type -> platform.VerifyAck
-	8,  // 16: platform.AuthService.GetServerList:output_type -> platform.ServerListAck
-	10, // 17: platform.OrderService.CreateOrder:output_type -> platform.OrderAck
-	12, // 18: platform.OrderService.QueryOrder:output_type -> platform.OrderDetail
-	13, // [13:19] is the sub-list for method output_type
-	7,  // [7:13] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	7,  // 0: platform.ServerListAck.accounts:type_name -> platform.ServerAccount
+	0,  // 1: platform.OrderDetail.status:type_name -> platform.OrderStatus
+	1,  // 2: platform.AuthService.Register:input_type -> platform.RegisterReq
+	2,  // 3: platform.AuthService.Login:input_type -> platform.AuthLoginReq
+	4,  // 4: platform.AuthService.VerifyToken:input_type -> platform.VerifyTokenReq
+	6,  // 5: platform.AuthService.GetServerList:input_type -> platform.GetServerListReq
+	9,  // 6: platform.OrderService.CreateOrder:input_type -> platform.CreateOrderReq
+	11, // 7: platform.OrderService.QueryOrder:input_type -> platform.QueryOrderReq
+	3,  // 8: platform.AuthService.Register:output_type -> platform.AuthAck
+	3,  // 9: platform.AuthService.Login:output_type -> platform.AuthAck
+	5,  // 10: platform.AuthService.VerifyToken:output_type -> platform.VerifyAck
+	8,  // 11: platform.AuthService.GetServerList:output_type -> platform.ServerListAck
+	10, // 12: platform.OrderService.CreateOrder:output_type -> platform.OrderAck
+	12, // 13: platform.OrderService.QueryOrder:output_type -> platform.OrderDetail
+	8,  // [8:14] is the sub-list for method output_type
+	2,  // [2:8] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_pfpb_platform_proto_init() }
@@ -959,9 +951,6 @@ func file_pfpb_platform_proto_init() {
 	if File_pfpb_platform_proto != nil {
 		return
 	}
-	file_pfpb_error_proto_init()
-	file_pfpb_platform_proto_msgTypes[4].OneofWrappers = []any{}
-	file_pfpb_platform_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

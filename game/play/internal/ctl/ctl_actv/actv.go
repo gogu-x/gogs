@@ -16,7 +16,7 @@ func OnGetActivityList(ctx *core.Context, request *pb_activity.GetActivityListRe
 	if request == nil {
 		return
 	}
-	forwardActivityRequest(ctx, 0, request, &pb_activity.GetActivityListAck{Code: pb_common.ErrCode_ACTIVITY_UNAVAILABLE.Enum()})
+	forwardActivityRequest(ctx, 0, request, &pb_activity.GetActivityListAck{Code: pb_common.ErrCode_ACTIVITY_UNAVAILABLE})
 }
 
 // OnJoinActivity 将玩家加入活动请求转发到全局活动 Actor。

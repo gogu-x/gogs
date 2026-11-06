@@ -7,7 +7,6 @@
 package pb_auth
 
 import (
-	pb_common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -24,7 +23,7 @@ const (
 
 type LoginGameAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Uid           uint64                 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -60,11 +59,11 @@ func (*LoginGameAck) Descriptor() ([]byte, []int) {
 	return file_cspb_auth_ack_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *LoginGameAck) GetCode() pb_common.ErrCode {
+func (x *LoginGameAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 func (x *LoginGameAck) GetUid() uint64 {
@@ -78,9 +77,9 @@ var File_cspb_auth_ack_proto protoreflect.FileDescriptor
 
 const file_cspb_auth_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x13cspb/auth/ack.proto\x1a\x15cspb/comm/error.proto\">\n" +
-	"\fLoginGameAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x10\n" +
+	"\x13cspb/auth/ack.proto\"4\n" +
+	"\fLoginGameAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\x04R\x03uidB(Z&github.com/gogu-x/gogs/pb/cspb/pb_authb\x06proto3"
 
 var (
@@ -97,16 +96,14 @@ func file_cspb_auth_ack_proto_rawDescGZIP() []byte {
 
 var file_cspb_auth_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_cspb_auth_ack_proto_goTypes = []any{
-	(*LoginGameAck)(nil),   // 0: LoginGameAck
-	(pb_common.ErrCode)(0), // 1: ErrCode
+	(*LoginGameAck)(nil), // 0: LoginGameAck
 }
 var file_cspb_auth_ack_proto_depIdxs = []int32{
-	1, // 0: LoginGameAck.code:type_name -> ErrCode
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_cspb_auth_ack_proto_init() }

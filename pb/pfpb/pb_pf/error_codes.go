@@ -1,0 +1,39 @@
+package pb_pf
+
+// ErrCode 表示整数错误码。
+type ErrCode = int32
+
+const (
+	// ErrCode_OK 表示错误码 OK。
+	ErrCode_OK int32 = 0
+	// ErrCode_UNKNOWN 表示错误码 UNKNOWN。
+	ErrCode_UNKNOWN int32 = -1
+	// ErrCode_PARAM 表示错误码 PARAM。
+	ErrCode_PARAM int32 = -2
+	// ErrCode_UNAUTHORIZED 表示错误码 UNAUTHORIZED。
+	ErrCode_UNAUTHORIZED int32 = -1001
+	// ErrCode_LOGIN_IN_PROGRESS 表示错误码 LOGIN_IN_PROGRESS。
+	ErrCode_LOGIN_IN_PROGRESS int32 = -1002
+	// ErrCode_SERVER_NOT_FOUND 表示错误码 SERVER_NOT_FOUND。
+	ErrCode_SERVER_NOT_FOUND int32 = -1003
+	// ErrCode_USERNAME_EXISTS 表示错误码 USERNAME_EXISTS。
+	ErrCode_USERNAME_EXISTS int32 = -2001
+	// ErrCode_WRONG_PASSWORD 表示错误码 WRONG_PASSWORD。
+	ErrCode_WRONG_PASSWORD int32 = -2002
+	// ErrCode_INTERNAL 表示错误码 INTERNAL。
+	ErrCode_INTERNAL int32 = -2003
+	// ErrCode_ACCOUNT_NOT_FOUND 表示错误码 ACCOUNT_NOT_FOUND。
+	ErrCode_ACCOUNT_NOT_FOUND int32 = -2004
+	// ErrCode_INVALID_TOKEN 表示错误码 INVALID_TOKEN。
+	ErrCode_INVALID_TOKEN int32 = -2005
+	// ErrCode_GUILD_EXISTS 表示错误码 GUILD_EXISTS。
+	ErrCode_GUILD_EXISTS int32 = -3001
+	// ErrCode_GUILD_NOT_FOUND 表示错误码 GUILD_NOT_FOUND。
+	ErrCode_GUILD_NOT_FOUND int32 = -3002
+	// ErrCode_ALREADY_IN_GUILD 表示错误码 ALREADY_IN_GUILD。
+	ErrCode_ALREADY_IN_GUILD int32 = -3003
+	// ErrCode_NOT_IN_GUILD 表示错误码 NOT_IN_GUILD。
+	ErrCode_NOT_IN_GUILD int32 = -3004
+	// ErrCode_ORDER_NOT_FOUND 表示错误码 ORDER_NOT_FOUND。
+	ErrCode_ORDER_NOT_FOUND int32 = -7001
+)

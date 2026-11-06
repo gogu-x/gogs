@@ -7,7 +7,6 @@
 package pb_equipment
 
 import (
-	pb_common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -457,7 +456,7 @@ type GetRoleEquipmentAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          *RoleEquipmentData     `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	RequestId     uint64                 `protobuf:"varint,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,4,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -506,11 +505,11 @@ func (x *GetRoleEquipmentAck) GetRequestId() uint64 {
 	return 0
 }
 
-func (x *GetRoleEquipmentAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *GetRoleEquipmentAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 // equipment_id 为空表示卸下指定槽位；否则服务端校验归属与槽位后穿戴。
@@ -602,7 +601,7 @@ type ChangeRoleEquipmentAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          *RoleEquipmentData     `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	RequestId     uint64                 `protobuf:"varint,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,4,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -651,18 +650,18 @@ func (x *ChangeRoleEquipmentAck) GetRequestId() uint64 {
 	return 0
 }
 
-func (x *ChangeRoleEquipmentAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *ChangeRoleEquipmentAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 var File_cspb_equipment_equipment_proto protoreflect.FileDescriptor
 
 const file_cspb_equipment_equipment_proto_rawDesc = "" +
 	"\n" +
-	"\x1ecspb/equipment/equipment.proto\x1a\x15cspb/comm/error.proto\"\xf7\x02\n" +
+	"\x1ecspb/equipment/equipment.proto\"\xf7\x02\n" +
 	"\rEquipmentItem\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x1b\n" +
@@ -700,13 +699,12 @@ const file_cspb_equipment_equipment_proto_rawDesc = "" +
 	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
 	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\x04R\trequestId\"\x88\x01\n" +
+	"request_id\x18\x01 \x01(\x04R\trequestId\"p\n" +
 	"\x13GetRoleEquipmentAck\x12&\n" +
 	"\x04data\x18\x01 \x01(\v2\x12.RoleEquipmentDataR\x04data\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x03 \x01(\x04R\trequestId\x12!\n" +
-	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code\"\xc6\x01\n" +
+	"request_id\x18\x03 \x01(\x04R\trequestId\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code\"\xc6\x01\n" +
 	"\x16ChangeRoleEquipmentReq\x12\x10\n" +
 	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
 	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
@@ -715,13 +713,12 @@ const file_cspb_equipment_equipment_proto_rawDesc = "" +
 	".EquipSlotR\x04slot\x12!\n" +
 	"\fequipment_id\x18\x02 \x01(\tR\vequipmentId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x03 \x01(\x04R\trequestId\"\x8b\x01\n" +
+	"request_id\x18\x03 \x01(\x04R\trequestId\"s\n" +
 	"\x16ChangeRoleEquipmentAck\x12&\n" +
 	"\x04data\x18\x01 \x01(\v2\x12.RoleEquipmentDataR\x04data\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x03 \x01(\x04R\trequestId\x12!\n" +
-	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code*\xa8\x01\n" +
+	"request_id\x18\x03 \x01(\x04R\trequestId\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code*\xa8\x01\n" +
 	"\tEquipSlot\x12\x1a\n" +
 	"\x16EQUIP_SLOT_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11EQUIP_SLOT_WEAPON\x10\x01\x12\x13\n" +
@@ -754,7 +751,6 @@ var file_cspb_equipment_equipment_proto_goTypes = []any{
 	(*GetRoleEquipmentAck)(nil),     // 5: GetRoleEquipmentAck
 	(*ChangeRoleEquipmentReq)(nil),  // 6: ChangeRoleEquipmentReq
 	(*ChangeRoleEquipmentAck)(nil),  // 7: ChangeRoleEquipmentAck
-	(pb_common.ErrCode)(0),          // 8: ErrCode
 }
 var file_cspb_equipment_equipment_proto_depIdxs = []int32{
 	0, // 0: EquipmentItem.slot:type_name -> EquipSlot
@@ -762,15 +758,13 @@ var file_cspb_equipment_equipment_proto_depIdxs = []int32{
 	1, // 2: RoleEquipmentData.items:type_name -> EquipmentItem
 	2, // 3: RoleEquipmentData.slots:type_name -> EquipmentSlotDefinition
 	3, // 4: GetRoleEquipmentAck.data:type_name -> RoleEquipmentData
-	8, // 5: GetRoleEquipmentAck.code:type_name -> ErrCode
-	0, // 6: ChangeRoleEquipmentReq.slot:type_name -> EquipSlot
-	3, // 7: ChangeRoleEquipmentAck.data:type_name -> RoleEquipmentData
-	8, // 8: ChangeRoleEquipmentAck.code:type_name -> ErrCode
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	0, // 5: ChangeRoleEquipmentReq.slot:type_name -> EquipSlot
+	3, // 6: ChangeRoleEquipmentAck.data:type_name -> RoleEquipmentData
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_cspb_equipment_equipment_proto_init() }
@@ -778,8 +772,6 @@ func file_cspb_equipment_equipment_proto_init() {
 	if File_cspb_equipment_equipment_proto != nil {
 		return
 	}
-	file_cspb_equipment_equipment_proto_msgTypes[4].OneofWrappers = []any{}
-	file_cspb_equipment_equipment_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

@@ -65,10 +65,10 @@ func requireStatus(t *testing.T, message proto.Message, expected pb_common.ErrCo
 	t.Helper()
 	reflected := message.ProtoReflect()
 	field := reflected.Descriptor().Fields().ByName("code")
-	if field == nil || !reflected.Has(field) {
-		t.Fatal("response omitted its explicit status")
+	if field == nil {
+		t.Fatal("response omitted its status field")
 	}
-	if actual := pb_common.ErrCode(reflected.Get(field).Enum()); actual != expected {
+	if actual := pb_common.ErrCode(reflected.Get(field).Int()); actual != expected {
 		t.Fatalf("status = %v, want %v", actual, expected)
 	}
 	if reflected.Descriptor().Fields().ByName("error") != nil {

@@ -66,7 +66,7 @@ func (c *Conn) LoginAck(_ tree.Context, msg interface{}) {
 	req := msg.(*pb_auth.LoginGameAck)
 	if req.GetCode() != pb_common.ErrCode_OK {
 		c.state = StateAnon
-		tlog.Log.Warn("LoginAck code err: %s", req.GetCode())
+		tlog.Log.Warn("LoginAck code err: %d", req.GetCode())
 		c.WriteWsMsg(&pb_gateway.LoginAck{Code: req.GetCode()})
 		return
 	}
@@ -142,13 +142,12 @@ func (c *Conn) getServerListCb(_ tree.Context, ret interface{}, err error) {
 	c.WriteWsMsg(&pb_gateway.ServerListAck{Code: pb_common.ErrCode_OK, Accounts: accounts})
 }
 
-// platformCode maps declared platform outcomes without assuming enum numbering.
+// platformCode 将平台错误码转换为客户端错误码。
 func platformCode(code pb_pf.ErrCode) pb_common.ErrCode {
-	name, declared := pb_pf.ErrCode_name[int32(code)]
-	if declared {
-		if value, found := pb_common.ErrCode_value[name]; found {
-			return pb_common.ErrCode(value)
-		}
+	switch code {
+	case pb_pf.ErrCode_OK, pb_pf.ErrCode_UNKNOWN, pb_pf.ErrCode_PARAM, pb_pf.ErrCode_UNAUTHORIZED, pb_pf.ErrCode_LOGIN_IN_PROGRESS, pb_pf.ErrCode_SERVER_NOT_FOUND, pb_pf.ErrCode_USERNAME_EXISTS, pb_pf.ErrCode_WRONG_PASSWORD, pb_pf.ErrCode_INTERNAL, pb_pf.ErrCode_ACCOUNT_NOT_FOUND, pb_pf.ErrCode_GUILD_EXISTS, pb_pf.ErrCode_GUILD_NOT_FOUND, pb_pf.ErrCode_ALREADY_IN_GUILD, pb_pf.ErrCode_NOT_IN_GUILD:
+		return code
+	default:
+		return pb_common.ErrCode_INTERNAL
 	}
-	return pb_common.ErrCode_INTERNAL
 }

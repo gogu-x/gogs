@@ -7,7 +7,6 @@
 package pb_guild
 
 import (
-	pb_common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -24,7 +23,7 @@ const (
 
 type CreateGuildAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Guild         *GuildInfo             `protobuf:"bytes,3,opt,name=guild,proto3" json:"guild,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -60,11 +59,11 @@ func (*CreateGuildAck) Descriptor() ([]byte, []int) {
 	return file_cspb_guild_ack_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CreateGuildAck) GetCode() pb_common.ErrCode {
+func (x *CreateGuildAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 func (x *CreateGuildAck) GetGuild() *GuildInfo {
@@ -76,7 +75,7 @@ func (x *CreateGuildAck) GetGuild() *GuildInfo {
 
 type JoinGuildAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -111,16 +110,16 @@ func (*JoinGuildAck) Descriptor() ([]byte, []int) {
 	return file_cspb_guild_ack_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *JoinGuildAck) GetCode() pb_common.ErrCode {
+func (x *JoinGuildAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type LeaveGuildAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -155,16 +154,16 @@ func (*LeaveGuildAck) Descriptor() ([]byte, []int) {
 	return file_cspb_guild_ack_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *LeaveGuildAck) GetCode() pb_common.ErrCode {
+func (x *LeaveGuildAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type GetGuildAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Guild         *GuildInfo             `protobuf:"bytes,2,opt,name=guild,proto3" json:"guild,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -200,11 +199,11 @@ func (*GetGuildAck) Descriptor() ([]byte, []int) {
 	return file_cspb_guild_ack_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *GetGuildAck) GetCode() pb_common.ErrCode {
+func (x *GetGuildAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 func (x *GetGuildAck) GetGuild() *GuildInfo {
@@ -218,17 +217,17 @@ var File_cspb_guild_ack_proto protoreflect.FileDescriptor
 
 const file_cspb_guild_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x14cspb/guild/ack.proto\x1a\x17cspb/guild/struct.proto\x1a\x15cspb/comm/error.proto\"P\n" +
-	"\x0eCreateGuildAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12 \n" +
+	"\x14cspb/guild/ack.proto\x1a\x17cspb/guild/struct.proto\"F\n" +
+	"\x0eCreateGuildAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12 \n" +
 	"\x05guild\x18\x03 \x01(\v2\n" +
-	".GuildInfoR\x05guild\",\n" +
-	"\fJoinGuildAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\"-\n" +
-	"\rLeaveGuildAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\"M\n" +
-	"\vGetGuildAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12 \n" +
+	".GuildInfoR\x05guild\"\"\n" +
+	"\fJoinGuildAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\"#\n" +
+	"\rLeaveGuildAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\"C\n" +
+	"\vGetGuildAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12 \n" +
 	"\x05guild\x18\x02 \x01(\v2\n" +
 	".GuildInfoR\x05guildB)Z'github.com/gogu-x/gogs/pb/cspb/pb_guildb\x06proto3"
 
@@ -250,21 +249,16 @@ var file_cspb_guild_ack_proto_goTypes = []any{
 	(*JoinGuildAck)(nil),   // 1: JoinGuildAck
 	(*LeaveGuildAck)(nil),  // 2: LeaveGuildAck
 	(*GetGuildAck)(nil),    // 3: GetGuildAck
-	(pb_common.ErrCode)(0), // 4: ErrCode
-	(*GuildInfo)(nil),      // 5: GuildInfo
+	(*GuildInfo)(nil),      // 4: GuildInfo
 }
 var file_cspb_guild_ack_proto_depIdxs = []int32{
-	4, // 0: CreateGuildAck.code:type_name -> ErrCode
-	5, // 1: CreateGuildAck.guild:type_name -> GuildInfo
-	4, // 2: JoinGuildAck.code:type_name -> ErrCode
-	4, // 3: LeaveGuildAck.code:type_name -> ErrCode
-	4, // 4: GetGuildAck.code:type_name -> ErrCode
-	5, // 5: GetGuildAck.guild:type_name -> GuildInfo
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	4, // 0: CreateGuildAck.guild:type_name -> GuildInfo
+	4, // 1: GetGuildAck.guild:type_name -> GuildInfo
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_cspb_guild_ack_proto_init() }

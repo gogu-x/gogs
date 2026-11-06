@@ -10,7 +10,6 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
-	sync "sync"
 	unsafe "unsafe"
 )
 
@@ -21,242 +20,13 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type ErrCode int32
-
-const (
-	ErrCode_OK                              ErrCode = 0
-	ErrCode_UNKNOWN                         ErrCode = -1
-	ErrCode_PARAM                           ErrCode = -2
-	ErrCode_UNAUTHORIZED                    ErrCode = -1001
-	ErrCode_LOGIN_IN_PROGRESS               ErrCode = -1002
-	ErrCode_SERVER_NOT_FOUND                ErrCode = -1003
-	ErrCode_USERNAME_EXISTS                 ErrCode = -2001
-	ErrCode_WRONG_PASSWORD                  ErrCode = -2002
-	ErrCode_INTERNAL                        ErrCode = -2003
-	ErrCode_ACCOUNT_NOT_FOUND               ErrCode = -2004 // Account is not registered.
-	ErrCode_GUILD_EXISTS                    ErrCode = -3001
-	ErrCode_GUILD_NOT_FOUND                 ErrCode = -3002
-	ErrCode_ALREADY_IN_GUILD                ErrCode = -3003
-	ErrCode_NOT_IN_GUILD                    ErrCode = -3004
-	ErrCode_LOADOUT_UNAVAILABLE             ErrCode = -4001 // Player progression state is unavailable.
-	ErrCode_CONFIG_UNAVAILABLE              ErrCode = -4002 // Required configuration is unavailable.
-	ErrCode_STALE_REVISION                  ErrCode = -4003 // Request does not match the current revision.
-	ErrCode_INVALID_SLOT                    ErrCode = -4004 // Slot is not configured.
-	ErrCode_ITEM_NOT_OWNED                  ErrCode = -4005 // Item does not belong to the player.
-	ErrCode_INVALID_ITEM_STATE              ErrCode = -4006 // Stored item state is invalid.
-	ErrCode_EQUIPMENT_UNAVAILABLE           ErrCode = -4101 // Equipment state is unavailable.
-	ErrCode_INVALID_EQUIPMENT               ErrCode = -4102 // Equipment cannot be used in this slot.
-	ErrCode_DUPLICATE_JADE                  ErrCode = -4201 // This soul jade configuration is already equipped.
-	ErrCode_MAX_LEVEL_REACHED               ErrCode = -4202 // Item has reached its configured maximum level.
-	ErrCode_INSUFFICIENT_ESSENCE            ErrCode = -4203 // Soul jade material balance is insufficient.
-	ErrCode_AFFIX_GENERATION_FAILED         ErrCode = -4204 // Configured affixes could not be generated.
-	ErrCode_INVALID_TALENT_NODE             ErrCode = -4301 // Talent node is not configured.
-	ErrCode_TALENT_ALREADY_LEARNED          ErrCode = -4302 // Talent node is already learned.
-	ErrCode_TALENT_PREREQUISITE_MISSING     ErrCode = -4303 // Talent prerequisite has not been learned.
-	ErrCode_INSUFFICIENT_TALENT_POINTS      ErrCode = -4304 // Available talent points are insufficient.
-	ErrCode_INVALID_TALENT_BRANCH           ErrCode = -4305 // Talent branch is not configured.
-	ErrCode_BATTLE_UNAVAILABLE              ErrCode = -5001 // Battle service is unavailable.
-	ErrCode_BATTLE_TIMEOUT                  ErrCode = -5002 // Battle creation did not finish before the deadline.
-	ErrCode_BATTLE_CREATE_FAILED            ErrCode = -5003 // Battle creation failed.
-	ErrCode_INVALID_BATTLE_REQUEST          ErrCode = -5004 // Battle request is invalid.
-	ErrCode_BATTLE_IN_PROGRESS              ErrCode = -5005 // A battle is already being created or played.
-	ErrCode_ACTIVITY_UNAVAILABLE            ErrCode = -6001 // Activity service or operation is unavailable.
-	ErrCode_ACTIVITY_NOT_FOUND              ErrCode = -6002 // Activity does not exist.
-	ErrCode_ACTIVITY_NOT_OPEN               ErrCode = -6003 // Activity is not open.
-	ErrCode_ACTIVITY_NOT_JOINED             ErrCode = -6004 // Player has not joined the activity.
-	ErrCode_ACTIVITY_ALREADY_JOINED         ErrCode = -6005 // Player has already joined the activity.
-	ErrCode_ACTIVITY_REWARD_NOT_READY       ErrCode = -6006 // Activity reward conditions are not met.
-	ErrCode_ACTIVITY_REWARD_ALREADY_CLAIMED ErrCode = -6007 // Activity reward has already been claimed.
-)
-
-// Enum value maps for ErrCode.
-var (
-	ErrCode_name = map[int32]string{
-		0:     "OK",
-		-1:    "UNKNOWN",
-		-2:    "PARAM",
-		-1001: "UNAUTHORIZED",
-		-1002: "LOGIN_IN_PROGRESS",
-		-1003: "SERVER_NOT_FOUND",
-		-2001: "USERNAME_EXISTS",
-		-2002: "WRONG_PASSWORD",
-		-2003: "INTERNAL",
-		-2004: "ACCOUNT_NOT_FOUND",
-		-3001: "GUILD_EXISTS",
-		-3002: "GUILD_NOT_FOUND",
-		-3003: "ALREADY_IN_GUILD",
-		-3004: "NOT_IN_GUILD",
-		-4001: "LOADOUT_UNAVAILABLE",
-		-4002: "CONFIG_UNAVAILABLE",
-		-4003: "STALE_REVISION",
-		-4004: "INVALID_SLOT",
-		-4005: "ITEM_NOT_OWNED",
-		-4006: "INVALID_ITEM_STATE",
-		-4101: "EQUIPMENT_UNAVAILABLE",
-		-4102: "INVALID_EQUIPMENT",
-		-4201: "DUPLICATE_JADE",
-		-4202: "MAX_LEVEL_REACHED",
-		-4203: "INSUFFICIENT_ESSENCE",
-		-4204: "AFFIX_GENERATION_FAILED",
-		-4301: "INVALID_TALENT_NODE",
-		-4302: "TALENT_ALREADY_LEARNED",
-		-4303: "TALENT_PREREQUISITE_MISSING",
-		-4304: "INSUFFICIENT_TALENT_POINTS",
-		-4305: "INVALID_TALENT_BRANCH",
-		-5001: "BATTLE_UNAVAILABLE",
-		-5002: "BATTLE_TIMEOUT",
-		-5003: "BATTLE_CREATE_FAILED",
-		-5004: "INVALID_BATTLE_REQUEST",
-		-5005: "BATTLE_IN_PROGRESS",
-		-6001: "ACTIVITY_UNAVAILABLE",
-		-6002: "ACTIVITY_NOT_FOUND",
-		-6003: "ACTIVITY_NOT_OPEN",
-		-6004: "ACTIVITY_NOT_JOINED",
-		-6005: "ACTIVITY_ALREADY_JOINED",
-		-6006: "ACTIVITY_REWARD_NOT_READY",
-		-6007: "ACTIVITY_REWARD_ALREADY_CLAIMED",
-	}
-	ErrCode_value = map[string]int32{
-		"OK":                              0,
-		"UNKNOWN":                         -1,
-		"PARAM":                           -2,
-		"UNAUTHORIZED":                    -1001,
-		"LOGIN_IN_PROGRESS":               -1002,
-		"SERVER_NOT_FOUND":                -1003,
-		"USERNAME_EXISTS":                 -2001,
-		"WRONG_PASSWORD":                  -2002,
-		"INTERNAL":                        -2003,
-		"ACCOUNT_NOT_FOUND":               -2004,
-		"GUILD_EXISTS":                    -3001,
-		"GUILD_NOT_FOUND":                 -3002,
-		"ALREADY_IN_GUILD":                -3003,
-		"NOT_IN_GUILD":                    -3004,
-		"LOADOUT_UNAVAILABLE":             -4001,
-		"CONFIG_UNAVAILABLE":              -4002,
-		"STALE_REVISION":                  -4003,
-		"INVALID_SLOT":                    -4004,
-		"ITEM_NOT_OWNED":                  -4005,
-		"INVALID_ITEM_STATE":              -4006,
-		"EQUIPMENT_UNAVAILABLE":           -4101,
-		"INVALID_EQUIPMENT":               -4102,
-		"DUPLICATE_JADE":                  -4201,
-		"MAX_LEVEL_REACHED":               -4202,
-		"INSUFFICIENT_ESSENCE":            -4203,
-		"AFFIX_GENERATION_FAILED":         -4204,
-		"INVALID_TALENT_NODE":             -4301,
-		"TALENT_ALREADY_LEARNED":          -4302,
-		"TALENT_PREREQUISITE_MISSING":     -4303,
-		"INSUFFICIENT_TALENT_POINTS":      -4304,
-		"INVALID_TALENT_BRANCH":           -4305,
-		"BATTLE_UNAVAILABLE":              -5001,
-		"BATTLE_TIMEOUT":                  -5002,
-		"BATTLE_CREATE_FAILED":            -5003,
-		"INVALID_BATTLE_REQUEST":          -5004,
-		"BATTLE_IN_PROGRESS":              -5005,
-		"ACTIVITY_UNAVAILABLE":            -6001,
-		"ACTIVITY_NOT_FOUND":              -6002,
-		"ACTIVITY_NOT_OPEN":               -6003,
-		"ACTIVITY_NOT_JOINED":             -6004,
-		"ACTIVITY_ALREADY_JOINED":         -6005,
-		"ACTIVITY_REWARD_NOT_READY":       -6006,
-		"ACTIVITY_REWARD_ALREADY_CLAIMED": -6007,
-	}
-)
-
-func (x ErrCode) Enum() *ErrCode {
-	p := new(ErrCode)
-	*p = x
-	return p
-}
-
-func (x ErrCode) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (ErrCode) Descriptor() protoreflect.EnumDescriptor {
-	return file_cspb_comm_error_proto_enumTypes[0].Descriptor()
-}
-
-func (ErrCode) Type() protoreflect.EnumType {
-	return &file_cspb_comm_error_proto_enumTypes[0]
-}
-
-func (x ErrCode) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use ErrCode.Descriptor instead.
-func (ErrCode) EnumDescriptor() ([]byte, []int) {
-	return file_cspb_comm_error_proto_rawDescGZIP(), []int{0}
-}
-
 var File_cspb_comm_error_proto protoreflect.FileDescriptor
 
 const file_cspb_comm_error_proto_rawDesc = "" +
 	"\n" +
-	"\x15cspb/comm/error.proto*\xe4\n" +
-	"\n" +
-	"\aErrCode\x12\x06\n" +
-	"\x02OK\x10\x00\x12\x14\n" +
-	"\aUNKNOWN\x10\xff\xff\xff\xff\xff\xff\xff\xff\xff\x01\x12\x12\n" +
-	"\x05PARAM\x10\xfe\xff\xff\xff\xff\xff\xff\xff\xff\x01\x12\x19\n" +
-	"\fUNAUTHORIZED\x10\x97\xf8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1e\n" +
-	"\x11LOGIN_IN_PROGRESS\x10\x96\xf8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1d\n" +
-	"\x10SERVER_NOT_FOUND\x10\x95\xf8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1c\n" +
-	"\x0fUSERNAME_EXISTS\x10\xaf\xf0\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1b\n" +
-	"\x0eWRONG_PASSWORD\x10\xae\xf0\xff\xff\xff\xff\xff\xff\xff\x01\x12\x15\n" +
-	"\bINTERNAL\x10\xad\xf0\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1e\n" +
-	"\x11ACCOUNT_NOT_FOUND\x10\xac\xf0\xff\xff\xff\xff\xff\xff\xff\x01\x12\x19\n" +
-	"\fGUILD_EXISTS\x10\xc7\xe8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1c\n" +
-	"\x0fGUILD_NOT_FOUND\x10\xc6\xe8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1d\n" +
-	"\x10ALREADY_IN_GUILD\x10\xc5\xe8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x19\n" +
-	"\fNOT_IN_GUILD\x10\xc4\xe8\xff\xff\xff\xff\xff\xff\xff\x01\x12 \n" +
-	"\x13LOADOUT_UNAVAILABLE\x10\xdf\xe0\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1f\n" +
-	"\x12CONFIG_UNAVAILABLE\x10\xde\xe0\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1b\n" +
-	"\x0eSTALE_REVISION\x10\xdd\xe0\xff\xff\xff\xff\xff\xff\xff\x01\x12\x19\n" +
-	"\fINVALID_SLOT\x10\xdc\xe0\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1b\n" +
-	"\x0eITEM_NOT_OWNED\x10\xdb\xe0\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1f\n" +
-	"\x12INVALID_ITEM_STATE\x10\xda\xe0\xff\xff\xff\xff\xff\xff\xff\x01\x12\"\n" +
-	"\x15EQUIPMENT_UNAVAILABLE\x10\xfb\xdf\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1e\n" +
-	"\x11INVALID_EQUIPMENT\x10\xfa\xdf\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1b\n" +
-	"\x0eDUPLICATE_JADE\x10\x97\xdf\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1e\n" +
-	"\x11MAX_LEVEL_REACHED\x10\x96\xdf\xff\xff\xff\xff\xff\xff\xff\x01\x12!\n" +
-	"\x14INSUFFICIENT_ESSENCE\x10\x95\xdf\xff\xff\xff\xff\xff\xff\xff\x01\x12$\n" +
-	"\x17AFFIX_GENERATION_FAILED\x10\x94\xdf\xff\xff\xff\xff\xff\xff\xff\x01\x12 \n" +
-	"\x13INVALID_TALENT_NODE\x10\xb3\xde\xff\xff\xff\xff\xff\xff\xff\x01\x12#\n" +
-	"\x16TALENT_ALREADY_LEARNED\x10\xb2\xde\xff\xff\xff\xff\xff\xff\xff\x01\x12(\n" +
-	"\x1bTALENT_PREREQUISITE_MISSING\x10\xb1\xde\xff\xff\xff\xff\xff\xff\xff\x01\x12'\n" +
-	"\x1aINSUFFICIENT_TALENT_POINTS\x10\xb0\xde\xff\xff\xff\xff\xff\xff\xff\x01\x12\"\n" +
-	"\x15INVALID_TALENT_BRANCH\x10\xaf\xde\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1f\n" +
-	"\x12BATTLE_UNAVAILABLE\x10\xf7\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1b\n" +
-	"\x0eBATTLE_TIMEOUT\x10\xf6\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12!\n" +
-	"\x14BATTLE_CREATE_FAILED\x10\xf5\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12#\n" +
-	"\x16INVALID_BATTLE_REQUEST\x10\xf4\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1f\n" +
-	"\x12BATTLE_IN_PROGRESS\x10\xf3\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12!\n" +
-	"\x14ACTIVITY_UNAVAILABLE\x10\x8f\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1f\n" +
-	"\x12ACTIVITY_NOT_FOUND\x10\x8e\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1e\n" +
-	"\x11ACTIVITY_NOT_OPEN\x10\x8d\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12 \n" +
-	"\x13ACTIVITY_NOT_JOINED\x10\x8c\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12$\n" +
-	"\x17ACTIVITY_ALREADY_JOINED\x10\x8b\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12&\n" +
-	"\x19ACTIVITY_REWARD_NOT_READY\x10\x8a\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12,\n" +
-	"\x1fACTIVITY_REWARD_ALREADY_CLAIMED\x10\x89\xd1\xff\xff\xff\xff\xff\xff\xff\x01B*Z(github.com/gogu-x/gogs/pb/cspb/pb_commonb\x06proto3"
+	"\x15cspb/comm/error.protoB*Z(github.com/gogu-x/gogs/pb/cspb/pb_commonb\x06proto3"
 
-var (
-	file_cspb_comm_error_proto_rawDescOnce sync.Once
-	file_cspb_comm_error_proto_rawDescData []byte
-)
-
-func file_cspb_comm_error_proto_rawDescGZIP() []byte {
-	file_cspb_comm_error_proto_rawDescOnce.Do(func() {
-		file_cspb_comm_error_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_cspb_comm_error_proto_rawDesc), len(file_cspb_comm_error_proto_rawDesc)))
-	})
-	return file_cspb_comm_error_proto_rawDescData
-}
-
-var file_cspb_comm_error_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_cspb_comm_error_proto_goTypes = []any{
-	(ErrCode)(0), // 0: ErrCode
-}
+var file_cspb_comm_error_proto_goTypes = []any{}
 var file_cspb_comm_error_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type
@@ -275,14 +45,13 @@ func file_cspb_comm_error_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_comm_error_proto_rawDesc), len(file_cspb_comm_error_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      0,
 			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_cspb_comm_error_proto_goTypes,
 		DependencyIndexes: file_cspb_comm_error_proto_depIdxs,
-		EnumInfos:         file_cspb_comm_error_proto_enumTypes,
 	}.Build()
 	File_cspb_comm_error_proto = out.File
 	file_cspb_comm_error_proto_goTypes = nil

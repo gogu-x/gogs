@@ -110,7 +110,7 @@ func (actor *Activity) saveAll(ctx tree.Context) {
 
 // activityList 将玩家当前已加载活动实例打包为客户端活动列表。
 func (actor *Activity) activityList(uid uint64) *pb_activity.GetActivityListAck {
-	ack := &pb_activity.GetActivityListAck{Code: pb_common.ErrCode_OK.Enum()}
+	ack := &pb_activity.GetActivityListAck{Code: pb_common.ErrCode_OK}
 	activities := actor.actvService.ListActvs(service.ScopePlayer, service.OwnerID(uid))
 	activityInfos := make([]*pb_activity.ActivityInfo, 0, len(activities))
 	for _, actv := range activities {

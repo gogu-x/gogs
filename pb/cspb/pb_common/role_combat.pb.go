@@ -172,7 +172,7 @@ type GetRoleCombatStatsAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     uint64                 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Data          *RoleCombatStatsData   `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Code          *ErrCode               `protobuf:"varint,3,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,3,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -221,18 +221,18 @@ func (x *GetRoleCombatStatsAck) GetData() *RoleCombatStatsData {
 	return nil
 }
 
-func (x *GetRoleCombatStatsAck) GetCode() ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *GetRoleCombatStatsAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return ErrCode_OK
+	return 0
 }
 
 var File_cspb_common_role_combat_proto protoreflect.FileDescriptor
 
 const file_cspb_common_role_combat_proto_rawDesc = "" +
 	"\n" +
-	"\x1dcspb/common/role_combat.proto\x1a\x15cspb/comm/error.proto\"\x8d\x01\n" +
+	"\x1dcspb/common/role_combat.proto\"\x8d\x01\n" +
 	"\x13RoleCombatStatsData\x12\x17\n" +
 	"\arole_id\x18\x01 \x01(\tR\x06roleId\x12\x15\n" +
 	"\x06max_hp\x18\x02 \x01(\x03R\x05maxHp\x12\x16\n" +
@@ -244,13 +244,12 @@ const file_cspb_common_role_combat_proto_rawDesc = "" +
 	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
 	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\x04R\trequestId\"\x8c\x01\n" +
+	"request_id\x18\x01 \x01(\x04R\trequestId\"t\n" +
 	"\x15GetRoleCombatStatsAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12(\n" +
-	"\x04data\x18\x02 \x01(\v2\x14.RoleCombatStatsDataR\x04data\x12!\n" +
-	"\x04code\x18\x03 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeB*Z(github.com/gogu-x/gogs/pb/cspb/pb_commonb\x06proto3"
+	"\x04data\x18\x02 \x01(\v2\x14.RoleCombatStatsDataR\x04data\x12\x12\n" +
+	"\x04code\x18\x03 \x01(\x05R\x04codeB*Z(github.com/gogu-x/gogs/pb/cspb/pb_commonb\x06proto3"
 
 var (
 	file_cspb_common_role_combat_proto_rawDescOnce sync.Once
@@ -269,16 +268,14 @@ var file_cspb_common_role_combat_proto_goTypes = []any{
 	(*RoleCombatStatsData)(nil),   // 0: RoleCombatStatsData
 	(*GetRoleCombatStatsReq)(nil), // 1: GetRoleCombatStatsReq
 	(*GetRoleCombatStatsAck)(nil), // 2: GetRoleCombatStatsAck
-	(ErrCode)(0),                  // 3: ErrCode
 }
 var file_cspb_common_role_combat_proto_depIdxs = []int32{
 	0, // 0: GetRoleCombatStatsAck.data:type_name -> RoleCombatStatsData
-	3, // 1: GetRoleCombatStatsAck.code:type_name -> ErrCode
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_cspb_common_role_combat_proto_init() }
@@ -286,8 +283,6 @@ func file_cspb_common_role_combat_proto_init() {
 	if File_cspb_common_role_combat_proto != nil {
 		return
 	}
-	file_cspb_comm_error_proto_init()
-	file_cspb_common_role_combat_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

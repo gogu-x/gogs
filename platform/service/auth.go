@@ -151,16 +151,16 @@ func GetServerList(db *mongo.Database, req *pb_pf.GetServerListReq) (*pb_pf.Serv
 func VerifyToken(req *pb_pf.VerifyTokenReq) (*pb_pf.VerifyAck, error) {
 	if req == nil {
 		tlog.Log.Warn("VerifyToken rejected: nil request")
-		return &pb_pf.VerifyAck{Valid: false, Code: pb_pf.ErrCode_PARAM.Enum()}, nil
+		return &pb_pf.VerifyAck{Valid: false, Code: pb_pf.ErrCode_PARAM}, nil
 	}
 
 	uid, err := auth.Verify(req.Token)
 	if err != nil {
 		tlog.Log.Warn("VerifyToken rejected: verification failed, err=%v", err)
-		return &pb_pf.VerifyAck{Valid: false, Code: pb_pf.ErrCode_INVALID_TOKEN.Enum()}, nil
+		return &pb_pf.VerifyAck{Valid: false, Code: pb_pf.ErrCode_INVALID_TOKEN}, nil
 	}
 	tlog.Log.Info("VerifyToken succeeded: uid=%d", uid)
-	return &pb_pf.VerifyAck{Valid: true, Uid: uid, Code: pb_pf.ErrCode_OK.Enum()}, nil
+	return &pb_pf.VerifyAck{Valid: true, Uid: uid, Code: pb_pf.ErrCode_OK}, nil
 }
 
 // EnsureIndexes creates account indexes during startup.

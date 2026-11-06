@@ -547,7 +547,7 @@ type GetRoleTalentAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     uint64                 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Data          *RoleTalentData        `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,4,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -596,18 +596,18 @@ func (x *GetRoleTalentAck) GetData() *RoleTalentData {
 	return nil
 }
 
-func (x *GetRoleTalentAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *GetRoleTalentAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type LearnRoleTalentAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     uint64                 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Data          *RoleTalentData        `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,4,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -656,18 +656,18 @@ func (x *LearnRoleTalentAck) GetData() *RoleTalentData {
 	return nil
 }
 
-func (x *LearnRoleTalentAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *LearnRoleTalentAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type ResetRoleTalentAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     uint64                 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Data          *RoleTalentData        `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,4,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -716,18 +716,18 @@ func (x *ResetRoleTalentAck) GetData() *RoleTalentData {
 	return nil
 }
 
-func (x *ResetRoleTalentAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *ResetRoleTalentAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 var File_cspb_talent_talent_proto protoreflect.FileDescriptor
 
 const file_cspb_talent_talent_proto_rawDesc = "" +
 	"\n" +
-	"\x18cspb/talent/talent.proto\x1a\x18cspb/common/growth.proto\x1a\x15cspb/comm/error.proto\"\xad\x02\n" +
+	"\x18cspb/talent/talent.proto\x1a\x18cspb/common/growth.proto\"\xad\x02\n" +
 	"\x14TalentNodeDefinition\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\x05R\x06nodeId\x12\x1b\n" +
 	"\tparent_id\x18\x02 \x01(\x05R\bparentId\x12\x12\n" +
@@ -776,25 +776,22 @@ const file_cspb_talent_talent_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\x04R\x10expectedRevision\x12\x16\n" +
-	"\x06branch\x18\x03 \x01(\x05R\x06branch\"\x82\x01\n" +
+	"\x06branch\x18\x03 \x01(\x05R\x06branch\"j\n" +
 	"\x10GetRoleTalentAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12#\n" +
-	"\x04data\x18\x02 \x01(\v2\x0f.RoleTalentDataR\x04data\x12!\n" +
-	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code\"\x84\x01\n" +
+	"\x04data\x18\x02 \x01(\v2\x0f.RoleTalentDataR\x04data\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code\"l\n" +
 	"\x12LearnRoleTalentAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12#\n" +
-	"\x04data\x18\x02 \x01(\v2\x0f.RoleTalentDataR\x04data\x12!\n" +
-	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code\"\x84\x01\n" +
+	"\x04data\x18\x02 \x01(\v2\x0f.RoleTalentDataR\x04data\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code\"l\n" +
 	"\x12ResetRoleTalentAck\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x04R\trequestId\x12#\n" +
-	"\x04data\x18\x02 \x01(\v2\x0f.RoleTalentDataR\x04data\x12!\n" +
-	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeB*Z(github.com/gogu-x/gogs/pb/cspb/pb_talentb\x06proto3"
+	"\x04data\x18\x02 \x01(\v2\x0f.RoleTalentDataR\x04data\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04codeB*Z(github.com/gogu-x/gogs/pb/cspb/pb_talentb\x06proto3"
 
 var (
 	file_cspb_talent_talent_proto_rawDescOnce sync.Once
@@ -820,24 +817,20 @@ var file_cspb_talent_talent_proto_goTypes = []any{
 	(*LearnRoleTalentAck)(nil),      // 7: LearnRoleTalentAck
 	(*ResetRoleTalentAck)(nil),      // 8: ResetRoleTalentAck
 	(*pb_common.GrowthBonuses)(nil), // 9: GrowthBonuses
-	(pb_common.ErrCode)(0),          // 10: ErrCode
 }
 var file_cspb_talent_talent_proto_depIdxs = []int32{
-	9,  // 0: TalentNodeDefinition.bonuses:type_name -> GrowthBonuses
-	0,  // 1: RoleTalentData.nodes:type_name -> TalentNodeDefinition
-	9,  // 2: RoleTalentData.bonuses:type_name -> GrowthBonuses
-	1,  // 3: RoleTalentData.branches:type_name -> TalentBranchDefinition
-	2,  // 4: GetRoleTalentAck.data:type_name -> RoleTalentData
-	10, // 5: GetRoleTalentAck.code:type_name -> ErrCode
-	2,  // 6: LearnRoleTalentAck.data:type_name -> RoleTalentData
-	10, // 7: LearnRoleTalentAck.code:type_name -> ErrCode
-	2,  // 8: ResetRoleTalentAck.data:type_name -> RoleTalentData
-	10, // 9: ResetRoleTalentAck.code:type_name -> ErrCode
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	9, // 0: TalentNodeDefinition.bonuses:type_name -> GrowthBonuses
+	0, // 1: RoleTalentData.nodes:type_name -> TalentNodeDefinition
+	9, // 2: RoleTalentData.bonuses:type_name -> GrowthBonuses
+	1, // 3: RoleTalentData.branches:type_name -> TalentBranchDefinition
+	2, // 4: GetRoleTalentAck.data:type_name -> RoleTalentData
+	2, // 5: LearnRoleTalentAck.data:type_name -> RoleTalentData
+	2, // 6: ResetRoleTalentAck.data:type_name -> RoleTalentData
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_cspb_talent_talent_proto_init() }
@@ -845,9 +838,6 @@ func file_cspb_talent_talent_proto_init() {
 	if File_cspb_talent_talent_proto != nil {
 		return
 	}
-	file_cspb_talent_talent_proto_msgTypes[6].OneofWrappers = []any{}
-	file_cspb_talent_talent_proto_msgTypes[7].OneofWrappers = []any{}
-	file_cspb_talent_talent_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

@@ -7,7 +7,6 @@
 package pb_gateway
 
 import (
-	pb_common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -24,7 +23,7 @@ const (
 
 type LoginAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -59,16 +58,16 @@ func (*LoginAck) Descriptor() ([]byte, []int) {
 	return file_cspb_gateway_ack_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *LoginAck) GetCode() pb_common.ErrCode {
+func (x *LoginAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type RegisterAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -103,16 +102,16 @@ func (*RegisterAck) Descriptor() ([]byte, []int) {
 	return file_cspb_gateway_ack_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *RegisterAck) GetCode() pb_common.ErrCode {
+func (x *RegisterAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type ServerListAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Accounts      []*ServerAccount       `protobuf:"bytes,2,rep,name=accounts,proto3" json:"accounts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -148,11 +147,11 @@ func (*ServerListAck) Descriptor() ([]byte, []int) {
 	return file_cspb_gateway_ack_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *ServerListAck) GetCode() pb_common.ErrCode {
+func (x *ServerListAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 func (x *ServerListAck) GetAccounts() []*ServerAccount {
@@ -166,13 +165,13 @@ var File_cspb_gateway_ack_proto protoreflect.FileDescriptor
 
 const file_cspb_gateway_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x16cspb/gateway/ack.proto\x1a\x15cspb/comm/error.proto\x1a\x19cspb/gateway/struct.proto\"(\n" +
-	"\bLoginAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\"+\n" +
-	"\vRegisterAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\"Y\n" +
-	"\rServerListAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12*\n" +
+	"\x16cspb/gateway/ack.proto\x1a\x19cspb/gateway/struct.proto\"\x1e\n" +
+	"\bLoginAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\"!\n" +
+	"\vRegisterAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\"O\n" +
+	"\rServerListAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12*\n" +
 	"\baccounts\x18\x02 \x03(\v2\x0e.ServerAccountR\baccountsB+Z)github.com/gogu-x/gogs/pb/cspb/pb_gatewayb\x06proto3"
 
 var (
@@ -189,22 +188,18 @@ func file_cspb_gateway_ack_proto_rawDescGZIP() []byte {
 
 var file_cspb_gateway_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_cspb_gateway_ack_proto_goTypes = []any{
-	(*LoginAck)(nil),       // 0: LoginAck
-	(*RegisterAck)(nil),    // 1: RegisterAck
-	(*ServerListAck)(nil),  // 2: ServerListAck
-	(pb_common.ErrCode)(0), // 3: ErrCode
-	(*ServerAccount)(nil),  // 4: ServerAccount
+	(*LoginAck)(nil),      // 0: LoginAck
+	(*RegisterAck)(nil),   // 1: RegisterAck
+	(*ServerListAck)(nil), // 2: ServerListAck
+	(*ServerAccount)(nil), // 3: ServerAccount
 }
 var file_cspb_gateway_ack_proto_depIdxs = []int32{
-	3, // 0: LoginAck.code:type_name -> ErrCode
-	3, // 1: RegisterAck.code:type_name -> ErrCode
-	3, // 2: ServerListAck.code:type_name -> ErrCode
-	4, // 3: ServerListAck.accounts:type_name -> ServerAccount
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	3, // 0: ServerListAck.accounts:type_name -> ServerAccount
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_cspb_gateway_ack_proto_init() }

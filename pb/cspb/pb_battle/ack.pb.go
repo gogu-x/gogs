@@ -7,7 +7,6 @@
 package pb_battle
 
 import (
-	pb_common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -26,7 +25,7 @@ const (
 type StartBattleAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BattleId      string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,3,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,3,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -68,22 +67,21 @@ func (x *StartBattleAck) GetBattleId() string {
 	return ""
 }
 
-func (x *StartBattleAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *StartBattleAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 var File_cspb_battle_ack_proto protoreflect.FileDescriptor
 
 const file_cspb_battle_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x15cspb/battle/ack.proto\x1a\x15cspb/comm/error.proto\"Y\n" +
+	"\x15cspb/battle/ack.proto\"A\n" +
 	"\x0eStartBattleAck\x12\x1b\n" +
-	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12!\n" +
-	"\x04code\x18\x03 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_codeB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
+	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x12\n" +
+	"\x04code\x18\x03 \x01(\x05R\x04codeB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
 
 var (
 	file_cspb_battle_ack_proto_rawDescOnce sync.Once
@@ -100,15 +98,13 @@ func file_cspb_battle_ack_proto_rawDescGZIP() []byte {
 var file_cspb_battle_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_cspb_battle_ack_proto_goTypes = []any{
 	(*StartBattleAck)(nil), // 0: StartBattleAck
-	(pb_common.ErrCode)(0), // 1: ErrCode
 }
 var file_cspb_battle_ack_proto_depIdxs = []int32{
-	1, // 0: StartBattleAck.code:type_name -> ErrCode
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_cspb_battle_ack_proto_init() }
@@ -116,7 +112,6 @@ func file_cspb_battle_ack_proto_init() {
 	if File_cspb_battle_ack_proto != nil {
 		return
 	}
-	file_cspb_battle_ack_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

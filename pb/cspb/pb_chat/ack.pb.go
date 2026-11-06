@@ -7,7 +7,6 @@
 package pb_chat
 
 import (
-	pb_common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -24,7 +23,7 @@ const (
 
 type ChatAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ErrCode       pb_common.ErrCode      `protobuf:"varint,1,opt,name=errCode,proto3,enum=ErrCode" json:"errCode,omitempty"`
+	ErrCode       int32                  `protobuf:"varint,1,opt,name=errCode,proto3" json:"errCode,omitempty"`
 	State         int32                  `protobuf:"varint,2,opt,name=state,proto3" json:"state,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -60,11 +59,11 @@ func (*ChatAck) Descriptor() ([]byte, []int) {
 	return file_cspb_chat_ack_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ChatAck) GetErrCode() pb_common.ErrCode {
+func (x *ChatAck) GetErrCode() int32 {
 	if x != nil {
 		return x.ErrCode
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 func (x *ChatAck) GetState() int32 {
@@ -78,9 +77,9 @@ var File_cspb_chat_ack_proto protoreflect.FileDescriptor
 
 const file_cspb_chat_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x13cspb/chat/ack.proto\x1a\x15cspb/comm/error.proto\"C\n" +
-	"\aChatAck\x12\"\n" +
-	"\aerrCode\x18\x01 \x01(\x0e2\b.ErrCodeR\aerrCode\x12\x14\n" +
+	"\x13cspb/chat/ack.proto\"9\n" +
+	"\aChatAck\x12\x18\n" +
+	"\aerrCode\x18\x01 \x01(\x05R\aerrCode\x12\x14\n" +
 	"\x05state\x18\x02 \x01(\x05R\x05stateB(Z&github.com/gogu-x/gogs/pb/cspb/pb_chatb\x06proto3"
 
 var (
@@ -97,16 +96,14 @@ func file_cspb_chat_ack_proto_rawDescGZIP() []byte {
 
 var file_cspb_chat_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_cspb_chat_ack_proto_goTypes = []any{
-	(*ChatAck)(nil),        // 0: ChatAck
-	(pb_common.ErrCode)(0), // 1: ErrCode
+	(*ChatAck)(nil), // 0: ChatAck
 }
 var file_cspb_chat_ack_proto_depIdxs = []int32{
-	1, // 0: ChatAck.errCode:type_name -> ErrCode
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_cspb_chat_ack_proto_init() }

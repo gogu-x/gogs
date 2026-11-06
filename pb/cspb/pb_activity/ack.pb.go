@@ -7,7 +7,6 @@
 package pb_activity
 
 import (
-	pb_common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -25,7 +24,7 @@ const (
 type GetActivityListAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Activities    []*ActivityInfo        `protobuf:"bytes,1,rep,name=activities,proto3" json:"activities,omitempty"`
-	Code          *pb_common.ErrCode     `protobuf:"varint,2,opt,name=code,proto3,enum=ErrCode,oneof" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,2,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -67,16 +66,16 @@ func (x *GetActivityListAck) GetActivities() []*ActivityInfo {
 	return nil
 }
 
-func (x *GetActivityListAck) GetCode() pb_common.ErrCode {
-	if x != nil && x.Code != nil {
-		return *x.Code
+func (x *GetActivityListAck) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type JoinActivityAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -111,16 +110,16 @@ func (*JoinActivityAck) Descriptor() ([]byte, []int) {
 	return file_cspb_activity_ack_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *JoinActivityAck) GetCode() pb_common.ErrCode {
+func (x *JoinActivityAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 type GetProgressAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Progress      *ActivityProgress      `protobuf:"bytes,2,opt,name=progress,proto3" json:"progress,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -156,11 +155,11 @@ func (*GetProgressAck) Descriptor() ([]byte, []int) {
 	return file_cspb_activity_ack_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *GetProgressAck) GetCode() pb_common.ErrCode {
+func (x *GetProgressAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 func (x *GetProgressAck) GetProgress() *ActivityProgress {
@@ -172,7 +171,7 @@ func (x *GetProgressAck) GetProgress() *ActivityProgress {
 
 type ClaimRewardAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          pb_common.ErrCode      `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -207,31 +206,30 @@ func (*ClaimRewardAck) Descriptor() ([]byte, []int) {
 	return file_cspb_activity_ack_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *ClaimRewardAck) GetCode() pb_common.ErrCode {
+func (x *ClaimRewardAck) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
-	return pb_common.ErrCode(0)
+	return 0
 }
 
 var File_cspb_activity_ack_proto protoreflect.FileDescriptor
 
 const file_cspb_activity_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x17cspb/activity/ack.proto\x1a\x1acspb/activity/struct.proto\x1a\x15cspb/comm/error.proto\"o\n" +
+	"\x17cspb/activity/ack.proto\x1a\x1acspb/activity/struct.proto\"W\n" +
 	"\x12GetActivityListAck\x12-\n" +
 	"\n" +
 	"activities\x18\x01 \x03(\v2\r.ActivityInfoR\n" +
-	"activities\x12!\n" +
-	"\x04code\x18\x02 \x01(\x0e2\b.ErrCodeH\x00R\x04code\x88\x01\x01B\a\n" +
-	"\x05_code\"/\n" +
-	"\x0fJoinActivityAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\"]\n" +
-	"\x0eGetProgressAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12-\n" +
-	"\bprogress\x18\x02 \x01(\v2\x11.ActivityProgressR\bprogress\".\n" +
-	"\x0eClaimRewardAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04codeB,Z*github.com/gogu-x/gogs/pb/cspb/pb_activityb\x06proto3"
+	"activities\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\"%\n" +
+	"\x0fJoinActivityAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\"S\n" +
+	"\x0eGetProgressAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12-\n" +
+	"\bprogress\x18\x02 \x01(\v2\x11.ActivityProgressR\bprogress\"$\n" +
+	"\x0eClaimRewardAck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04codeB,Z*github.com/gogu-x/gogs/pb/cspb/pb_activityb\x06proto3"
 
 var (
 	file_cspb_activity_ack_proto_rawDescOnce sync.Once
@@ -252,21 +250,16 @@ var file_cspb_activity_ack_proto_goTypes = []any{
 	(*GetProgressAck)(nil),     // 2: GetProgressAck
 	(*ClaimRewardAck)(nil),     // 3: ClaimRewardAck
 	(*ActivityInfo)(nil),       // 4: ActivityInfo
-	(pb_common.ErrCode)(0),     // 5: ErrCode
-	(*ActivityProgress)(nil),   // 6: ActivityProgress
+	(*ActivityProgress)(nil),   // 5: ActivityProgress
 }
 var file_cspb_activity_ack_proto_depIdxs = []int32{
 	4, // 0: GetActivityListAck.activities:type_name -> ActivityInfo
-	5, // 1: GetActivityListAck.code:type_name -> ErrCode
-	5, // 2: JoinActivityAck.code:type_name -> ErrCode
-	5, // 3: GetProgressAck.code:type_name -> ErrCode
-	6, // 4: GetProgressAck.progress:type_name -> ActivityProgress
-	5, // 5: ClaimRewardAck.code:type_name -> ErrCode
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	5, // 1: GetProgressAck.progress:type_name -> ActivityProgress
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_cspb_activity_ack_proto_init() }
@@ -275,7 +268,6 @@ func file_cspb_activity_ack_proto_init() {
 		return
 	}
 	file_cspb_activity_struct_proto_init()
-	file_cspb_activity_ack_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

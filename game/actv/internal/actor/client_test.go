@@ -16,7 +16,7 @@ func TestActivityListExplicitSuccessAndJoinNotFound(t *testing.T) {
 	actor := &Activity{actvService: service.NewActvService(1)}
 	value, err := actor.handlePlayerActivityMessage(&ipb.PlayerActivityMessage{UID: 7, Message: &pb_activity.GetActivityListReq{}})
 	ack, valid := value.(*pb_activity.GetActivityListAck)
-	if err != nil || !valid || ack.Code == nil || ack.GetCode() != pb_common.ErrCode_OK {
+	if err != nil || !valid || ack.GetCode() != pb_common.ErrCode_OK {
 		t.Fatalf("list=%v err=%v", value, err)
 	}
 	value, err = actor.handlePlayerActivityMessage(&ipb.PlayerActivityMessage{UID: 7, ActvID: 99, Message: &pb_activity.JoinActivityReq{ActivityId: 99}})

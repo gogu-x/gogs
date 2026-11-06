@@ -2,6 +2,7 @@ package conn
 
 import (
 	"os"
+	"strconv"
 
 	"errors"
 	"github.com/gogu-x/tree/tlog"
@@ -23,7 +24,7 @@ func (*capturedAckCodec) Unmarshal([]byte) (interface{}, error) { return nil, ni
 
 func TestPlatformFailuresPreserveCodesAndResetSession(t *testing.T) {
 	for _, code := range []pb_pf.ErrCode{pb_pf.ErrCode_WRONG_PASSWORD, pb_pf.ErrCode_USERNAME_EXISTS, pb_pf.ErrCode_ACCOUNT_NOT_FOUND, pb_pf.ErrCode_PARAM, pb_pf.ErrCode_INTERNAL} {
-		t.Run(code.String(), func(t *testing.T) {
+		t.Run(strconv.FormatInt(int64(code), 10), func(t *testing.T) {
 			capture := &capturedAckCodec{}
 			c := &Conn{codec: capture, state: StateLoggIng}
 			c.authLoginCb(nil, &pb_pf.AuthAck{Code: code}, nil)
