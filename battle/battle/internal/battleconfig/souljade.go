@@ -1,4 +1,4 @@
-package configcompiler
+package battleconfig
 
 import (
 	"fmt"

@@ -19,6 +19,8 @@ type BattleStatusCfg struct {
 	DurationTurns int32            `bson:"duration_turns"` // 持续行动次数
 	Potency       int64            `bson:"potency"`        // DOT 或 HOT 数值
 	Modifier      []*cspb.TypIDVal `bson:"modifier"`       // attribute modifiers (Typ=battle_attribute; IDs 1..4=max_hp/attack/defense/speed)
+	DurationMS    int64            `bson:"duration_ms"`    // 持续毫秒数，零表示按回合
+	IntervalMS    int64            `bson:"interval_ms"`    // 周期毫秒数，非周期效果填零
 }
 
 func loadBattleStatusCfg(dbURI, dbName, confName string) (*CsvConf, error) {

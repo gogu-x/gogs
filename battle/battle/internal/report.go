@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
+	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
 var ErrReportNotFound = errors.New("battle report not found")
@@ -20,14 +21,15 @@ var ErrReportNotFound = errors.New("battle report not found")
 // Report is the durable hand-off between battle execution and result delivery.
 // A Finished notification must never be sent before this document is saved.
 type Report struct {
-	BattleID       string        `bson:"_id" json:"battle_id"`
-	UID            uint64        `bson:"uid" json:"uid"`
-	SourceServerID int           `bson:"source_server_id" json:"source_server_id"`
-	SourceNodeID   int           `bson:"source_node_id" json:"source_node_id"`
-	Result         engine.Result `bson:"result" json:"result"`
-	CreatedAt      time.Time     `bson:"created_at" json:"created_at"`
-	UpdatedAt      time.Time     `bson:"updated_at" json:"updated_at"`
-	Confirmed      bool          `bson:"confirmed" json:"confirmed"`
+	BattleID       string                 `bson:"_id" json:"battle_id"`
+	UID            uint64                 `bson:"uid" json:"uid"`
+	SourceServerID int                    `bson:"source_server_id" json:"source_server_id"`
+	SourceNodeID   int                    `bson:"source_node_id" json:"source_node_id"`
+	Result         engine.Result          `bson:"result" json:"result"`
+	InitialUnits   []*pb.BattleUnitResult `bson:"initial_units" json:"initial_units"` // 运行前的单位快照，供创建通知和重投使用。
+	CreatedAt      time.Time              `bson:"created_at" json:"created_at"`
+	UpdatedAt      time.Time              `bson:"updated_at" json:"updated_at"`
+	Confirmed      bool                   `bson:"confirmed" json:"confirmed"`
 }
 
 // Repository 是战报的持久化存取契约，由各进程装配层提供实现（如 Mongo、

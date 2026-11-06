@@ -3,6 +3,7 @@ package battle
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/gogu-x/gogs/def"
 	gameevent "github.com/gogu-x/gogs/game/event"
@@ -75,7 +76,8 @@ type State struct {
 
 type record struct {
 	State
-	seen map[uint64]struct{}
+	seen     map[uint64]struct{}
+	playback *playbackWindow // 服务端维护的演出准入窗口，不依赖客户端完成上报。
 }
 
 type Client struct {
@@ -166,6 +168,10 @@ func (c *Client) begin(ctx tree.Context, msg *Begin) {
 	request := proto.Clone(msg.Request).(*pb.StartBattleReq)
 	uid := request.GetUID()
 	r := c.state(uid)
+	if r.playback.pending(time.Now()) {
+		ctx.Response(r.State, ErrInProgress)
+		return
+	}
 	if r.Status == Creating || r.Status == CreateUnknown || r.Status == Running {
 		ctx.Response(r.State, fmt.Errorf("battle client: uid=%d is %s", uid, r.Status))
 		return
@@ -178,6 +184,7 @@ func (c *Client) begin(ctx tree.Context, msg *Begin) {
 	}
 	r.State = State{UID: uid, Status: Creating, Node: node}
 	r.seen = make(map[uint64]struct{})
+	r.playback = nil
 	request.ServerID = uint32(c.gameServerID)
 	request.SourceNodeId = uint32(c.gameNodeID)
 	if err := c.sender.Start(node, request); err != nil {
@@ -203,6 +210,9 @@ func (c *Client) created(ctx tree.Context, msg *pb.BattleCreatedNtf) {
 	}
 	r.BattleID = msg.BattleId
 	r.Status = Running
+	if r.playback == nil {
+		r.playback = newPlaybackWindow(msg.GetTickDurationMs())
+	}
 	c.push(ctx, msg.Uid, msg)
 }
 
@@ -222,6 +232,7 @@ func (c *Client) action(ctx tree.Context, msg *pb.BattleActionNtf) {
 		return
 	}
 	r.seen[sequence] = struct{}{}
+	r.playback.observe(msg.GetEvent(), time.Now())
 	if sequence > r.LastSequence {
 		r.LastSequence = sequence
 	}
@@ -288,6 +299,10 @@ func (c *Client) reset(ctx tree.Context, msg *Reset) {
 		return
 	}
 	r := c.state(msg.UID)
+	if r.playback.pending(time.Now()) {
+		ctx.Response(r.State, ErrInProgress)
+		return
+	}
 	if r.Status == Creating || r.Status == CreateUnknown || r.Status == Running {
 		ctx.Response(r.State, fmt.Errorf("battle client: cannot reset %s", r.Status))
 		return

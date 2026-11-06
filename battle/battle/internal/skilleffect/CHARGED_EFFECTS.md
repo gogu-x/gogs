@@ -21,6 +21,6 @@
 
 ## 后续扩展位置
 
-冰爆和天雷分别由 `internal/effectresolver/iceburst`、`internal/effectresolver/thunder` 包处理，基础伤害计算与扣血复用 `internal/engine/damage.go`。普通伤害、治疗和状态效果也分别位于 `damage`、`heal`、`status` 包；`effectresolver` 根包只负责配置类型定义与处理器注册。效果与状态类型直接使用协议源文件 `cspb/battle/struct.proto` 中定义的 `EffectType` 和 `StatusType`。`internal/engine/battle.go` 负责积攒值和触发时选取目标，当前固定对存活的敌方全体结算。
+冰爆和天雷分别由 `internal/skilleffect/iceburst`、`internal/skilleffect/thunder` 包处理，基础伤害计算与扣血复用 `internal/engine/damage.go`。普通伤害、治疗和状态效果也分别位于 `damage`、`heal`、`status` 包；`skilleffect` 根包只负责配置类型定义与处理器注册。效果与状态类型直接使用协议源文件 `cspb/battle/struct.proto` 中定义的 `EffectType` 和 `StatusType`。`internal/engine/battle.go` 负责积攒值和触发时选取目标，当前固定对存活的敌方全体结算。
 
 如果以后要在触发天雷时，对单个或多个单位附加持续若干回合的雷、冰状态，需要在技能配置里明确状态 ID、持续回合数和状态目标规则，再由编译器解析为运行时配置；目标选择应由战斗引擎按该规则执行，天雷处理器对选中的目标调用现有状态处理接口。若要让攻击命中带天雷状态的目标时增伤，还需让伤害计算取得目标当前状态，并配置增伤数值及叠加规则。当前版本只有两种独立的全体伤害效果，尚未定义或执行上述状态与增伤规则。

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/configcompiler"
+	"github.com/gogu-x/gogs/battle/battle/internal/battleconfig"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/def"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
@@ -16,30 +16,23 @@ import (
 )
 
 const (
-	// battleTickTimer 是本 actor 自己那台时间轮上的节拍任务类型（每个 wheel 内唯一即可）。
-	battleTickTimer = timer.TimerType(1)
-	// timeWheelChanLen 是时间轮到期队列的缓冲长度。参考 game/play 的取值。
-	timeWheelChanLen = 16
 	// battleMailboxSize 是 actor 邮箱容量。时间轮回调与普通用户消息共用这个邮箱，
 	// 而 BattleResultConfirmedNtf 是从共享的 Nats actor goroutine 投递进来的
 	// （投递是阻塞的），邮箱被填满会连带卡住整个进程的 NATS 路由，所以留足余量。
 	battleMailboxSize = 256
 )
 
-// BattleActor 是一场战斗的独立 battle。整场战斗的"创建回执→按 tick 流式推送→
-// 结算→落库→结束推送→确认→退出"全部在它自己的 goroutine 内串行完成。
+// BattleActor 独立完成整场计算、战报保存、有序推送和结果确认。
 // 注册名 = def.BattleActorName(battleID)，跨进程可被 NATS 按 TaggerName
 // 直达（如 BattleResultConfirmedNtf 确认）。
 type BattleActor struct {
-	p          Params
-	report     Report // 待推送/已推送的战报载体（流式期间为空，结算后才填充）
-	attempts   int
-	timer      *timer.TimeWheel
-	released   bool
-	system     *tree.Tree
-	self       tree.PID
-	battle     *engine.Battle // ModeRun 下的引擎实例，按 tick 增量推进
-	paceAnchor time.Time      // 节拍锚点：tick N 的推送目标时刻 = paceAnchor + N*tickDuration
+	p        Params
+	report   Report // 已保存、等待投递或确认的完整战报。
+	attempts int
+	timer    *timer.TimeWheel
+	released bool
+	system   *tree.Tree
+	self     tree.PID
 }
 
 func NewBattleActor(p Params) *BattleActor {
@@ -52,25 +45,19 @@ func (a *BattleActor) MailboxSize() int { return battleMailboxSize }
 func (a *BattleActor) OnInit(ctx tree.Context) {
 	a.system = ctx.System()
 	a.self = ctx.Self()
-	// Register 必须在 After 之前，否则 handler() 会 panic；而 OnInit 走 safeCall，
-	// panic 只会被 recover 掉，表现为 actor 半初始化后继续跑，极难排查。
-	a.timer = timer.NewTimeWheel(timeWheelChanLen, ctx.Self(), ctx.System())
-	a.timer.Register(battleTickTimer, func(interface{}) {
-		// 时间轮回调不发 ctx（SendCallback 会丢掉它），转投自己的邮箱，
-		// 这样 HandleMessage 里拿到的是新鲜可用的 ctx。
-		a.system.Send(a.self, &battleTick{})
-	})
-	a.begin(ctx)
+	a.initTimer()
+	// SpawnOne 等待初始化结束；计算放入邮箱，避免阻塞管理器创建其他战斗。
+	a.system.Send(a.self, &beginBattle{})
 }
 
 func (a *BattleActor) OnStop(_ tree.Context) { a.stopTimer() }
 
 func (a *BattleActor) HandleMessage(ctx tree.Context, msg interface{}) {
 	switch m := msg.(type) {
+	case *beginBattle:
+		a.begin(ctx)
 	case *pb.BattleResultConfirmedNtf:
 		a.confirm(ctx, m)
-	case *battleTick:
-		a.onTick(ctx)
 	case *retryTick:
 		a.retry(ctx)
 	case *RetireBattle:
@@ -80,15 +67,12 @@ func (a *BattleActor) HandleMessage(ctx tree.Context, msg interface{}) {
 	}
 }
 
-// begin 在 OnInit 中把一场战斗推进到"开始按 tick 推送"或"已推送完成、等待确认"。
-//
-// ModeRun 顺序保证：Created → 按 tick 分批的 Action 流 → 结算并 Save → Finished。
-// ModeRedeliver 顺序保证：Created → 全部 Action → Finished（战报已在库中，直接快推）。
+// begin 先完成计算和战报保存，再按创建、过程、结束顺序下发。
 func (a *BattleActor) begin(ctx tree.Context) {
 	if a.p.Mode == ModeRun && a.p.Battle == nil {
 		compiler := a.p.Compiler
 		if compiler == nil {
-			compiler = configcompiler.NewDefault()
+			compiler = battleconfig.NewDefault()
 		}
 		setup, err := compiler.Compile(a.p.BattleID, a.p.Seed, a.p.Request)
 		if err == nil {
@@ -100,24 +84,8 @@ func (a *BattleActor) begin(ctx tree.Context) {
 			return
 		}
 	}
-	a.notifyCreated()
-
 	if a.p.Mode == ModeRun {
-		a.battle = a.p.Battle
-		if tlog.Log != nil {
-			tlog.Log.Info("[战斗/执行] 开始自动战斗, battleID=%v uid=%v seed=%v", a.p.BattleID, a.p.UID, a.p.Seed)
-		}
-		// 节拍锚点：tick N 的推送目标时刻 = paceAnchor + N*tickDuration。
-		// 把首个 tick 反推到"现在"，让首个动作立刻开始演出；后续 tick 的相对
-		// 间距不变，因此整条时间轴仍然与客户端的时间轴对齐。
-		duration := a.tickDuration()
-		a.paceAnchor = time.Now()
-		if duration > 0 {
-			if first, ok := a.battle.NextTick(); ok && first > 0 {
-				a.paceAnchor = a.paceAnchor.Add(-time.Duration(first) * duration)
-			}
-		}
-		a.onTick(ctx)
+		a.runBattle(ctx)
 		return
 	}
 
@@ -127,6 +95,7 @@ func (a *BattleActor) begin(ctx tree.Context) {
 	r.SourceServerID = a.p.Source.ServerID
 	r.SourceNodeID = a.p.Source.NodeID
 	a.report = r
+	a.notifyCreated()
 	a.pushActions()
 	a.pushFinished()
 	if a.report.Confirmed {
@@ -136,31 +105,24 @@ func (a *BattleActor) begin(ctx tree.Context) {
 }
 
 func (a *BattleActor) notifyCreated() {
-	tickDurationMS := engine.DefaultTickDurationMS
-	if a.p.Battle != nil {
-		tickDurationMS = a.p.Battle.TickDurationMS()
-	} else if a.p.Report.Result.TickDurationMS > 0 {
-		tickDurationMS = a.p.Report.Result.TickDurationMS
+	tickDurationMS := a.report.Result.GetTickDurationMS()
+	if tickDurationMS <= 0 {
+		tickDurationMS = engine.DefaultTickDurationMS
 	}
 	created := &pb.BattleCreatedNtf{BattleId: a.p.BattleID, Uid: a.p.UID, TickDurationMs: tickDurationMS}
 	// 参战名单在创建时即已确定，随 Created 一起下发，客户端进战斗页就能把双方单位摆好。
-	if a.p.Battle != nil {
-		created.Units = a.p.Battle.UnitResults()
-	} else if a.p.Report.Result.Units != nil {
-		created.Units = a.p.Report.Result.Units
-	}
+	created.Units = a.report.InitialUnits
 	if err := a.p.Notifier.Notify(a.p.Source, created); err != nil {
 		tlog.Log.Warn("battle battle %s: notify Created: %v", a.p.BattleID, err)
 	}
 }
 
-// pushActions 把库中已有战报的全部事件一次性推完（仅重投路径使用）。
+// pushActions 按逻辑时间和序号发送完整事件，不等待演出时间。
 func (a *BattleActor) pushActions() {
 	a.pushEvents(a.report.BattleID, a.report.UID, a.report.Result.Events)
 }
 
-// pushEvents 逐条推送一批战斗事件。调用方一次只传一个 tick 的事件，避免长时间
-// 占住 actor goroutine —— Notify 是带超时的同步往返，不是 fire-and-forget。
+// pushEvents 保持现有消息格式，逐条发布事件；真实演出节奏由客户端控制。
 func (a *BattleActor) pushEvents(battleID string, uid uint64, events []*pb.BattleEvent) {
 	if len(events) == 0 {
 		return
@@ -178,76 +140,29 @@ func (a *BattleActor) pushEvents(battleID string, uid uint64, events []*pb.Battl
 	}
 }
 
-// tickDuration 返回一个 tick 对应的真实墙钟时长。
-// PaceTickDuration > 0 直接覆盖；< 0 表示不节流（测试用），返回 0。
-func (a *BattleActor) tickDuration() time.Duration {
-	if a.p.PaceTickDuration > 0 {
-		return a.p.PaceTickDuration
-	}
-	if a.p.PaceTickDuration < 0 {
-		return 0
-	}
-	if a.battle != nil {
-		return time.Duration(a.battle.TickDurationMS()) * time.Millisecond
-	}
-	return time.Duration(engine.DefaultTickDurationMS) * time.Millisecond
-}
-
-// onTick 推进一个节拍：推送当前 tick 的事件，再按节拍锚点排下一个节拍。
-// 不节流时（tickDuration <= 0）在一个循环里推到底，供测试与重投路径使用。
-func (a *BattleActor) onTick(ctx tree.Context) {
-	if a.battle == nil {
-		return
-	}
-	duration := a.tickDuration()
-	for {
-		if _, ok := a.battle.NextTick(); !ok {
-			a.finalizeBattle(ctx)
-			return
-		}
-		a.pushEvents(a.p.BattleID, a.p.UID, a.battle.Advance())
-		if duration <= 0 {
-			continue
-		}
-		next, ok := a.battle.NextTick()
-		if !ok {
-			// 刚推完最后一个 tick，立刻收尾，不必再等一个节拍。
-			a.finalizeBattle(ctx)
-			return
-		}
-		// 用绝对锚点算延迟：时间轮会把延迟向上取整到 10ms，
-		// 按增量排期会逐跳累积漂移。
-		target := a.paceAnchor.Add(time.Duration(next) * duration)
-		delay := time.Until(target)
-		if delay < 0 {
-			delay = 0
-		}
-		a.timer.After(battleTickTimer, delay, nil)
-		return
-	}
-}
-
-// finalizeBattle 结束模拟：推送收尾事件 → 落库 → 推送 Finished。
-// 顺序不可颠倒：report.go 明确要求 Finished 不得早于战报落库。
-// Checksum 是全量事件的哈希，因此 Finished 必须在整场结束后才发。
-func (a *BattleActor) finalizeBattle(ctx tree.Context) {
-	result, err := a.battle.Finalize()
+// runBattle 用逻辑时间循环算完整场，保存初始快照后再运行以免取得最终血量。
+func (a *BattleActor) runBattle(ctx tree.Context) {
+	initialUnits := a.p.Battle.UnitResults()
+	result, err := a.p.Battle.Run()
 	if err != nil {
 		tlog.Log.Error("[战斗/执行] 自动战斗结算失败, battleID=%v uid=%v err=%v", a.p.BattleID, a.p.UID, err)
 		a.finish(ctx)
 		return
 	}
-	a.pushEvents(a.p.BattleID, a.p.UID, a.battle.Flush())
 	a.logResult(result)
 
 	now := time.Now().UTC()
-	report := Report{BattleID: result.BattleID, UID: a.p.UID, SourceServerID: a.p.Source.ServerID, SourceNodeID: a.p.Source.NodeID, Result: result, CreatedAt: now, UpdatedAt: now}
+	report := Report{BattleID: result.BattleID, UID: a.p.UID, SourceServerID: a.p.Source.ServerID, SourceNodeID: a.p.Source.NodeID, InitialUnits: initialUnits, Result: result, CreatedAt: now, UpdatedAt: now}
 	if err := a.p.Reports.Save(context.Background(), report); err != nil {
 		tlog.Log.Error("battle battle %s: save report: %v", a.p.BattleID, err)
 		a.finish(ctx)
 		return
 	}
 	a.report = report
+	a.notifyCreated()
+	a.pushActions()
+	// 计算结束后只保留战报，释放引擎的单位、状态和时间轴。
+	a.p.Battle = nil
 	a.pushFinished()
 }
 
@@ -280,10 +195,7 @@ func (a *BattleActor) logResult(result engine.Result) {
 	tlog.Log.Info("[战斗/结算] 自动战斗完成, battleID=%v uid=%v outcome=%v tick=%v events=%v checksum=%v", result.BattleID, a.p.UID, result.Outcome, result.Tick, len(result.Events), result.Checksum)
 }
 
-// pushSource 返回推送目标。
-// 流式推送发生在战报落库之前（那时 a.report 还是零值），若直接读它会得到
-// Source{0,0}，事件会被投递到不存在的 0 号节点而静默丢弃。此时回落到创建请求方 ——
-// 两条路径的目标本来就相同：begin 里对 report 的赋值用的就是 a.p.Source。
+// pushSource 返回战报的投递目标，未指定时使用创建请求的来源节点。
 func (a *BattleActor) pushSource() Source {
 	if a.report.SourceServerID == 0 && a.report.SourceNodeID == 0 {
 		return a.p.Source
@@ -302,13 +214,6 @@ func (a *BattleActor) pushFinished() {
 	if !a.report.Confirmed {
 		a.scheduleRetry()
 	}
-}
-
-func (a *BattleActor) scheduleRetry() {
-	a.stopTimer()
-	//a.timer = a.timer.After(a.p.RetryDelay, func() {
-	//	a.system.Send(a.self, &retryTick{})
-	//})
 }
 
 func (a *BattleActor) retry(ctx tree.Context) {

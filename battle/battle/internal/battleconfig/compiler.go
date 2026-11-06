@@ -1,13 +1,13 @@
-package configcompiler
+package battleconfig
 
 import (
 	"fmt"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/effectresolver"
+	"github.com/gogu-x/gogs/battle/battle/internal/battlestatus"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/battle/battle/internal/mode"
-	"github.com/gogu-x/gogs/battle/battle/internal/statushandler"
-	"github.com/gogu-x/gogs/battle/battle/internal/targetselector"
+	"github.com/gogu-x/gogs/battle/battle/internal/skilleffect"
+	"github.com/gogu-x/gogs/battle/battle/internal/targeting"
 	"github.com/gogu-x/gogs/glconf"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
@@ -19,7 +19,7 @@ type Compiler struct {
 	roleStats         RoleStatCalculator
 	skills            RoleSkillProgression
 	strategies        engine.Strategies
-	effectDefinitions effectresolver.Definitions
+	effectDefinitions skilleffect.Definitions
 }
 
 func New(modes mode.Registry) *Compiler {
@@ -29,11 +29,11 @@ func New(modes mode.Registry) *Compiler {
 			registry[battleType] = rule
 		}
 	}
-	return &Compiler{modes: registry, roleStats: configuredRoleStatCalculator{}, skills: configuredRoleSkillProgression{}, strategies: defaultStrategies(), effectDefinitions: effectresolver.DefaultDefinitions()}
+	return &Compiler{modes: registry, roleStats: configuredRoleStatCalculator{}, skills: configuredRoleSkillProgression{}, strategies: defaultStrategies(), effectDefinitions: skilleffect.DefaultDefinitions()}
 }
 
 func defaultStrategies() engine.Strategies {
-	return engine.Strategies{Targets: targetselector.Default(), Skills: engine.DefaultSkillExecutor{}, Effects: effectresolver.Default(), Damage: engine.DefaultDamageFormula{}, Statuses: statushandler.Default()}
+	return engine.Strategies{Targets: targeting.Default(), Skills: engine.DefaultSkillExecutor{}, Effects: skilleffect.Default(), Damage: engine.DefaultDamageFormula{}, Statuses: battlestatus.Default()}
 }
 
 func DefaultStrategies() engine.Strategies { return defaultStrategies() }
@@ -67,12 +67,12 @@ func (c *Compiler) WithStrategies(strategies engine.Strategies) *Compiler {
 
 // WithEffectDefinitions extends config effect type decoding. Existing
 // definitions are copied, so registering a new type does not mutate peers.
-func (c *Compiler) WithEffectDefinition(name string, definition effectresolver.Definition) *Compiler {
+func (c *Compiler) WithEffectDefinition(name string, definition skilleffect.Definition) *Compiler {
 	if c == nil {
 		return nil
 	}
 	copy := *c
-	copy.effectDefinitions = make(effectresolver.Definitions, len(c.effectDefinitions)+1)
+	copy.effectDefinitions = make(skilleffect.Definitions, len(c.effectDefinitions)+1)
 	for key, value := range c.effectDefinitions {
 		copy.effectDefinitions[key] = value
 	}

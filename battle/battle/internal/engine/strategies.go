@@ -39,9 +39,15 @@ type DamageFormula interface {
 	Calculate(DamageInput, *RNG) DamageResult
 }
 
+// StatusInstance 表示某个单位身上的独立状态及刷新版本。
 type StatusInstance struct {
-	Config    StatusConfig
-	Remaining int
+	Config     StatusConfig // 状态配置。
+	Remaining  int          // 剩余行动回合数。
+	InstanceID uint64       // 本场战斗内唯一实例编号。
+	SourceID   string       // 施加者实例编号。
+	SkillID    string       // 来源技能编号。
+	ExpireTick int64        // 到期逻辑帧，回合模式为零。
+	Version    uint64       // 刷新版本。
 }
 type StatusTickResult struct {
 	Damage, Heal int64
@@ -94,11 +100,12 @@ type EffectTarget interface {
 }
 
 type EffectApplyContext struct {
-	ActorID  string
-	SkillID  string
-	Target   EffectTarget
-	Statuses StatusHandler
-	Emit     func(
+	ActorID     string
+	SkillID     string
+	Target      EffectTarget
+	Statuses    StatusHandler
+	ApplyStatus func(StatusConfig) error // 将状态生命周期交给引擎的统一入口。
+	Emit        func(
 		pb.BattleEventType, string, int64, int64, int64, EffectResolution,
 	)
 }

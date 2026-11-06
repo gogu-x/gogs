@@ -1,4 +1,4 @@
-package statushandler
+package battlestatus
 
 import (
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
@@ -7,7 +7,7 @@ import (
 
 func (Registry) Has(statuses []engine.StatusInstance, kind pb.StatusType) bool {
 	for _, status := range statuses {
-		if status.Remaining > 0 && status.Config.Kind == kind {
+		if status.IsActive() && status.Config.Kind == kind {
 			return true
 		}
 	}
@@ -17,7 +17,7 @@ func (Registry) Has(statuses []engine.StatusInstance, kind pb.StatusType) bool {
 func (Registry) Modifier(statuses []engine.StatusInstance) engine.AttributeModifier {
 	var modifier engine.AttributeModifier
 	for _, status := range statuses {
-		if status.Remaining <= 0 {
+		if !status.IsActive() {
 			continue
 		}
 		modifier.AttackFlat += status.Config.Modifier.AttackFlat
@@ -30,6 +30,10 @@ func (Registry) Modifier(statuses []engine.StatusInstance) engine.AttributeModif
 func (Registry) Expire(statuses []engine.StatusInstance) []engine.StatusInstance {
 	kept := statuses[:0]
 	for _, status := range statuses {
+		if status.Config.DurationMS > 0 {
+			kept = append(kept, status)
+			continue
+		}
 		status.Remaining--
 		if status.Remaining > 0 {
 			kept = append(kept, status)

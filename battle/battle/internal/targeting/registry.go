@@ -1,10 +1,10 @@
-package targetselector
+package targeting
 
 import (
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
-	"github.com/gogu-x/gogs/battle/battle/internal/targetselector/allylowest"
-	"github.com/gogu-x/gogs/battle/battle/internal/targetselector/enemy"
-	"github.com/gogu-x/gogs/battle/battle/internal/targetselector/self"
+	"github.com/gogu-x/gogs/battle/battle/internal/targeting/allylowest"
+	"github.com/gogu-x/gogs/battle/battle/internal/targeting/enemy"
+	"github.com/gogu-x/gogs/battle/battle/internal/targeting/self"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 

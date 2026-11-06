@@ -3,7 +3,7 @@ package internal
 import (
 	"testing"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/configcompiler"
+	"github.com/gogu-x/gogs/battle/battle/internal/battleconfig"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
@@ -26,7 +26,7 @@ func chargeTestSetup(skill engine.SkillConfig) engine.Setup {
 			{InstanceID: "enemy-2", Team: pb.BattleTeam_BATTLE_TEAM_DEFENDER, Position: 2, MaxHP: 100, Attack: 1, Speed: 1, BasicSkill: skill},
 			{InstanceID: "enemy-3", Team: pb.BattleTeam_BATTLE_TEAM_DEFENDER, Position: 3, MaxHP: 100, Attack: 1, Speed: 1, BasicSkill: skill},
 		},
-		Strategies: configcompiler.DefaultStrategies(),
+		Strategies: battleconfig.DefaultStrategies(),
 	}
 }
 

@@ -412,21 +412,24 @@ const (
 	BattleEventType_BATTLE_EVENT_TYPE_BATTLE_ENDED BattleEventType = 8
 	// 行动取消
 	BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED BattleEventType = 9
+	// 状态已移除
+	BattleEventType_BATTLE_EVENT_TYPE_STATUS_REMOVED BattleEventType = 10
 )
 
 // Enum value maps for BattleEventType.
 var (
 	BattleEventType_name = map[int32]string{
-		0: "BATTLE_EVENT_TYPE_UNSPECIFIED",
-		1: "BATTLE_EVENT_TYPE_ACTION_STARTED",
-		2: "BATTLE_EVENT_TYPE_SKILL_USED",
-		3: "BATTLE_EVENT_TYPE_DAMAGE",
-		4: "BATTLE_EVENT_TYPE_HEAL",
-		5: "BATTLE_EVENT_TYPE_STATUS_APPLIED",
-		6: "BATTLE_EVENT_TYPE_ACTION_SKIPPED",
-		7: "BATTLE_EVENT_TYPE_ACTION_ENDED",
-		8: "BATTLE_EVENT_TYPE_BATTLE_ENDED",
-		9: "BATTLE_EVENT_TYPE_ACTION_CANCELLED",
+		0:  "BATTLE_EVENT_TYPE_UNSPECIFIED",
+		1:  "BATTLE_EVENT_TYPE_ACTION_STARTED",
+		2:  "BATTLE_EVENT_TYPE_SKILL_USED",
+		3:  "BATTLE_EVENT_TYPE_DAMAGE",
+		4:  "BATTLE_EVENT_TYPE_HEAL",
+		5:  "BATTLE_EVENT_TYPE_STATUS_APPLIED",
+		6:  "BATTLE_EVENT_TYPE_ACTION_SKIPPED",
+		7:  "BATTLE_EVENT_TYPE_ACTION_ENDED",
+		8:  "BATTLE_EVENT_TYPE_BATTLE_ENDED",
+		9:  "BATTLE_EVENT_TYPE_ACTION_CANCELLED",
+		10: "BATTLE_EVENT_TYPE_STATUS_REMOVED",
 	}
 	BattleEventType_value = map[string]int32{
 		"BATTLE_EVENT_TYPE_UNSPECIFIED":      0,
@@ -439,6 +442,7 @@ var (
 		"BATTLE_EVENT_TYPE_ACTION_ENDED":     7,
 		"BATTLE_EVENT_TYPE_BATTLE_ENDED":     8,
 		"BATTLE_EVENT_TYPE_ACTION_CANCELLED": 9,
+		"BATTLE_EVENT_TYPE_STATUS_REMOVED":   10,
 	}
 )
 
@@ -822,7 +826,13 @@ type BattleEvent struct {
 	// 行动跳过或取消原因
 	Reason BattleEventReason `protobuf:"varint,21,opt,name=reason,proto3,enum=BattleEventReason" json:"reason,omitempty"`
 	// 战斗结算结果
-	Outcome       BattleOutcome `protobuf:"varint,22,opt,name=outcome,proto3,enum=BattleOutcome" json:"outcome,omitempty"`
+	Outcome BattleOutcome `protobuf:"varint,22,opt,name=outcome,proto3,enum=BattleOutcome" json:"outcome,omitempty"`
+	// 状态实例编号，施加、刷新、周期生效及移除事件携带
+	StatusInstanceId uint64 `protobuf:"varint,23,opt,name=status_instance_id,json=statusInstanceId,proto3" json:"status_instance_id,omitempty"`
+	// 状态到期逻辑帧，按回合持续时为零
+	StatusExpireTick int64 `protobuf:"varint,24,opt,name=status_expire_tick,json=statusExpireTick,proto3" json:"status_expire_tick,omitempty"`
+	// 状态刷新版本，较旧版本的到期任务不再生效
+	StatusVersion uint64 `protobuf:"varint,25,opt,name=status_version,json=statusVersion,proto3" json:"status_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1002,6 +1012,27 @@ func (x *BattleEvent) GetOutcome() BattleOutcome {
 		return x.Outcome
 	}
 	return BattleOutcome_BATTLE_OUTCOME_UNSPECIFIED
+}
+
+func (x *BattleEvent) GetStatusInstanceId() uint64 {
+	if x != nil {
+		return x.StatusInstanceId
+	}
+	return 0
+}
+
+func (x *BattleEvent) GetStatusExpireTick() int64 {
+	if x != nil {
+		return x.StatusExpireTick
+	}
+	return 0
+}
+
+func (x *BattleEvent) GetStatusVersion() uint64 {
+	if x != nil {
+		return x.StatusVersion
+	}
+	return 0
 }
 
 // 一个单位的最终生命结果
@@ -1395,7 +1426,7 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x06equips\x18\a \x03(\v2\n" +
 	".RoleEquipR\x06equips\x12:\n" +
 	"\x1asoul_jade_effect_affix_ids\x18\t \x03(\x05R\x16soulJadeEffectAffixIds\x121\n" +
-	"\fgrowth_bonus\x18\b \x01(\v2\x0e.GrowthBonusesR\vgrowthBonus\"\xa6\x05\n" +
+	"\fgrowth_bonus\x18\b \x01(\v2\x0e.GrowthBonusesR\vgrowthBonus\"\xa9\x06\n" +
 	"\vBattleEvent\x12\x1a\n" +
 	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\x04R\x06action\x12\x12\n" +
@@ -1423,7 +1454,10 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\bcritical\x18\x13 \x01(\bR\bcritical\x12!\n" +
 	"\fbasic_attack\x18\x14 \x01(\bR\vbasicAttack\x12*\n" +
 	"\x06reason\x18\x15 \x01(\x0e2\x12.BattleEventReasonR\x06reason\x12(\n" +
-	"\aoutcome\x18\x16 \x01(\x0e2\x0e.BattleOutcomeR\aoutcome\"\x91\x01\n" +
+	"\aoutcome\x18\x16 \x01(\x0e2\x0e.BattleOutcomeR\aoutcome\x12,\n" +
+	"\x12status_instance_id\x18\x17 \x01(\x04R\x10statusInstanceId\x12,\n" +
+	"\x12status_expire_tick\x18\x18 \x01(\x03R\x10statusExpireTick\x12%\n" +
+	"\x0estatus_version\x18\x19 \x01(\x04R\rstatusVersion\"\x91\x01\n" +
 	"\x10BattleUnitResult\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x1f\n" +
@@ -1491,7 +1525,7 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x13STATUS_TYPE_SILENCE\x10\x02\x12\x13\n" +
 	"\x0fSTATUS_TYPE_DOT\x10\x03\x12\x13\n" +
 	"\x0fSTATUS_TYPE_HOT\x10\x04\x12\"\n" +
-	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\xf2\x02\n" +
+	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\x98\x03\n" +
 	"\x0fBattleEventType\x12!\n" +
 	"\x1dBATTLE_EVENT_TYPE_UNSPECIFIED\x10\x00\x12$\n" +
 	" BATTLE_EVENT_TYPE_ACTION_STARTED\x10\x01\x12 \n" +
@@ -1502,7 +1536,9 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	" BATTLE_EVENT_TYPE_ACTION_SKIPPED\x10\x06\x12\"\n" +
 	"\x1eBATTLE_EVENT_TYPE_ACTION_ENDED\x10\a\x12\"\n" +
 	"\x1eBATTLE_EVENT_TYPE_BATTLE_ENDED\x10\b\x12&\n" +
-	"\"BATTLE_EVENT_TYPE_ACTION_CANCELLED\x10\t*\xc8\x01\n" +
+	"\"BATTLE_EVENT_TYPE_ACTION_CANCELLED\x10\t\x12$\n" +
+	" BATTLE_EVENT_TYPE_STATUS_REMOVED\x10\n" +
+	"*\xc8\x01\n" +
 	"\x11BattleEventReason\x12#\n" +
 	"\x1fBATTLE_EVENT_REASON_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eBATTLE_EVENT_REASON_ACTOR_DEAD\x10\x01\x12\x1f\n" +

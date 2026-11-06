@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -32,6 +33,20 @@ func MainTest(t *testing.T) {
 	}
 }
 
+// activeBattleQuery 仅用于通过管理器邮箱读取活跃登记。
+type activeBattleQuery struct{ battleID string }
+
+// observedServer 保证测试不从其他协程直接读取管理器状态。
+type observedServer struct{ *Server }
+
+func (s *observedServer) HandleMessage(ctx tree.Context, message interface{}) {
+	if query, ok := message.(*activeBattleQuery); ok {
+		ctx.Response(s.active[query.battleID], nil)
+		return
+	}
+	s.Server.HandleMessage(ctx, message)
+}
+
 func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	MainTest(t)
 	server := New()
@@ -50,7 +65,7 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 		return nil
 	})
 	treeSystem := tree.NewTree()
-	managerPID := treeSystem.SpawnOne(server)
+	managerPID := treeSystem.SpawnOne(&observedServer{Server: server})
 	t.Cleanup(treeSystem.Shutdown)
 	request := &pb.StartBattleReq{UID: 7, ServerID: 1, SourceNodeId: 2, BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
 	value, err := treeSystem.Request(managerPID, request).AwaitTimeout(time.Second)
@@ -61,9 +76,13 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	if ack.GetBattleId() == "" {
 		t.Fatal("missing generated battle id")
 	}
-	actorPID, exists := server.active[ack.GetBattleId()]
-	if !exists || actorPID.ID == 0 {
-		t.Fatalf("active = %#v", server.active)
+	value, err = treeSystem.Request(managerPID, &activeBattleQuery{battleID: ack.GetBattleId()}).AwaitTimeout(time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actorPID := value.(tree.PID)
+	if actorPID.ID == 0 {
+		t.Fatal("战斗未登记")
 	}
 	select {
 	case <-finished:
@@ -76,28 +95,29 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	treeSystem.Send(managerPID, &battle.ActorStopped{BattleID: ack.GetBattleId(), PID: actorPID})
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if _, exists := server.active[ack.GetBattleId()]; !exists {
+		value, err = treeSystem.Request(managerPID, &activeBattleQuery{battleID: ack.GetBattleId()}).AwaitTimeout(time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if value.(tree.PID).ID == 0 {
 			return
 		}
 		time.Sleep(time.Millisecond)
 	}
-	if _, exists := server.active[ack.GetBattleId()]; exists {
-		t.Fatalf("active battle was not removed: %#v", server.active)
-	}
+	t.Fatal("战斗登记未清理")
 }
 
-// TestBattleStreamsActionsByTick 锁定流式推送契约：Action 事件必须随真实时间按 tick
-// 分批到达，而不是等整场模拟结束后一次性涌来。同时校验顺序性 —— Game 侧按 Sequence
-// 去重且丢弃乱序，顺序一旦破坏客户端会静默丢事件。
-func TestBattleStreamsActionsByTick(t *testing.T) {
+// TestBattleComputesBeforeDelivery 验证先算完并保存，再有序发送完整时间轴。
+func TestBattleComputesBeforeDelivery(t *testing.T) {
 	MainTest(t)
+	// 将一帧设为一分钟，旧的真实时间推进方式无法在测试期限内完成。
+	glconf.GetBattleRuleCfg(int32(pb.BattleType_BATTLE_TYPE_TOWER)).TickDurationMS = 60000
 	server := New()
 
 	var mu sync.Mutex
 	type arrival struct {
 		tick     int64
 		sequence uint64
-		at       time.Time
 	}
 	// 投递顺序：Action 记 Sequence，Finished 记哨兵。用顺序而非时间戳判断先后，
 	// 因为同一毫秒内两次 Notify 的时间戳可能相等。
@@ -107,6 +127,7 @@ func TestBattleStreamsActionsByTick(t *testing.T) {
 	var badSource []string
 	var createdUnits []*pb.BattleUnitResult
 	var finishedBattleType pb.BattleType
+	var reportMissing bool
 	server.notifier = battle.NotifyFunc(func(source battle.Source, message proto.Message) error {
 		mu.Lock()
 		defer mu.Unlock()
@@ -118,12 +139,15 @@ func TestBattleStreamsActionsByTick(t *testing.T) {
 		switch value := message.(type) {
 		case *pb.BattleActionNtf:
 			event := value.GetEvent()
-			actions = append(actions, arrival{tick: event.GetTick(), sequence: event.GetSequence(), at: time.Now()})
+			actions = append(actions, arrival{tick: event.GetTick(), sequence: event.GetSequence()})
 			order = append(order, event.GetSequence())
 		case *pb.BattleCreatedNtf:
 			// 参战名单必须随 Created 下发：否则客户端要等某个单位先行动才建出它，
 			// 表现为"进入战斗时对面空无一物"。
 			createdUnits = value.GetUnits()
+			if report, err := server.reports.Get(context.Background(), value.GetBattleId()); err != nil || len(report.Result.Events) == 0 {
+				reportMissing = true
+			}
 		case *pb.BattleFinishedNtf:
 			order = append(order, finishedMarker)
 			finishedBattleType = value.GetBattleType()
@@ -139,7 +163,7 @@ func TestBattleStreamsActionsByTick(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(2 * time.Second)
 	for {
 		mu.Lock()
 		done := len(order) > 0 && order[len(order)-1] == finishedMarker
@@ -158,6 +182,9 @@ func TestBattleStreamsActionsByTick(t *testing.T) {
 	if len(badSource) > 0 {
 		t.Fatalf("推送目标为 0 号节点,消息会被静默丢弃: %v", badSource)
 	}
+	if reportMissing {
+		t.Fatal("创建通知发出前未保存完整战报")
+	}
 	if len(createdUnits) < 2 {
 		t.Fatalf("Created 未携带参战名单: %d 个单位", len(createdUnits))
 	}
@@ -166,7 +193,7 @@ func TestBattleStreamsActionsByTick(t *testing.T) {
 		t.Fatalf("Finished 未携带战斗类型: %v", finishedBattleType)
 	}
 	for _, unit := range createdUnits {
-		if unit.GetInstanceId() == "" || unit.GetMaxHp() <= 0 {
+		if unit.GetInstanceId() == "" || unit.GetMaxHp() <= 0 || unit.GetHp() != unit.GetMaxHp() || !unit.GetAlive() {
 			t.Fatalf("Created 名单里的单位不完整: %#v", unit)
 		}
 	}
@@ -196,10 +223,43 @@ func TestBattleStreamsActionsByTick(t *testing.T) {
 	if finishedCount != 1 {
 		t.Fatalf("Finished 投递次数 = %d,期望 1", finishedCount)
 	}
-	// 关键断言：事件分散在多个时间点到达。若退化成一次性推送，首尾间隔会接近 0。
-	spread := actions[len(actions)-1].at.Sub(actions[0].at)
-	if spread < 200*time.Millisecond {
-		t.Fatalf("事件像是被一次性推完的: 首尾间隔=%v actions=%d", spread, len(actions))
+	if actions[len(actions)-1].tick <= actions[0].tick {
+		t.Fatal("快速计算丢失了逻辑时间跨度")
 	}
-	t.Logf("流式推送: actions=%d 首尾间隔=%v", len(actions), spread)
+}
+
+// TestSlowDeliveryDoesNotBlockManager 验证单场计算后的慢投递不会阻塞管理器创建其他战斗。
+func TestSlowDeliveryDoesNotBlockManager(t *testing.T) {
+	MainTest(t)
+	server := New()
+	blocked := make(chan struct{}, 2)
+	release := make(chan struct{})
+	server.notifier = battle.NotifyFunc(func(_ battle.Source, message proto.Message) error {
+		if _, ok := message.(*pb.BattleCreatedNtf); ok {
+			blocked <- struct{}{}
+			<-release
+		}
+		return nil
+	})
+	system := tree.NewTree()
+	manager := system.SpawnOne(server)
+	t.Cleanup(func() {
+		close(release)
+		system.Shutdown()
+	})
+	for uid := uint64(1); uid <= 2; uid++ {
+		request := &pb.StartBattleReq{
+			UID: uid, ServerID: 1, SourceNodeId: 2,
+			BattleType:    pb.BattleType_BATTLE_TYPE_TOWER,
+			AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1,
+		}
+		if _, err := system.Request(manager, request).AwaitTimeout(time.Second); err != nil {
+			t.Fatalf("管理器被单场投递阻塞: %v", err)
+		}
+		select {
+		case <-blocked:
+		case <-time.After(time.Second):
+			t.Fatal("战斗没有独立进入投递阶段")
+		}
+	}
 }

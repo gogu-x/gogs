@@ -12,10 +12,16 @@ func unitLess(left, right *unit) bool {
 type timelinePhase uint8
 
 const (
+	// 状态先到期，再执行周期效果及动作，避免到期帧继续享受增益。
+	phaseStatusExpire timelinePhase = iota
+	// 周期效果在该帧动作之前执行，按回合效果仍沿用原有时机。
+	phaseStatusTick
 	// 已在更早 tick 开始的动作先结算 impact，再结束，最后允许新动作开始。
 	// 零前摇动作在 start 处理时插入 impact，仍会在同 tick 确定性结算。
-	phaseImpact timelinePhase = iota
+	phaseImpact
+	// 结束当前动作并结算回合状态。
 	phaseEnd
+	// 开始单位的下一次行动。
 	phaseStart
 )
 
@@ -32,10 +38,12 @@ type scheduledAction struct {
 }
 
 type timelineItem struct {
-	Tick   int64
-	Phase  timelinePhase
-	Actor  *unit
-	Action *scheduledAction
+	Tick          int64
+	Phase         timelinePhase
+	Actor         *unit
+	Action        *scheduledAction
+	StatusID      uint64 // 状态任务关联的实例编号。
+	StatusVersion uint64 // 入队时的版本，刷新后旧任务自动失效。
 }
 
 type timelineQueue []*timelineItem
@@ -59,7 +67,13 @@ func (q timelineQueue) Less(i, j int) bool {
 	if leftAction != rightAction {
 		return leftAction < rightAction
 	}
-	return unitLess(left.Actor, right.Actor)
+	if left.Actor != right.Actor {
+		return unitLess(left.Actor, right.Actor)
+	}
+	if left.StatusID != right.StatusID {
+		return left.StatusID < right.StatusID
+	}
+	return left.StatusVersion < right.StatusVersion
 }
 func (q timelineQueue) Swap(i, j int)   { q[i], q[j] = q[j], q[i] }
 func (q *timelineQueue) Push(value any) { *q = append(*q, value.(*timelineItem)) }

@@ -1,4 +1,4 @@
-package configcompiler
+package battleconfig
 
 import (
 	"fmt"
@@ -217,9 +217,14 @@ func (c *Compiler) buildStatus(id int32) (engine.StatusConfig, error) {
 		return engine.StatusConfig{}, fmt.Errorf("battle status config not found: status_config_id=%d", id)
 	}
 	modifiers := battleAttributeValues(config.Modifier)
-	return engine.StatusConfig{
+	status := engine.StatusConfig{
 		ID: strconv.Itoa(int(config.CfgID)), Kind: pb.StatusType(config.Kind),
 		DurationTurns: int(config.DurationTurns), Potency: config.Potency,
+		DurationMS: config.DurationMS, IntervalMS: config.IntervalMS,
 		Modifier: engine.AttributeModifier{AttackFlat: modifiers[1], DefenseFlat: modifiers[2], SpeedFlat: modifiers[3]},
-	}, nil
+	}
+	if err := status.Validate(); err != nil {
+		return engine.StatusConfig{}, err
+	}
+	return status, nil
 }

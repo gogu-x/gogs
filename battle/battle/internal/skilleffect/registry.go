@@ -1,14 +1,14 @@
-package effectresolver
+package skilleffect
 
 import (
 	"fmt"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/effectresolver/damage"
-	"github.com/gogu-x/gogs/battle/battle/internal/effectresolver/heal"
-	"github.com/gogu-x/gogs/battle/battle/internal/effectresolver/iceburst"
-	"github.com/gogu-x/gogs/battle/battle/internal/effectresolver/status"
-	"github.com/gogu-x/gogs/battle/battle/internal/effectresolver/thunder"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
+	"github.com/gogu-x/gogs/battle/battle/internal/skilleffect/damage"
+	"github.com/gogu-x/gogs/battle/battle/internal/skilleffect/heal"
+	"github.com/gogu-x/gogs/battle/battle/internal/skilleffect/iceburst"
+	"github.com/gogu-x/gogs/battle/battle/internal/skilleffect/status"
+	"github.com/gogu-x/gogs/battle/battle/internal/skilleffect/thunder"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 

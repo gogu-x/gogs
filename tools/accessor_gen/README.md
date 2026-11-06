@@ -7,7 +7,7 @@
 ```powershell
 make accessor GEN_DIR=game/play/internal/player/souljade STRUCTS="Mgr Item Affix"
 make accessor GEN_DIR=game/play/internal/player/talent STRUCTS=Mgr
-make accessor GEN_DIR=battle/battle/internal/configcompiler STRUCTS=RoleAttributes
+make accessor GEN_DIR=battle/battle/internal/battleconfig STRUCTS=RoleAttributes
 make deepcopy GEN_DIR=game/play/internal/player
 ```
 

@@ -25,6 +25,12 @@ func (Handler) Apply(context engine.EffectApplyContext, resolution engine.Effect
 	if status == nil {
 		return fmt.Errorf("resolved status is missing")
 	}
+	if context.ApplyStatus != nil {
+		return context.ApplyStatus(*status)
+	}
+	if status.DurationMS > 0 {
+		return fmt.Errorf("限时状态需要引擎的逻辑时间调度入口")
+	}
 	if context.Statuses == nil {
 		return fmt.Errorf("status handler is not configured")
 	}

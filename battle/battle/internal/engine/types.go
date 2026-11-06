@@ -13,13 +13,15 @@ type AttributeModifier struct {
 	SpeedFlat   int64
 }
 
-// StatusConfig contains the resolved runtime data for one status.
+// StatusConfig 表示状态配置，持续毫秒数与持续回合数只能选择一种。
 type StatusConfig struct {
-	ID            string
-	Kind          pb.StatusType
-	DurationTurns int
-	Potency       int64
-	Modifier      AttributeModifier
+	ID            string            // 状态配置编号。
+	Kind          pb.StatusType     // 状态类型。
+	DurationTurns int               // 持续行动回合数。
+	DurationMS    int64             // 持续毫秒数，为零时使用回合模式。
+	IntervalMS    int64             // 限时持续伤害或治疗的生效间隔毫秒数。
+	Potency       int64             // 单次周期效果数值。
+	Modifier      AttributeModifier // 属性修正值。
 }
 
 // EffectConfig contains the resolved runtime data for one skill effect.
@@ -144,6 +146,11 @@ func (s Setup) validate() error {
 			return invalid("unit.basic_skill", "required")
 		}
 		allSkills := append([]SkillConfig{unit.BasicSkill}, unit.ActiveSkills...)
+		for _, status := range unit.InitialStatus {
+			if err := status.Validate(); err != nil {
+				return err
+			}
+		}
 		thresholds := make(map[pb.EffectType]int64)
 		seenPassive := make(map[pb.EffectType]bool)
 		for _, charge := range unit.PassiveCharges {
@@ -157,6 +164,13 @@ func (s Setup) validate() error {
 			thresholds[charge.Kind] = charge.Threshold
 		}
 		for _, skill := range allSkills {
+			for _, effect := range skill.Effects {
+				if effect.Status != nil {
+					if err := effect.Status.Validate(); err != nil {
+						return err
+					}
+				}
+			}
 			if skill.WindupTicks < 0 || skill.RecoveryTicks < 0 {
 				return invalid("unit.skill.timing", "windup and recovery ticks cannot be negative")
 			}

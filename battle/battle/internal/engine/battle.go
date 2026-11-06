@@ -35,6 +35,7 @@ type Battle struct {
 	tick           int64
 	action         uint64
 	nextAction     uint64
+	nextStatus     uint64 // 状态实例编号，整场战斗内单调递增。
 	startedActions int
 	activeActions  int
 	events         []*pb.BattleEvent
@@ -57,13 +58,14 @@ func NewBattle(setup Setup) (*Battle, error) {
 	}
 	battle := &Battle{setup: setup, rng: NewRNG(setup.Seed), strategies: setup.Strategies}
 	for _, config := range setup.Units {
-		statuses := make([]activeStatus, 0, len(config.InitialStatus))
-		for _, status := range config.InitialStatus {
-			statuses = append(statuses, activeStatus{Config: status, Remaining: status.DurationTurns})
-		}
-		battle.units = append(battle.units, &unit{Config: config, HP: config.MaxHP, Cooldowns: make(map[string]int), Statuses: statuses, charges: make(map[pb.EffectType]int64)})
+		battle.units = append(battle.units, &unit{Config: config, HP: config.MaxHP, Cooldowns: make(map[string]int), charges: make(map[pb.EffectType]int64)})
 	}
 	for _, actor := range battle.units {
+		for _, status := range actor.Config.InitialStatus {
+			if err := battle.applyStatus(actor, actor, "", status); err != nil {
+				return nil, err
+			}
+		}
 		battle.schedule(&timelineItem{Tick: battle.attackInterval(actor), Phase: phaseStart, Actor: actor})
 	}
 	heap.Init(&battle.timeline)
@@ -176,32 +178,20 @@ func (b *Battle) tickPeriodic(actor *unit) {
 		if !actor.alive() {
 			return
 		}
-		before := actor.HP
-		result := b.strategies.Statuses.Tick(status)
-		if result.Damage > 0 {
-			result.Damage = min(result.Damage, actor.HP)
-			actor.HP -= result.Damage
-			b.emit(
-				pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE,
-				actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID,
-				result.Damage, before, actor.HP,
-				eventInfo{StatusType: status.Config.Kind}, nil,
-			)
-		}
-		if result.Heal > 0 {
-			actor.HP = min(actor.Config.MaxHP, actor.HP+result.Heal)
-			b.emit(
-				pb.BattleEventType_BATTLE_EVENT_TYPE_HEAL,
-				actor.Config.InstanceID, actor.Config.InstanceID, "", status.Config.ID,
-				actor.HP-before, before, actor.HP,
-				eventInfo{StatusType: status.Config.Kind}, nil,
-			)
+		if status.Config.DurationMS == 0 && status.IsActive() {
+			b.applyPeriodicStatus(actor, status)
 		}
 	}
 }
 
 func (b *Battle) expireStatuses(actor *unit) {
+	previous := append([]StatusInstance(nil), actor.Statuses...)
 	actor.Statuses = b.strategies.Statuses.Expire(actor.Statuses)
+	for _, status := range previous {
+		if actor.statusIndex(status.InstanceID) < 0 {
+			b.emitStatus(pb.BattleEventType_BATTLE_EVENT_TYPE_STATUS_REMOVED, actor, status)
+		}
+	}
 }
 
 func (b *Battle) chooseSkill(actor *unit) SkillConfig {
@@ -382,6 +372,9 @@ func (b *Battle) applyResolution(
 	before := target.HP
 	err := b.strategies.Effects.Apply(EffectApplyContext{
 		ActorID: actor.Config.InstanceID, SkillID: skill.ID, Target: effectTarget{unit: target}, Statuses: b.strategies.Statuses,
+		ApplyStatus: func(config StatusConfig) error {
+			return b.applyStatus(actor, target, skill.ID, config)
+		},
 		Emit: func(
 			kind pb.BattleEventType, statusID string, amount, before, after int64,
 			result EffectResolution,
@@ -527,6 +520,10 @@ func (b *Battle) Advance() []*pb.BattleEvent {
 		item := heap.Pop(&b.timeline).(*timelineItem)
 		b.tick = item.Tick
 		switch item.Phase {
+		case phaseStatusExpire:
+			b.handleStatusTask(item)
+		case phaseStatusTick:
+			b.handleStatusTask(item)
 		case phaseStart:
 			if b.terminal || b.startedActions >= b.setup.Rules.MaxActions || !item.Actor.alive() {
 				// 与一次性 Run 的循环保持一致：跳过本轮的终局重算与终止检查。

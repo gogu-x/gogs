@@ -2,12 +2,12 @@ package battle
 
 import (
 	"github.com/gogu-x/gogs/battle/battle/internal"
-	"github.com/gogu-x/gogs/battle/battle/internal/configcompiler"
-	"github.com/gogu-x/gogs/battle/battle/internal/effectresolver"
+	"github.com/gogu-x/gogs/battle/battle/internal/battleconfig"
+	"github.com/gogu-x/gogs/battle/battle/internal/battlestatus"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/battle/battle/internal/mode"
-	"github.com/gogu-x/gogs/battle/battle/internal/statushandler"
-	"github.com/gogu-x/gogs/battle/battle/internal/targetselector"
+	"github.com/gogu-x/gogs/battle/battle/internal/skilleffect"
+	"github.com/gogu-x/gogs/battle/battle/internal/targeting"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/tree"
 )
@@ -16,25 +16,25 @@ type Params = internal.Params
 type Mode = internal.Mode
 type BattleScenario = mode.Scenario
 type BattleMode = mode.Rule
-type ConfigCompiler = configcompiler.Compiler
-type RoleAttributes = configcompiler.RoleAttributes
-type RoleStatCalculator = configcompiler.RoleStatCalculator
-type RoleSkillProgression = configcompiler.RoleSkillProgression
+type ConfigCompiler = battleconfig.Compiler
+type RoleAttributes = battleconfig.RoleAttributes
+type RoleStatCalculator = battleconfig.RoleStatCalculator
+type RoleSkillProgression = battleconfig.RoleSkillProgression
 type BattleStrategies = engine.Strategies
 type TargetSelector = engine.TargetSelector
-type TargetPolicy = targetselector.Selector
-type TargetPolicyFunc = targetselector.SelectorFunc
-type TargetRegistry = targetselector.Registry
+type TargetPolicy = targeting.Selector
+type TargetPolicyFunc = targeting.SelectorFunc
+type TargetRegistry = targeting.Registry
 type TargetQuery = engine.TargetQuery
 type BattleUnitView = engine.UnitView
 type EffectResolver = engine.EffectResolver
 
-type EffectHandler = effectresolver.Handler
-type EffectHandlerFunc = effectresolver.HandlerFunc
-type EffectHandlerFuncs = effectresolver.HandlerFuncs
-type EffectRegistry = effectresolver.Registry
-type EffectDefinition = effectresolver.Definition
-type EffectDefinitions = effectresolver.Definitions
+type EffectHandler = skilleffect.Handler
+type EffectHandlerFunc = skilleffect.HandlerFunc
+type EffectHandlerFuncs = skilleffect.HandlerFuncs
+type EffectRegistry = skilleffect.Registry
+type EffectDefinition = skilleffect.Definition
+type EffectDefinitions = skilleffect.Definitions
 type SkillExecutor = engine.SkillExecutor
 type SkillExecutionContext = engine.SkillExecutionContext
 type EffectContext = engine.EffectContext
@@ -46,7 +46,7 @@ type DamageInput = engine.DamageInput
 type DamageResult = engine.DamageResult
 type StatusHandler = engine.StatusHandler
 
-type StatusRegistry = statushandler.Registry
+type StatusRegistry = battlestatus.Registry
 type StatusPolicy = engine.StatusPolicy
 type StatusInstance = engine.StatusInstance
 type StatusTickResult = engine.StatusTickResult
@@ -61,24 +61,24 @@ type ActorStopped = internal.ActorStopped
 func New(p Params) tree.Actor { return internal.NewBattleActor(p) }
 
 // NewDefaultConfigCompiler 创建使用默认玩法规则和战斗策略的配置编译器。
-func NewDefaultConfigCompiler() *ConfigCompiler { return configcompiler.NewDefault() }
+func NewDefaultConfigCompiler() *ConfigCompiler { return battleconfig.NewDefault() }
 
 // NewDefaultSkillExecutor 返回按配置顺序解析普通技能效果的公共执行器。
 func NewDefaultSkillExecutor() SkillExecutor { return engine.DefaultSkillExecutor{} }
 
 // NewConfigCompiler 创建使用指定战斗模式的配置编译器。
 func NewConfigCompiler(modes map[pb.BattleType]BattleMode) *ConfigCompiler {
-	return configcompiler.New(mode.Registry(modes))
+	return battleconfig.New(mode.Registry(modes))
 }
 
 // NewConfigCompilerWithRoleStats 创建带有自定义角色属性计算器的配置编译器。
 func NewConfigCompilerWithRoleStats(modes map[pb.BattleType]BattleMode, calculator RoleStatCalculator) *ConfigCompiler {
-	return configcompiler.NewWithRoleStats(mode.Registry(modes), calculator)
+	return battleconfig.NewWithRoleStats(mode.Registry(modes), calculator)
 }
 
 // NewConfigCompilerWithProgression 创建带有自定义属性和技能成长规则的配置编译器。
 func NewConfigCompilerWithProgression(modes map[pb.BattleType]BattleMode, roleStats RoleStatCalculator, skills RoleSkillProgression) *ConfigCompiler {
-	return configcompiler.NewWithProgression(mode.Registry(modes), roleStats, skills)
+	return battleconfig.NewWithProgression(mode.Registry(modes), roleStats, skills)
 }
 
 // DefaultBattleModes 返回默认战斗模式注册表的副本。

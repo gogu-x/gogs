@@ -1,9 +1,9 @@
-package statushandler
+package battlestatus
 
 import (
+	"github.com/gogu-x/gogs/battle/battle/internal/battlestatus/dot"
+	"github.com/gogu-x/gogs/battle/battle/internal/battlestatus/hot"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
-	"github.com/gogu-x/gogs/battle/battle/internal/statushandler/dot"
-	"github.com/gogu-x/gogs/battle/battle/internal/statushandler/hot"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
