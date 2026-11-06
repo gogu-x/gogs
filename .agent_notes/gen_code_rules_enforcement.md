@@ -37,7 +37,7 @@
 ## 代码生成标记规则（结构体级别）
 
 - 需要持久化到 DB（玩家存档、全局数据）→ 加 `// +deepcopy-gen=true`
-- 字段需要在多处被访问 → 加 `//go:generate accessor_engine2 <StructName>` 自动生成 Get/Set 方法
+- 字段需要在多处被访问 → 加 `//go:generate make -C <到仓库根目录的相对路径> accessor GEN_DIR=<包相对仓库根目录的路径> STRUCTS=<StructName>` 自动生成 Get/Set 方法；工具路径统一配置在 `config.mk`，使用已编译文件，不临时编译。
 - 纯内存中间结构体（请求参数、临时计算结果）→ 不需要以上两个标记
 - 注意：包级别也可以用 `// +deepcopy-gen=package` 声明在 doc.go 顶部，使该包内所有结构体默认生成 deepcopy，此时具体结构体要排除则用 `// +deepcopy-gen=false`
 

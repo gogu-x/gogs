@@ -22,6 +22,10 @@ func TestPublicResponsesUseErrCodeWithoutErrorText(t *testing.T) {
 		if !strings.HasPrefix(file.Path(), "cspb/") && !strings.HasPrefix(file.Path(), "pfpb/") {
 			return true
 		}
+		wantKind := protoreflect.Int32Kind
+		if strings.HasPrefix(file.Path(), "cspb/") {
+			wantKind = protoreflect.EnumKind
+		}
 		messages := file.Messages()
 		for i := 0; i < messages.Len(); i++ {
 			message := messages.Get(i)
@@ -45,8 +49,8 @@ func TestPublicResponsesUseErrCodeWithoutErrorText(t *testing.T) {
 					status = field
 				}
 			}
-			if status == nil || status.Kind() != protoreflect.Int32Kind {
-				t.Errorf("%s must expose an int32 error code", message.FullName())
+			if status == nil || status.Kind() != wantKind {
+				t.Errorf("%s must expose a %s error code", message.FullName(), wantKind)
 			}
 		}
 		return true
@@ -70,6 +74,33 @@ func TestStatusFieldsPreserveNumericCodes(t *testing.T) {
 		&pb_talent.ResetRoleTalentAck{},
 		&pb_battle.StartBattleAck{},
 		&pb_activity.GetActivityListAck{},
+	}
+	for _, message := range messages {
+		reflection := message.ProtoReflect()
+		field := reflection.Descriptor().Fields().ByName("code")
+		if field == nil || field.HasPresence() {
+			t.Fatalf("%T must use a non-optional status", message)
+		}
+		for _, code := range []pb_common.ErrCode{pb_common.ErrCode_OK, pb_common.ErrCode_STALE_REVISION, pb_common.ErrCode(-987654)} {
+			reflection.Set(field, protoreflect.ValueOfEnum(protoreflect.EnumNumber(code)))
+			encoded, err := proto.Marshal(message)
+			if err != nil {
+				t.Fatal(err)
+			}
+			decoded := reflection.New().Interface()
+			if err := proto.Unmarshal(encoded, decoded); err != nil {
+				t.Fatal(err)
+			}
+			result := decoded.ProtoReflect()
+			if result.Get(field).Enum() != protoreflect.EnumNumber(code) {
+				t.Fatalf("%T lost explicit status %d during serialization", message, code)
+			}
+		}
+	}
+}
+
+func TestPlatformStatusFieldsPreserveNumericCodes(t *testing.T) {
+	messages := []proto.Message{
 		&pb_pf.VerifyAck{},
 		&pb_pf.OrderDetail{},
 	}
@@ -79,7 +110,7 @@ func TestStatusFieldsPreserveNumericCodes(t *testing.T) {
 		if field == nil || field.HasPresence() {
 			t.Fatalf("%T must use a non-optional status", message)
 		}
-		for _, code := range []int32{0, pb_common.ErrCode_STALE_REVISION, -987654} {
+		for _, code := range []int32{0, int32(pb_pf.ErrCode_PARAM), -987654} {
 			reflection.Set(field, protoreflect.ValueOfInt32(code))
 			encoded, err := proto.Marshal(message)
 			if err != nil {

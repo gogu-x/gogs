@@ -1,4 +1,4 @@
-//go:generate go run ../../../tools/deepcopy-gen -dir ../..
+//go:generate make -C ../../.. deepcopy GEN_DIR=game
 
 package internal
 

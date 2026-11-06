@@ -8,7 +8,7 @@ import (
 // Affix stores a server-generated stat modifier.
 // +deepcopy-gen=true
 //
-//go:generate accessor_engine2 Affix
+//go:generate make -C ../../../../.. accessor GEN_DIR=game/play/internal/player/souljade STRUCTS=Affix
 type Affix struct {
 	Attribute int32 `bson:"attribute"` // Supported battle attribute identifier.
 	Permille  int32 `bson:"permille"`  // Additive growth in permille.
@@ -17,7 +17,7 @@ type Affix struct {
 // Item stores one owned soul jade instance.
 // +deepcopy-gen=true
 //
-//go:generate accessor_engine2 Item
+//go:generate make -C ../../../../.. accessor GEN_DIR=game/play/internal/player/souljade STRUCTS=Item
 type Item struct {
 	ID       string   `bson:"id"`        // Unique instance identifier.
 	ConfigID int32    `bson:"config_id"` // Definition identifier.
@@ -31,7 +31,7 @@ func (item *Item) AddAffix(affix *Affix) { item.Affixes = append(item.GetAffixes
 // Mgr stores owned instances, materials and generic slots.
 // +deepcopy-gen=true
 //
-//go:generate accessor_engine2 Mgr
+//go:generate make -C ../../../../.. accessor GEN_DIR=game/play/internal/player/souljade STRUCTS=Mgr
 type Mgr struct {
 	Revision uint64           `bson:"revision"` // Mutation revision used for optimistic concurrency.
 	Essence  int64            `bson:"essence"`  // Available upgrade and reroll materials.

@@ -3,7 +3,7 @@ package talent
 // Mgr persists learned nodes; clients cannot supply a point balance.
 // +deepcopy-gen=true
 //
-//go:generate accessor_engine2 Mgr
+//go:generate make -C ../../../../.. accessor GEN_DIR=game/play/internal/player/talent STRUCTS=Mgr
 type Mgr struct {
 	Revision uint64         `bson:"revision"` // Mutation revision.
 	Learned  map[int32]bool `bson:"learned"`  // Learned definition identifiers.

@@ -18,14 +18,18 @@ conf-data:
 
 c: conf-code conf-data
 
-.PHONY: deepcopy-tool deepcopy
+.PHONY: deepcopy accessor router
 
-DEEPCOPY_GEN_BIN := tools\deepcopy-gen.exe
+# 生成目录相对于仓库根目录，支持命令行覆盖。
+GEN_DIR ?= .
 
-deepcopy-tool:
-	go build -o $(DEEPCOPY_GEN_BIN) ./tools/deepcopy-gen
+deepcopy:
+	"$(DEEPCOPY_GEN_BIN)" -dir "$(GEN_DIR)"
 
-deepcopy: deepcopy-tool
-	$(DEEPCOPY_GEN_BIN)
+accessor:
+	"$(ACCESSOR_GEN_BIN)" -dir "$(GEN_DIR)" $(STRUCTS)
+
+router:
+	"$(ROUTER_GEN_BIN)" -dir "$(GEN_DIR)"
 
 build: c proto register deepcopy

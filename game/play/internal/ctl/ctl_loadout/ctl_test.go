@@ -15,6 +15,7 @@ import (
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type captureGate struct {
@@ -68,7 +69,14 @@ func requireStatus(t *testing.T, message proto.Message, expected pb_common.ErrCo
 	if field == nil {
 		t.Fatal("response omitted its status field")
 	}
-	if actual := pb_common.ErrCode(reflected.Get(field).Int()); actual != expected {
+	var actual pb_common.ErrCode
+	switch field.Kind() {
+	case protoreflect.EnumKind:
+		actual = pb_common.ErrCode(reflected.Get(field).Enum())
+	default:
+		actual = pb_common.ErrCode(reflected.Get(field).Int())
+	}
+	if actual != expected {
 		t.Fatalf("status = %v, want %v", actual, expected)
 	}
 	if reflected.Descriptor().Fields().ByName("error") != nil {

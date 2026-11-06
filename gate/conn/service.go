@@ -146,7 +146,7 @@ func (c *Conn) getServerListCb(_ tree.Context, ret interface{}, err error) {
 func platformCode(code pb_pf.ErrCode) pb_common.ErrCode {
 	switch code {
 	case pb_pf.ErrCode_OK, pb_pf.ErrCode_UNKNOWN, pb_pf.ErrCode_PARAM, pb_pf.ErrCode_UNAUTHORIZED, pb_pf.ErrCode_LOGIN_IN_PROGRESS, pb_pf.ErrCode_SERVER_NOT_FOUND, pb_pf.ErrCode_USERNAME_EXISTS, pb_pf.ErrCode_WRONG_PASSWORD, pb_pf.ErrCode_INTERNAL, pb_pf.ErrCode_ACCOUNT_NOT_FOUND, pb_pf.ErrCode_GUILD_EXISTS, pb_pf.ErrCode_GUILD_NOT_FOUND, pb_pf.ErrCode_ALREADY_IN_GUILD, pb_pf.ErrCode_NOT_IN_GUILD:
-		return code
+		return pb_common.ErrCode(code)
 	default:
 		return pb_common.ErrCode_INTERNAL
 	}
