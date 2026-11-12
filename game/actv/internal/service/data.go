@@ -237,6 +237,7 @@ func (as *ActvService) UnloadPlayer(uid uint64, guildID OwnerID) {
 		ids = append(ids, actv.GetMeta().GetActvID())
 	}
 	as.RemoveActvs(ids)
+	delete(as.taskHubs, uid)
 	tlog.Log.Info("[actv/ActvService.UnloadPlayer] 卸载玩家活动数据, pid=%v actvs=%v", uid, len(ids))
 	as.rangePlayerShared(guildID, func(actv *Actv) {
 		actv.unloadPlayer(uid)

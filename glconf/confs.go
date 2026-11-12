@@ -17,7 +17,15 @@ var confs []*confMeta
 // InitGameCfg 注册全部自动生成的配置表；可重复调用。
 func InitGameCfg() {
 	confs = confs[:0]
+	confs = append(confs, &confMeta{source: ActvItemCfgKey, loader: loadActvItemCfg})
+	confs = append(confs, &confMeta{source: ActvLotteryPoolCfgKey, loader: loadActvLotteryPoolCfg})
+	confs = append(confs, &confMeta{source: ActvLotteryRewardCfgKey, loader: loadActvLotteryRewardCfg})
 	confs = append(confs, &confMeta{source: ActvOnlineCfgKey, loader: loadActvOnlineCfg})
+	confs = append(confs, &confMeta{source: ActvRewardCfgKey, loader: loadActvRewardCfg})
+	confs = append(confs, &confMeta{source: ActvShopCfgKey, loader: loadActvShopCfg})
+	confs = append(confs, &confMeta{source: ActvShopGoodsCfgKey, loader: loadActvShopGoodsCfg})
+	confs = append(confs, &confMeta{source: ActvTaskCfgKey, loader: loadActvTaskCfg})
+	confs = append(confs, &confMeta{source: ActvTaskLotteryCfgKey, loader: loadActvTaskLotteryCfg})
 	confs = append(confs, &confMeta{source: BattleEquipCfgKey, loader: loadBattleEquipCfg})
 	confs = append(confs, &confMeta{source: BattleMonsterCfgKey, loader: loadBattleMonsterCfg})
 	confs = append(confs, &confMeta{source: BattleMonsterGroupCfgKey, loader: loadBattleMonsterGroupCfg})

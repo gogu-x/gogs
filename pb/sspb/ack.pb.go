@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v3.21.12
-// source: sspb/natsrpc.proto
+// source: sspb/ack.proto
 
 package sspb
 
@@ -20,114 +20,6 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
-
-type NatsMsgReq struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 消息唯一标识
-	SessionID int64 `protobuf:"varint,1,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
-	// 目标服务类型
-	SendModule string `protobuf:"bytes,2,opt,name=SendModule,proto3" json:"SendModule,omitempty"`
-	// 目标服务类型
-	TaggerModule string `protobuf:"bytes,3,opt,name=TaggerModule,proto3" json:"TaggerModule,omitempty"`
-	// 发送者Actor Name
-	SendName string `protobuf:"bytes,4,opt,name=SendName,proto3" json:"SendName,omitempty"`
-	// 目标actor Name
-	TaggerName string `protobuf:"bytes,5,opt,name=TaggerName,proto3" json:"TaggerName,omitempty"`
-	// 目标服务id
-	Id int32 `protobuf:"varint,6,opt,name=id,proto3" json:"id,omitempty"`
-	// nodeId
-	NodeID int32 `protobuf:"varint,7,opt,name=nodeID,proto3" json:"nodeID,omitempty"`
-	// 消息
-	Msg           []byte `protobuf:"bytes,8,opt,name=Msg,proto3" json:"Msg,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *NatsMsgReq) Reset() {
-	*x = NatsMsgReq{}
-	mi := &file_sspb_natsrpc_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *NatsMsgReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*NatsMsgReq) ProtoMessage() {}
-
-func (x *NatsMsgReq) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_natsrpc_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use NatsMsgReq.ProtoReflect.Descriptor instead.
-func (*NatsMsgReq) Descriptor() ([]byte, []int) {
-	return file_sspb_natsrpc_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *NatsMsgReq) GetSessionID() int64 {
-	if x != nil {
-		return x.SessionID
-	}
-	return 0
-}
-
-func (x *NatsMsgReq) GetSendModule() string {
-	if x != nil {
-		return x.SendModule
-	}
-	return ""
-}
-
-func (x *NatsMsgReq) GetTaggerModule() string {
-	if x != nil {
-		return x.TaggerModule
-	}
-	return ""
-}
-
-func (x *NatsMsgReq) GetSendName() string {
-	if x != nil {
-		return x.SendName
-	}
-	return ""
-}
-
-func (x *NatsMsgReq) GetTaggerName() string {
-	if x != nil {
-		return x.TaggerName
-	}
-	return ""
-}
-
-func (x *NatsMsgReq) GetId() int32 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-func (x *NatsMsgReq) GetNodeID() int32 {
-	if x != nil {
-		return x.NodeID
-	}
-	return 0
-}
-
-func (x *NatsMsgReq) GetMsg() []byte {
-	if x != nil {
-		return x.Msg
-	}
-	return nil
-}
 
 type NatsMsgAck struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -153,7 +45,7 @@ type NatsMsgAck struct {
 
 func (x *NatsMsgAck) Reset() {
 	*x = NatsMsgAck{}
-	mi := &file_sspb_natsrpc_proto_msgTypes[1]
+	mi := &file_sspb_ack_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -165,7 +57,7 @@ func (x *NatsMsgAck) String() string {
 func (*NatsMsgAck) ProtoMessage() {}
 
 func (x *NatsMsgAck) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_natsrpc_proto_msgTypes[1]
+	mi := &file_sspb_ack_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -178,7 +70,7 @@ func (x *NatsMsgAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NatsMsgAck.ProtoReflect.Descriptor instead.
 func (*NatsMsgAck) Descriptor() ([]byte, []int) {
-	return file_sspb_natsrpc_proto_rawDescGZIP(), []int{1}
+	return file_sspb_ack_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *NatsMsgAck) GetSessionID() int64 {
@@ -261,7 +153,7 @@ type NatsMsgNtf struct {
 
 func (x *NatsMsgNtf) Reset() {
 	*x = NatsMsgNtf{}
-	mi := &file_sspb_natsrpc_proto_msgTypes[2]
+	mi := &file_sspb_ack_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -273,7 +165,7 @@ func (x *NatsMsgNtf) String() string {
 func (*NatsMsgNtf) ProtoMessage() {}
 
 func (x *NatsMsgNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_sspb_natsrpc_proto_msgTypes[2]
+	mi := &file_sspb_ack_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -286,7 +178,7 @@ func (x *NatsMsgNtf) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NatsMsgNtf.ProtoReflect.Descriptor instead.
 func (*NatsMsgNtf) Descriptor() ([]byte, []int) {
-	return file_sspb_natsrpc_proto_rawDescGZIP(), []int{2}
+	return file_sspb_ack_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *NatsMsgNtf) GetSessionID() int64 {
@@ -345,25 +237,11 @@ func (x *NatsMsgNtf) GetMsg() []byte {
 	return nil
 }
 
-var File_sspb_natsrpc_proto protoreflect.FileDescriptor
+var File_sspb_ack_proto protoreflect.FileDescriptor
 
-const file_sspb_natsrpc_proto_rawDesc = "" +
+const file_sspb_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x12sspb/natsrpc.proto\"\xe4\x01\n" +
-	"\n" +
-	"NatsMsgReq\x12\x1c\n" +
-	"\tsessionID\x18\x01 \x01(\x03R\tsessionID\x12\x1e\n" +
-	"\n" +
-	"SendModule\x18\x02 \x01(\tR\n" +
-	"SendModule\x12\"\n" +
-	"\fTaggerModule\x18\x03 \x01(\tR\fTaggerModule\x12\x1a\n" +
-	"\bSendName\x18\x04 \x01(\tR\bSendName\x12\x1e\n" +
-	"\n" +
-	"TaggerName\x18\x05 \x01(\tR\n" +
-	"TaggerName\x12\x0e\n" +
-	"\x02id\x18\x06 \x01(\x05R\x02id\x12\x16\n" +
-	"\x06nodeID\x18\a \x01(\x05R\x06nodeID\x12\x10\n" +
-	"\x03Msg\x18\b \x01(\fR\x03Msg\"\xe4\x01\n" +
+	"\x0esspb/ack.proto\"\xe4\x01\n" +
 	"\n" +
 	"NatsMsgAck\x12\x1c\n" +
 	"\tsessionID\x18\x01 \x01(\x03R\tsessionID\x12\x1e\n" +
@@ -394,24 +272,23 @@ const file_sspb_natsrpc_proto_rawDesc = "" +
 	"\x03Msg\x18\b \x01(\fR\x03MsgB Z\x1egithub.com/gogu-x/gogs/pb/sspbb\x06proto3"
 
 var (
-	file_sspb_natsrpc_proto_rawDescOnce sync.Once
-	file_sspb_natsrpc_proto_rawDescData []byte
+	file_sspb_ack_proto_rawDescOnce sync.Once
+	file_sspb_ack_proto_rawDescData []byte
 )
 
-func file_sspb_natsrpc_proto_rawDescGZIP() []byte {
-	file_sspb_natsrpc_proto_rawDescOnce.Do(func() {
-		file_sspb_natsrpc_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_sspb_natsrpc_proto_rawDesc), len(file_sspb_natsrpc_proto_rawDesc)))
+func file_sspb_ack_proto_rawDescGZIP() []byte {
+	file_sspb_ack_proto_rawDescOnce.Do(func() {
+		file_sspb_ack_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_sspb_ack_proto_rawDesc), len(file_sspb_ack_proto_rawDesc)))
 	})
-	return file_sspb_natsrpc_proto_rawDescData
+	return file_sspb_ack_proto_rawDescData
 }
 
-var file_sspb_natsrpc_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
-var file_sspb_natsrpc_proto_goTypes = []any{
-	(*NatsMsgReq)(nil), // 0: NatsMsgReq
-	(*NatsMsgAck)(nil), // 1: NatsMsgAck
-	(*NatsMsgNtf)(nil), // 2: NatsMsgNtf
+var file_sspb_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_sspb_ack_proto_goTypes = []any{
+	(*NatsMsgAck)(nil), // 0: NatsMsgAck
+	(*NatsMsgNtf)(nil), // 1: NatsMsgNtf
 }
-var file_sspb_natsrpc_proto_depIdxs = []int32{
+var file_sspb_ack_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -419,26 +296,26 @@ var file_sspb_natsrpc_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_sspb_natsrpc_proto_init() }
-func file_sspb_natsrpc_proto_init() {
-	if File_sspb_natsrpc_proto != nil {
+func init() { file_sspb_ack_proto_init() }
+func file_sspb_ack_proto_init() {
+	if File_sspb_ack_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sspb_natsrpc_proto_rawDesc), len(file_sspb_natsrpc_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sspb_ack_proto_rawDesc), len(file_sspb_ack_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_sspb_natsrpc_proto_goTypes,
-		DependencyIndexes: file_sspb_natsrpc_proto_depIdxs,
-		MessageInfos:      file_sspb_natsrpc_proto_msgTypes,
+		GoTypes:           file_sspb_ack_proto_goTypes,
+		DependencyIndexes: file_sspb_ack_proto_depIdxs,
+		MessageInfos:      file_sspb_ack_proto_msgTypes,
 	}.Build()
-	File_sspb_natsrpc_proto = out.File
-	file_sspb_natsrpc_proto_goTypes = nil
-	file_sspb_natsrpc_proto_depIdxs = nil
+	File_sspb_ack_proto = out.File
+	file_sspb_ack_proto_goTypes = nil
+	file_sspb_ack_proto_depIdxs = nil
 }

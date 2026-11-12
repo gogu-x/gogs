@@ -78,6 +78,9 @@ func main() {
 			}
 		}
 	}
+	if err := g.loadReferencedPackages(); err != nil {
+		fatal(err)
+	}
 	if err := g.generate(); err != nil {
 		fatal(err)
 	}
@@ -522,4 +525,76 @@ func isPrimitive(name string) bool {
 	default:
 		return false
 	}
+}
+
+// loadReferencedPackages 从标记结构体的外部字段类型发现依赖，避免浅拷贝任务等持久化状态。
+func (g *generator) loadReferencedPackages() error {
+	paths := map[string]bool{}
+	for _, pkg := range g.packages {
+		for _, file := range pkg.files {
+			used := map[string]bool{}
+			for _, decl := range file.Decls {
+				gen, ok := decl.(*ast.GenDecl)
+				if !ok {
+					continue
+				}
+				for _, spec := range gen.Specs {
+					ts, ok := spec.(*ast.TypeSpec)
+					if !ok {
+						continue
+					}
+					info := pkg.types[ts.Name.Name]
+					if info == nil || !info.marked {
+						continue
+					}
+					ast.Inspect(ts.Type, func(n ast.Node) bool {
+						if v, ok := n.(*ast.SelectorExpr); ok {
+							if id, ok := v.X.(*ast.Ident); ok {
+								used[id.Name] = true
+							}
+						}
+						return true
+					})
+				}
+			}
+			for _, imp := range file.Imports {
+				path, err := strconv.Unquote(imp.Path.Value)
+				if err != nil {
+					return err
+				}
+				alias := filepath.Base(path)
+				if imp.Name != nil {
+					alias = imp.Name.Name
+				}
+				if used[alias] && g.byImport[path] == nil {
+					paths[path] = true
+				}
+			}
+		}
+	}
+	for path := range paths {
+		cmd := exec.Command("go", "list", "-f", "{{.Dir}}|{{.Standard}}", path)
+		cmd.Dir = g.root
+		out, err := cmd.Output()
+		if err != nil {
+			return fmt.Errorf("resolve deepcopy dependency %s: %w", path, err)
+		}
+		parts := strings.Split(strings.TrimSpace(string(out)), "|")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid dependency path %s", path)
+		}
+		if parts[1] == "true" {
+			continue
+		}
+		ref := &generator{root: parts[0], packages: make(map[string]*packageInfo), byImport: make(map[string]*packageInfo)}
+		if err := ref.loadPackages(); err != nil {
+			return err
+		}
+		for key, pkg := range ref.byImport {
+			if g.byImport[key] == nil {
+				g.byImport[key] = pkg
+			}
+		}
+	}
+	return nil
 }

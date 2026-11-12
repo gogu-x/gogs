@@ -2,6 +2,7 @@ package trigger
 
 import (
 	"github.com/gogu-x/gogs/glconf"
+	"strconv"
 	"time"
 )
 
@@ -61,7 +62,7 @@ func NewEngine(
 		return Selection{serverPlans: due}
 	})
 	engine.Register(OnPlayerInit, func(_ int64, history map[int32]bool) Selection {
-		return Selection{playerConfigs: PlayerOnceConfigs(playerRows, history)}
+		return Selection{playerConfigs: PlayerCreationConfigs(playerRows, history)}
 	})
 	return engine
 }
@@ -85,7 +86,7 @@ func PlayerOnceConfigs(rows []*glconf.ActvOnlineCfg, history map[int32]bool) []*
 	selected := make([]*glconf.ActvOnlineCfg, 0)
 	seen := make(map[int32]bool)
 	for _, row := range rows {
-		if row == nil || !row.GetAvailable() || row.IsReopen() || len(row.GetServerGroups()) > 0 {
+		if row == nil || !row.GetAvailable() || row.IsReopen() || len(row.GetServerGroups()) > 0 || row.GetTriggerType() == 5 {
 			continue
 		}
 		id := row.GetID()
@@ -101,4 +102,34 @@ func PlayerOnceConfigs(rows []*glconf.ActvOnlineCfg, history map[int32]bool) []*
 // NewSelection 供扩展规则返回服务器计划或个人配置，不暴露引擎内部容器。
 func NewSelection(serverPlans []*Plan, playerConfigs []*glconf.ActvOnlineCfg) Selection {
 	return Selection{serverPlans: serverPlans, playerConfigs: playerConfigs}
+}
+
+// PlayerCreationConfigs 统一选择个人主活动及缺少的关联子活动，禁止由模板自行创建。
+func PlayerCreationConfigs(rows []*glconf.ActvOnlineCfg, history map[int32]bool) []*glconf.ActvOnlineCfg {
+	selected := PlayerOnceConfigs(rows, history)
+	parents := make(map[int32]bool)
+	for id := range history {
+		parents[id] = true
+	}
+	for _, r := range selected {
+		parents[r.GetID()] = true
+	}
+	for _, r := range rows {
+		if r == nil || !r.GetAvailable() || r.GetTriggerType() != 5 || r.IsReopen() || len(r.GetServerGroups()) > 0 || history[r.GetID()] {
+			continue
+		}
+		parent, err := strconv.ParseInt(r.GetTriggerVal(), 10, 32)
+		if err != nil || !parents[int32(parent)] {
+			continue
+		}
+		parentRow := glconf.GetActvOnlineCfgNoErr(int32(parent))
+		if parentRow == nil || !parentRow.GetAvailable() {
+			continue
+		}
+		if r.GetID() == int32(parent) || r.GetType() != 7003 {
+			continue
+		}
+		selected = append(selected, r)
+	}
+	return selected
 }

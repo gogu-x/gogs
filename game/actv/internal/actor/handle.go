@@ -78,6 +78,7 @@ func (actor *Actv) saveAll(ctx tree.Context) {
 		return
 	}
 	actor.lifecycle.SaveAll(ctx, func(_ tree.Context, err error) {
+		ctx.Response(nil, err)
 		if err != nil {
 			tlog.Log.Error("[actv/Actv.saveAll] 活动数据存盘失败, err=%v", err)
 			return

@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v3.21.12
-// source: cspb/gateway/struct.proto
+// source: cspb/gateway/service.proto
 
 package pb_gateway
 
@@ -117,5 +117,5 @@ var Gateway_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "cspb/gateway/struct.proto",
+	Metadata: "cspb/gateway/service.proto",
 }

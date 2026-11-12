@@ -21,6 +21,300 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// 切换目标服务器消息
+type SwitchMsg struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 旧服务器标识
+	ServerId string `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	// 新目标地址
+	NewAddr       string `protobuf:"bytes,2,opt,name=new_addr,json=newAddr,proto3" json:"new_addr,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SwitchMsg) Reset() {
+	*x = SwitchMsg{}
+	mi := &file_cspb_gateway_struct_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SwitchMsg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SwitchMsg) ProtoMessage() {}
+
+func (x *SwitchMsg) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_gateway_struct_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SwitchMsg.ProtoReflect.Descriptor instead.
+func (*SwitchMsg) Descriptor() ([]byte, []int) {
+	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *SwitchMsg) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *SwitchMsg) GetNewAddr() string {
+	if x != nil {
+		return x.NewAddr
+	}
+	return ""
+}
+
+// 转发到游戏服的消息帧
+type StreamMsg struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 待转发的消息帧
+	Frame         *Frame `protobuf:"bytes,1,opt,name=frame,proto3" json:"frame,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamMsg) Reset() {
+	*x = StreamMsg{}
+	mi := &file_cspb_gateway_struct_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamMsg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamMsg) ProtoMessage() {}
+
+func (x *StreamMsg) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_gateway_struct_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamMsg.ProtoReflect.Descriptor instead.
+func (*StreamMsg) Descriptor() ([]byte, []int) {
+	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *StreamMsg) GetFrame() *Frame {
+	if x != nil {
+		return x.Frame
+	}
+	return nil
+}
+
+// 延迟确认节点下线消息
+type CheckDeleteMsg struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 服务器标识
+	ServerId string `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	// 节点标识
+	NodeId        string `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckDeleteMsg) Reset() {
+	*x = CheckDeleteMsg{}
+	mi := &file_cspb_gateway_struct_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckDeleteMsg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckDeleteMsg) ProtoMessage() {}
+
+func (x *CheckDeleteMsg) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_gateway_struct_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckDeleteMsg.ProtoReflect.Descriptor instead.
+func (*CheckDeleteMsg) Descriptor() ([]byte, []int) {
+	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CheckDeleteMsg) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *CheckDeleteMsg) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+// 连接注册消息
+type ConnRegMsg struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 连接编号
+	ConnId        uint64 `protobuf:"varint,1,opt,name=conn_id,json=connId,proto3" json:"conn_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConnRegMsg) Reset() {
+	*x = ConnRegMsg{}
+	mi := &file_cspb_gateway_struct_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnRegMsg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnRegMsg) ProtoMessage() {}
+
+func (x *ConnRegMsg) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_gateway_struct_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnRegMsg.ProtoReflect.Descriptor instead.
+func (*ConnRegMsg) Descriptor() ([]byte, []int) {
+	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ConnRegMsg) GetConnId() uint64 {
+	if x != nil {
+		return x.ConnId
+	}
+	return 0
+}
+
+// 连接注销消息
+type ConnUnregMsg struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 连接编号
+	ConnId        uint64 `protobuf:"varint,1,opt,name=conn_id,json=connId,proto3" json:"conn_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConnUnregMsg) Reset() {
+	*x = ConnUnregMsg{}
+	mi := &file_cspb_gateway_struct_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnUnregMsg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnUnregMsg) ProtoMessage() {}
+
+func (x *ConnUnregMsg) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_gateway_struct_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnUnregMsg.ProtoReflect.Descriptor instead.
+func (*ConnUnregMsg) Descriptor() ([]byte, []int) {
+	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ConnUnregMsg) GetConnId() uint64 {
+	if x != nil {
+		return x.ConnId
+	}
+	return 0
+}
+
+// 广播消息
+type BroadcastMsg struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 广播载荷
+	Data          []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BroadcastMsg) Reset() {
+	*x = BroadcastMsg{}
+	mi := &file_cspb_gateway_struct_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BroadcastMsg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BroadcastMsg) ProtoMessage() {}
+
+func (x *BroadcastMsg) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_gateway_struct_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BroadcastMsg.ProtoReflect.Descriptor instead.
+func (*BroadcastMsg) Descriptor() ([]byte, []int) {
+	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *BroadcastMsg) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 // 网关与游戏服之间的通用消息帧
 type Frame struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -32,7 +326,7 @@ type Frame struct {
 
 func (x *Frame) Reset() {
 	*x = Frame{}
-	mi := &file_cspb_gateway_struct_proto_msgTypes[0]
+	mi := &file_cspb_gateway_struct_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +338,7 @@ func (x *Frame) String() string {
 func (*Frame) ProtoMessage() {}
 
 func (x *Frame) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_gateway_struct_proto_msgTypes[0]
+	mi := &file_cspb_gateway_struct_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +351,7 @@ func (x *Frame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Frame.ProtoReflect.Descriptor instead.
 func (*Frame) Descriptor() ([]byte, []int) {
-	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{0}
+	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Frame) GetPayload() []byte {
@@ -80,7 +374,7 @@ type ServerAccount struct {
 
 func (x *ServerAccount) Reset() {
 	*x = ServerAccount{}
-	mi := &file_cspb_gateway_struct_proto_msgTypes[1]
+	mi := &file_cspb_gateway_struct_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -92,7 +386,7 @@ func (x *ServerAccount) String() string {
 func (*ServerAccount) ProtoMessage() {}
 
 func (x *ServerAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_gateway_struct_proto_msgTypes[1]
+	mi := &file_cspb_gateway_struct_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -105,7 +399,7 @@ func (x *ServerAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerAccount.ProtoReflect.Descriptor instead.
 func (*ServerAccount) Descriptor() ([]byte, []int) {
-	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{1}
+	return file_cspb_gateway_struct_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ServerAccount) GetServerId() uint32 {
@@ -126,14 +420,27 @@ var File_cspb_gateway_struct_proto protoreflect.FileDescriptor
 
 const file_cspb_gateway_struct_proto_rawDesc = "" +
 	"\n" +
-	"\x19cspb/gateway/struct.proto\"!\n" +
+	"\x19cspb/gateway/struct.proto\"C\n" +
+	"\tSwitchMsg\x12\x1b\n" +
+	"\tserver_id\x18\x01 \x01(\tR\bserverId\x12\x19\n" +
+	"\bnew_addr\x18\x02 \x01(\tR\anewAddr\")\n" +
+	"\tStreamMsg\x12\x1c\n" +
+	"\x05frame\x18\x01 \x01(\v2\x06.FrameR\x05frame\"F\n" +
+	"\x0eCheckDeleteMsg\x12\x1b\n" +
+	"\tserver_id\x18\x01 \x01(\tR\bserverId\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\"%\n" +
+	"\n" +
+	"ConnRegMsg\x12\x17\n" +
+	"\aconn_id\x18\x01 \x01(\x04R\x06connId\"'\n" +
+	"\fConnUnregMsg\x12\x17\n" +
+	"\aconn_id\x18\x01 \x01(\x04R\x06connId\"\"\n" +
+	"\fBroadcastMsg\x12\x12\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\"!\n" +
 	"\x05Frame\x12\x18\n" +
 	"\apayload\x18\x01 \x01(\fR\apayload\">\n" +
 	"\rServerAccount\x12\x1b\n" +
 	"\tserver_id\x18\x01 \x01(\rR\bserverId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid2'\n" +
-	"\aGateway\x12\x1c\n" +
-	"\x06Stream\x12\x06.Frame\x1a\x06.Frame(\x010\x01B+Z)github.com/gogu-x/gogs/pb/cspb/pb_gatewayb\x06proto3"
+	"\x03uid\x18\x02 \x01(\x04R\x03uidB+Z)github.com/gogu-x/gogs/pb/cspb/pb_gatewayb\x06proto3"
 
 var (
 	file_cspb_gateway_struct_proto_rawDescOnce sync.Once
@@ -147,19 +454,24 @@ func file_cspb_gateway_struct_proto_rawDescGZIP() []byte {
 	return file_cspb_gateway_struct_proto_rawDescData
 }
 
-var file_cspb_gateway_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_cspb_gateway_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_cspb_gateway_struct_proto_goTypes = []any{
-	(*Frame)(nil),         // 0: Frame
-	(*ServerAccount)(nil), // 1: ServerAccount
+	(*SwitchMsg)(nil),      // 0: SwitchMsg
+	(*StreamMsg)(nil),      // 1: StreamMsg
+	(*CheckDeleteMsg)(nil), // 2: CheckDeleteMsg
+	(*ConnRegMsg)(nil),     // 3: ConnRegMsg
+	(*ConnUnregMsg)(nil),   // 4: ConnUnregMsg
+	(*BroadcastMsg)(nil),   // 5: BroadcastMsg
+	(*Frame)(nil),          // 6: Frame
+	(*ServerAccount)(nil),  // 7: ServerAccount
 }
 var file_cspb_gateway_struct_proto_depIdxs = []int32{
-	0, // 0: Gateway.Stream:input_type -> Frame
-	0, // 1: Gateway.Stream:output_type -> Frame
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	6, // 0: StreamMsg.frame:type_name -> Frame
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_cspb_gateway_struct_proto_init() }
@@ -173,9 +485,9 @@ func file_cspb_gateway_struct_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_gateway_struct_proto_rawDesc), len(file_cspb_gateway_struct_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   8,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   0,
 		},
 		GoTypes:           file_cspb_gateway_struct_proto_goTypes,
 		DependencyIndexes: file_cspb_gateway_struct_proto_depIdxs,

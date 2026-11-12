@@ -185,7 +185,7 @@ func (actor *Actv) applyPlayerData(uid uint64, state *playerLoadState) {
 		actor.actvService.ApplyDataDocs(*state.docs, actor.playerGuildID(uid))
 	}
 	for _, actv := range restored {
-		actv.GetExt().OnLoaded()
+		actor.actvService.Loaded(actv)
 	}
 	actor.actvService.NotifyPlayerLoaded(uid, actor.playerGuildID(uid))
 	tlog.Log.Info("[actv/Actv.applyPlayerData] 玩家活动数据加载完成, pid=%v actvs=%v data=%v",

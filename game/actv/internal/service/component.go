@@ -88,3 +88,12 @@ func newDataSnapshot(actvID int64, compID int32, scope OwnerScope, ownerID Owner
 		dirty:      true,
 	}
 }
+
+// GetActvID 返回所属活动实例编号。
+func (d *ActvDataDoc) GetActvID() int64 { return d.ActvID }
+
+// GetOwnerID 返回数据归属者。
+func (d *ActvDataDoc) GetOwnerID() OwnerID { return d.OwnerID }
+
+// GetData 返回不可变存盘快照。
+func (d *ActvDataDoc) GetData() bson.Raw { return d.Data }

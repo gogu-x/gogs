@@ -178,11 +178,588 @@ func (x *ClaimRewardAck) GetCode() pb_common.ErrCode {
 	return pb_common.ErrCode(0)
 }
 
+// 具体业务自行填充错误码和状态。
+type GetSevenDayLoginAck struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 请求处理结果。
+	Code pb_common.ErrCode `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	// 七日登录状态。
+	Data          *SevenDayLoginData `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSevenDayLoginAck) Reset() {
+	*x = GetSevenDayLoginAck{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSevenDayLoginAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSevenDayLoginAck) ProtoMessage() {}
+
+func (x *GetSevenDayLoginAck) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSevenDayLoginAck.ProtoReflect.Descriptor instead.
+func (*GetSevenDayLoginAck) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetSevenDayLoginAck) GetCode() pb_common.ErrCode {
+	if x != nil {
+		return x.Code
+	}
+	return pb_common.ErrCode(0)
+}
+
+func (x *GetSevenDayLoginAck) GetData() *SevenDayLoginData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// 登录、跨日及进度变化时推送的完整个人状态。
+type SevenDayLoginNtf struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 七日登录状态。
+	Data          *SevenDayLoginData `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SevenDayLoginNtf) Reset() {
+	*x = SevenDayLoginNtf{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SevenDayLoginNtf) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SevenDayLoginNtf) ProtoMessage() {}
+
+func (x *SevenDayLoginNtf) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SevenDayLoginNtf.ProtoReflect.Descriptor instead.
+func (*SevenDayLoginNtf) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SevenDayLoginNtf) GetData() *SevenDayLoginData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// 查询结果。
+type GetTaskLotteryAck struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 错误码。
+	Code pb_common.ErrCode `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	// 个人状态。
+	Data          *TaskLotteryState `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskLotteryAck) Reset() {
+	*x = GetTaskLotteryAck{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskLotteryAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskLotteryAck) ProtoMessage() {}
+
+func (x *GetTaskLotteryAck) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskLotteryAck.ProtoReflect.Descriptor instead.
+func (*GetTaskLotteryAck) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetTaskLotteryAck) GetCode() pb_common.ErrCode {
+	if x != nil {
+		return x.Code
+	}
+	return pb_common.ErrCode(0)
+}
+
+func (x *GetTaskLotteryAck) GetData() *TaskLotteryState {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// 写操作结果，由玩家资源处理完成后确认。
+type ActvOperationAck struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 错误码。
+	Code pb_common.ErrCode `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	// 原请求序号。
+	Sequence uint64 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	// 最新个人状态。
+	Data *TaskLotteryState `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	// 本次奖励，重复请求不重复执行。
+	Rewards []*ActvRewardItem `protobuf:"bytes,4,rep,name=rewards,proto3" json:"rewards,omitempty"`
+	// 已受理，等待玩家资源处理结果。
+	Pending       bool `protobuf:"varint,5,opt,name=pending,proto3" json:"pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActvOperationAck) Reset() {
+	*x = ActvOperationAck{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActvOperationAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActvOperationAck) ProtoMessage() {}
+
+func (x *ActvOperationAck) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActvOperationAck.ProtoReflect.Descriptor instead.
+func (*ActvOperationAck) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ActvOperationAck) GetCode() pb_common.ErrCode {
+	if x != nil {
+		return x.Code
+	}
+	return pb_common.ErrCode(0)
+}
+
+func (x *ActvOperationAck) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *ActvOperationAck) GetData() *TaskLotteryState {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ActvOperationAck) GetRewards() []*ActvRewardItem {
+	if x != nil {
+		return x.Rewards
+	}
+	return nil
+}
+
+func (x *ActvOperationAck) GetPending() bool {
+	if x != nil {
+		return x.Pending
+	}
+	return false
+}
+
+// 登录、任务、资产、兑换和跨日变更主动推送。
+type TaskLotteryNtf struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 最新个人状态。
+	Data          *TaskLotteryState `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaskLotteryNtf) Reset() {
+	*x = TaskLotteryNtf{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskLotteryNtf) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskLotteryNtf) ProtoMessage() {}
+
+func (x *TaskLotteryNtf) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskLotteryNtf.ProtoReflect.Descriptor instead.
+func (*TaskLotteryNtf) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *TaskLotteryNtf) GetData() *TaskLotteryState {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// 商店查询响应。
+type GetActvShopAck struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 业务结果。
+	Code pb_common.ErrCode `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	// 商店状态。
+	Data          *ActvShopState `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetActvShopAck) Reset() {
+	*x = GetActvShopAck{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetActvShopAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetActvShopAck) ProtoMessage() {}
+
+func (x *GetActvShopAck) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetActvShopAck.ProtoReflect.Descriptor instead.
+func (*GetActvShopAck) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetActvShopAck) GetCode() pb_common.ErrCode {
+	if x != nil {
+		return x.Code
+	}
+	return pb_common.ErrCode(0)
+}
+
+func (x *GetActvShopAck) GetData() *ActvShopState {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// 商店购买响应，pending=true仅表示已受理，最终结果另行推送。
+type BuyActvShopAck struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 业务结果。
+	Code pb_common.ErrCode `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	// 本次序号。
+	Sequence uint64 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	// 商店状态。
+	Data *ActvShopState `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	// 实际奖励。
+	Rewards []*ActvRewardItem `protobuf:"bytes,4,rep,name=rewards,proto3" json:"rewards,omitempty"`
+	// 正在等待通用资产交易完成。
+	Pending       bool `protobuf:"varint,5,opt,name=pending,proto3" json:"pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BuyActvShopAck) Reset() {
+	*x = BuyActvShopAck{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BuyActvShopAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BuyActvShopAck) ProtoMessage() {}
+
+func (x *BuyActvShopAck) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BuyActvShopAck.ProtoReflect.Descriptor instead.
+func (*BuyActvShopAck) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *BuyActvShopAck) GetCode() pb_common.ErrCode {
+	if x != nil {
+		return x.Code
+	}
+	return pb_common.ErrCode(0)
+}
+
+func (x *BuyActvShopAck) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *BuyActvShopAck) GetData() *ActvShopState {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *BuyActvShopAck) GetRewards() []*ActvRewardItem {
+	if x != nil {
+		return x.Rewards
+	}
+	return nil
+}
+
+func (x *BuyActvShopAck) GetPending() bool {
+	if x != nil {
+		return x.Pending
+	}
+	return false
+}
+
+// 商店状态主动通知。
+type ActvShopNtf struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 商店状态。
+	Data          *ActvShopState `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActvShopNtf) Reset() {
+	*x = ActvShopNtf{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActvShopNtf) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActvShopNtf) ProtoMessage() {}
+
+func (x *ActvShopNtf) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActvShopNtf.ProtoReflect.Descriptor instead.
+func (*ActvShopNtf) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ActvShopNtf) GetData() *ActvShopState {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// 通用活动任务进度推送，tasks为当前活动的完整任务列表。
+type ActvTasksNtf struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 活动实例编号。
+	ActvId uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	// 当前任务状态。
+	Tasks         []*ActvTaskState `protobuf:"bytes,2,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActvTasksNtf) Reset() {
+	*x = ActvTasksNtf{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActvTasksNtf) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActvTasksNtf) ProtoMessage() {}
+
+func (x *ActvTasksNtf) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActvTasksNtf.ProtoReflect.Descriptor instead.
+func (*ActvTasksNtf) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ActvTasksNtf) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+func (x *ActvTasksNtf) GetTasks() []*ActvTaskState {
+	if x != nil {
+		return x.Tasks
+	}
+	return nil
+}
+
+// 商店刷新响应。
+type RefreshActvShopAck struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 业务结果。
+	Code pb_common.ErrCode `protobuf:"varint,1,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	// 最新商店状态。
+	Data          *ActvShopState `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefreshActvShopAck) Reset() {
+	*x = RefreshActvShopAck{}
+	mi := &file_cspb_actv_ack_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefreshActvShopAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefreshActvShopAck) ProtoMessage() {}
+
+func (x *RefreshActvShopAck) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_ack_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefreshActvShopAck.ProtoReflect.Descriptor instead.
+func (*RefreshActvShopAck) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_ack_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RefreshActvShopAck) GetCode() pb_common.ErrCode {
+	if x != nil {
+		return x.Code
+	}
+	return pb_common.ErrCode(0)
+}
+
+func (x *RefreshActvShopAck) GetData() *ActvShopState {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 var File_cspb_actv_ack_proto protoreflect.FileDescriptor
 
 const file_cspb_actv_ack_proto_rawDesc = "" +
 	"\n" +
-	"\x13cspb/actv/ack.proto\x1a\x17cspb/common/error.proto\x1a\x16cspb/actv/struct.proto\"O\n" +
+	"\x13cspb/actv/ack.proto\x1a\x16cspb/actv/struct.proto\x1a\x17cspb/common/error.proto\"O\n" +
 	"\x0eGetActvListAck\x12\x1f\n" +
 	"\x05actvs\x18\x01 \x03(\v2\t.ActvInfoR\x05actvs\x12\x1c\n" +
 	"\x04code\x18\x02 \x01(\x0e2\b.ErrCodeR\x04code\"Y\n" +
@@ -190,7 +767,40 @@ const file_cspb_actv_ack_proto_rawDesc = "" +
 	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12)\n" +
 	"\bprogress\x18\x02 \x01(\v2\r.ActvProgressR\bprogress\".\n" +
 	"\x0eClaimRewardAck\x12\x1c\n" +
-	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04codeB(Z&github.com/gogu-x/gogs/pb/cspb/pb_actvb\x06proto3"
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\"[\n" +
+	"\x13GetSevenDayLoginAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12&\n" +
+	"\x04data\x18\x02 \x01(\v2\x12.SevenDayLoginDataR\x04data\":\n" +
+	"\x10SevenDayLoginNtf\x12&\n" +
+	"\x04data\x18\x01 \x01(\v2\x12.SevenDayLoginDataR\x04data\"X\n" +
+	"\x11GetTaskLotteryAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12%\n" +
+	"\x04data\x18\x02 \x01(\v2\x11.TaskLotteryStateR\x04data\"\xb8\x01\n" +
+	"\x10ActvOperationAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x1a\n" +
+	"\bsequence\x18\x02 \x01(\x04R\bsequence\x12%\n" +
+	"\x04data\x18\x03 \x01(\v2\x11.TaskLotteryStateR\x04data\x12)\n" +
+	"\arewards\x18\x04 \x03(\v2\x0f.ActvRewardItemR\arewards\x12\x18\n" +
+	"\apending\x18\x05 \x01(\bR\apending\"7\n" +
+	"\x0eTaskLotteryNtf\x12%\n" +
+	"\x04data\x18\x01 \x01(\v2\x11.TaskLotteryStateR\x04data\"R\n" +
+	"\x0eGetActvShopAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\"\n" +
+	"\x04data\x18\x02 \x01(\v2\x0e.ActvShopStateR\x04data\"\xb3\x01\n" +
+	"\x0eBuyActvShopAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\x1a\n" +
+	"\bsequence\x18\x02 \x01(\x04R\bsequence\x12\"\n" +
+	"\x04data\x18\x03 \x01(\v2\x0e.ActvShopStateR\x04data\x12)\n" +
+	"\arewards\x18\x04 \x03(\v2\x0f.ActvRewardItemR\arewards\x12\x18\n" +
+	"\apending\x18\x05 \x01(\bR\apending\"1\n" +
+	"\vActvShopNtf\x12\"\n" +
+	"\x04data\x18\x01 \x01(\v2\x0e.ActvShopStateR\x04data\"L\n" +
+	"\fActvTasksNtf\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\x12$\n" +
+	"\x05tasks\x18\x02 \x03(\v2\x0e.ActvTaskStateR\x05tasks\"V\n" +
+	"\x12RefreshActvShopAck\x12\x1c\n" +
+	"\x04code\x18\x01 \x01(\x0e2\b.ErrCodeR\x04code\x12\"\n" +
+	"\x04data\x18\x02 \x01(\v2\x0e.ActvShopStateR\x04dataB(Z&github.com/gogu-x/gogs/pb/cspb/pb_actvb\x06proto3"
 
 var (
 	file_cspb_actv_ack_proto_rawDescOnce sync.Once
@@ -204,26 +814,59 @@ func file_cspb_actv_ack_proto_rawDescGZIP() []byte {
 	return file_cspb_actv_ack_proto_rawDescData
 }
 
-var file_cspb_actv_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_cspb_actv_ack_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_cspb_actv_ack_proto_goTypes = []any{
-	(*GetActvListAck)(nil), // 0: GetActvListAck
-	(*GetProgressAck)(nil), // 1: GetProgressAck
-	(*ClaimRewardAck)(nil), // 2: ClaimRewardAck
-	(*ActvInfo)(nil),       // 3: ActvInfo
-	(pb_common.ErrCode)(0), // 4: ErrCode
-	(*ActvProgress)(nil),   // 5: ActvProgress
+	(*GetActvListAck)(nil),      // 0: GetActvListAck
+	(*GetProgressAck)(nil),      // 1: GetProgressAck
+	(*ClaimRewardAck)(nil),      // 2: ClaimRewardAck
+	(*GetSevenDayLoginAck)(nil), // 3: GetSevenDayLoginAck
+	(*SevenDayLoginNtf)(nil),    // 4: SevenDayLoginNtf
+	(*GetTaskLotteryAck)(nil),   // 5: GetTaskLotteryAck
+	(*ActvOperationAck)(nil),    // 6: ActvOperationAck
+	(*TaskLotteryNtf)(nil),      // 7: TaskLotteryNtf
+	(*GetActvShopAck)(nil),      // 8: GetActvShopAck
+	(*BuyActvShopAck)(nil),      // 9: BuyActvShopAck
+	(*ActvShopNtf)(nil),         // 10: ActvShopNtf
+	(*ActvTasksNtf)(nil),        // 11: ActvTasksNtf
+	(*RefreshActvShopAck)(nil),  // 12: RefreshActvShopAck
+	(*ActvInfo)(nil),            // 13: ActvInfo
+	(pb_common.ErrCode)(0),      // 14: ErrCode
+	(*ActvProgress)(nil),        // 15: ActvProgress
+	(*SevenDayLoginData)(nil),   // 16: SevenDayLoginData
+	(*TaskLotteryState)(nil),    // 17: TaskLotteryState
+	(*ActvRewardItem)(nil),      // 18: ActvRewardItem
+	(*ActvShopState)(nil),       // 19: ActvShopState
+	(*ActvTaskState)(nil),       // 20: ActvTaskState
 }
 var file_cspb_actv_ack_proto_depIdxs = []int32{
-	3, // 0: GetActvListAck.actvs:type_name -> ActvInfo
-	4, // 1: GetActvListAck.code:type_name -> ErrCode
-	4, // 2: GetProgressAck.code:type_name -> ErrCode
-	5, // 3: GetProgressAck.progress:type_name -> ActvProgress
-	4, // 4: ClaimRewardAck.code:type_name -> ErrCode
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	13, // 0: GetActvListAck.actvs:type_name -> ActvInfo
+	14, // 1: GetActvListAck.code:type_name -> ErrCode
+	14, // 2: GetProgressAck.code:type_name -> ErrCode
+	15, // 3: GetProgressAck.progress:type_name -> ActvProgress
+	14, // 4: ClaimRewardAck.code:type_name -> ErrCode
+	14, // 5: GetSevenDayLoginAck.code:type_name -> ErrCode
+	16, // 6: GetSevenDayLoginAck.data:type_name -> SevenDayLoginData
+	16, // 7: SevenDayLoginNtf.data:type_name -> SevenDayLoginData
+	14, // 8: GetTaskLotteryAck.code:type_name -> ErrCode
+	17, // 9: GetTaskLotteryAck.data:type_name -> TaskLotteryState
+	14, // 10: ActvOperationAck.code:type_name -> ErrCode
+	17, // 11: ActvOperationAck.data:type_name -> TaskLotteryState
+	18, // 12: ActvOperationAck.rewards:type_name -> ActvRewardItem
+	17, // 13: TaskLotteryNtf.data:type_name -> TaskLotteryState
+	14, // 14: GetActvShopAck.code:type_name -> ErrCode
+	19, // 15: GetActvShopAck.data:type_name -> ActvShopState
+	14, // 16: BuyActvShopAck.code:type_name -> ErrCode
+	19, // 17: BuyActvShopAck.data:type_name -> ActvShopState
+	18, // 18: BuyActvShopAck.rewards:type_name -> ActvRewardItem
+	19, // 19: ActvShopNtf.data:type_name -> ActvShopState
+	20, // 20: ActvTasksNtf.tasks:type_name -> ActvTaskState
+	14, // 21: RefreshActvShopAck.code:type_name -> ErrCode
+	19, // 22: RefreshActvShopAck.data:type_name -> ActvShopState
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_cspb_actv_ack_proto_init() }
@@ -238,7 +881,7 @@ func file_cspb_actv_ack_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_actv_ack_proto_rawDesc), len(file_cspb_actv_ack_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

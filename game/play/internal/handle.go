@@ -4,11 +4,13 @@ import (
 	"github.com/gogu-x/gogs/game/battle"
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_actv"
+	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_assets"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_auth"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_battle"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_equipment"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_guild"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_loadout"
+	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/cspb/pb_auth"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
@@ -21,6 +23,14 @@ import (
 
 // InitRoutes 注册单个玩家角色的全部业务路由。
 func InitRoutes(actor *core.PlayerActor) {
+	core.RegisterSysMsg(actor, (*ipb.ActvAssetTrade)(nil), ctl_assets.OnActvAssetTrade)
+	core.RegisterPlayerMsg(actor, (*pb_actv.GetActvShopReq)(nil), ctl_actv.OnGetActvShop)
+	core.RegisterPlayerMsg(actor, (*pb_actv.RefreshActvShopReq)(nil), ctl_actv.OnRefreshActvShop)
+	core.RegisterPlayerMsg(actor, (*pb_actv.GetTaskLotteryReq)(nil), ctl_actv.OnGetTaskLottery)
+	core.RegisterPlayerMsg(actor, (*pb_actv.ClaimActvTaskReq)(nil), ctl_actv.OnClaimActvTask)
+	core.RegisterPlayerMsg(actor, (*pb_actv.DrawActvReq)(nil), ctl_actv.OnDrawActv)
+	core.RegisterPlayerMsg(actor, (*pb_actv.BuyActvShopReq)(nil), ctl_actv.OnBuyActvShop)
+
 	core.RegisterPlayerMsg(actor, (*pb_actv.GetSevenDayLoginReq)(nil), ctl_actv.OnGetSevenDayLogin)
 	core.RegisterSysMsg(actor, (*pb_auth.LoginGameReq)(nil), ctl_auth.AutoLogin)
 	core.RegisterPlayerMsg(actor, (*pb_actv.GetActvListReq)(nil), ctl_actv.OnGetActvList)

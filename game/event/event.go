@@ -77,7 +77,14 @@ func SendToActors(system *tree.Tree, message *sspb.Event, actorNames []string) e
 	var deliveryErr error
 	for _, actorName := range actorNames {
 		pid, _ := system.Lookup(actorName)
-		system.Send(pid, Clone(message))
+		if IsServerClosing(message) {
+			if _, err := system.Request(pid, Clone(message)).AwaitTimeout(eventDeliveryTimeout); err != nil {
+				deliveryErr = fmt.Errorf("shutdown actor %s: %w", actorName, err)
+				break
+			}
+		} else {
+			system.Send(pid, Clone(message))
+		}
 	}
 	return deliveryErr
 }

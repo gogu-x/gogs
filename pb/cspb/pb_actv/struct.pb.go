@@ -331,6 +331,444 @@ func (x *ActvProgress) GetRewarded() bool {
 	return false
 }
 
+// 七日登录的个人状态。
+type SevenDayLoginData struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 活动实例编号。
+	ActvId uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	// 累计有效登录天数，最多七天。
+	LoginDays int32 `protobuf:"varint,2,opt,name=loginDays,proto3" json:"loginDays,omitempty"`
+	// 当天有效登录次数，最多一次。
+	TodayLoginCount int32 `protobuf:"varint,3,opt,name=todayLoginCount,proto3" json:"todayLoginCount,omitempty"`
+	// 服务器时区下次零点的 Unix 秒。
+	NextResetTime int64 `protobuf:"varint,4,opt,name=nextResetTime,proto3" json:"nextResetTime,omitempty"`
+	// 是否已累计登录七天。
+	Completed     bool `protobuf:"varint,5,opt,name=completed,proto3" json:"completed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SevenDayLoginData) Reset() {
+	*x = SevenDayLoginData{}
+	mi := &file_cspb_actv_struct_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SevenDayLoginData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SevenDayLoginData) ProtoMessage() {}
+
+func (x *SevenDayLoginData) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_struct_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SevenDayLoginData.ProtoReflect.Descriptor instead.
+func (*SevenDayLoginData) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_struct_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SevenDayLoginData) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+func (x *SevenDayLoginData) GetLoginDays() int32 {
+	if x != nil {
+		return x.LoginDays
+	}
+	return 0
+}
+
+func (x *SevenDayLoginData) GetTodayLoginCount() int32 {
+	if x != nil {
+		return x.TodayLoginCount
+	}
+	return 0
+}
+
+func (x *SevenDayLoginData) GetNextResetTime() int64 {
+	if x != nil {
+		return x.NextResetTime
+	}
+	return 0
+}
+
+func (x *SevenDayLoginData) GetCompleted() bool {
+	if x != nil {
+		return x.Completed
+	}
+	return false
+}
+
+// 活动任务状态。
+type ActvTaskState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 任务配置编号。
+	TaskId int32 `protobuf:"varint,1,opt,name=taskId,proto3" json:"taskId,omitempty"`
+	// 当前进度。
+	Progress int64 `protobuf:"varint,2,opt,name=progress,proto3" json:"progress,omitempty"`
+	// 完成目标。
+	Target int64 `protobuf:"varint,3,opt,name=target,proto3" json:"target,omitempty"`
+	// 状态：0进行中、1待领取、2已领取。
+	Status        int32 `protobuf:"varint,4,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActvTaskState) Reset() {
+	*x = ActvTaskState{}
+	mi := &file_cspb_actv_struct_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActvTaskState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActvTaskState) ProtoMessage() {}
+
+func (x *ActvTaskState) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_struct_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActvTaskState.ProtoReflect.Descriptor instead.
+func (*ActvTaskState) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_struct_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ActvTaskState) GetTaskId() int32 {
+	if x != nil {
+		return x.TaskId
+	}
+	return 0
+}
+
+func (x *ActvTaskState) GetProgress() int64 {
+	if x != nil {
+		return x.Progress
+	}
+	return 0
+}
+
+func (x *ActvTaskState) GetTarget() int64 {
+	if x != nil {
+		return x.Target
+	}
+	return 0
+}
+
+func (x *ActvTaskState) GetStatus() int32 {
+	if x != nil {
+		return x.Status
+	}
+	return 0
+}
+
+// 兑换商品状态。
+type ActvGoodsState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 商品配置编号。
+	GoodsId int32 `protobuf:"varint,1,opt,name=goodsId,proto3" json:"goodsId,omitempty"`
+	// 当前限购周期已购份数。
+	Bought        int64 `protobuf:"varint,2,opt,name=bought,proto3" json:"bought,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActvGoodsState) Reset() {
+	*x = ActvGoodsState{}
+	mi := &file_cspb_actv_struct_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActvGoodsState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActvGoodsState) ProtoMessage() {}
+
+func (x *ActvGoodsState) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_struct_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActvGoodsState.ProtoReflect.Descriptor instead.
+func (*ActvGoodsState) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_struct_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ActvGoodsState) GetGoodsId() int32 {
+	if x != nil {
+		return x.GoodsId
+	}
+	return 0
+}
+
+func (x *ActvGoodsState) GetBought() int64 {
+	if x != nil {
+		return x.Bought
+	}
+	return 0
+}
+
+// 抽奖及兑换的奖励结果。
+type ActvRewardItem struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 类型：1普通资源、2装备。
+	RewardType int32 `protobuf:"varint,1,opt,name=rewardType,proto3" json:"rewardType,omitempty"`
+	// 奖励配置编号。
+	RewardId int32 `protobuf:"varint,2,opt,name=rewardId,proto3" json:"rewardId,omitempty"`
+	// 奖励数量。
+	Count         int64 `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActvRewardItem) Reset() {
+	*x = ActvRewardItem{}
+	mi := &file_cspb_actv_struct_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActvRewardItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActvRewardItem) ProtoMessage() {}
+
+func (x *ActvRewardItem) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_struct_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActvRewardItem.ProtoReflect.Descriptor instead.
+func (*ActvRewardItem) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_struct_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ActvRewardItem) GetRewardType() int32 {
+	if x != nil {
+		return x.RewardType
+	}
+	return 0
+}
+
+func (x *ActvRewardItem) GetRewardId() int32 {
+	if x != nil {
+		return x.RewardId
+	}
+	return 0
+}
+
+func (x *ActvRewardItem) GetCount() int64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+// 任务抽奖活动自身的个人状态。
+type TaskLotteryState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 活动实例编号。
+	ActvId uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	// 任务状态。
+	Tasks []*ActvTaskState `protobuf:"bytes,2,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	// 下一笔本活动写请求序号。
+	NextSequence uint64 `protobuf:"varint,3,opt,name=nextSequence,proto3" json:"nextSequence,omitempty"`
+	// 待完成的道具交易数量。
+	PendingRewards int32 `protobuf:"varint,4,opt,name=pendingRewards,proto3" json:"pendingRewards,omitempty"`
+	// 下次本地零点。
+	NextResetTime int64 `protobuf:"varint,5,opt,name=nextResetTime,proto3" json:"nextResetTime,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaskLotteryState) Reset() {
+	*x = TaskLotteryState{}
+	mi := &file_cspb_actv_struct_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskLotteryState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskLotteryState) ProtoMessage() {}
+
+func (x *TaskLotteryState) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_struct_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskLotteryState.ProtoReflect.Descriptor instead.
+func (*TaskLotteryState) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_struct_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *TaskLotteryState) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+func (x *TaskLotteryState) GetTasks() []*ActvTaskState {
+	if x != nil {
+		return x.Tasks
+	}
+	return nil
+}
+
+func (x *TaskLotteryState) GetNextSequence() uint64 {
+	if x != nil {
+		return x.NextSequence
+	}
+	return 0
+}
+
+func (x *TaskLotteryState) GetPendingRewards() int32 {
+	if x != nil {
+		return x.PendingRewards
+	}
+	return 0
+}
+
+func (x *TaskLotteryState) GetNextResetTime() int64 {
+	if x != nil {
+		return x.NextResetTime
+	}
+	return 0
+}
+
+// 独立个人商店状态。
+type ActvShopState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 商店实例编号。
+	ActvId uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	// 商品限购状态。
+	Goods []*ActvGoodsState `protobuf:"bytes,3,rep,name=goods,proto3" json:"goods,omitempty"`
+	// 下一笔商店交易序号，与其他活动独立。
+	NextSequence uint64 `protobuf:"varint,4,opt,name=nextSequence,proto3" json:"nextSequence,omitempty"`
+	// 下一次当地零点。
+	NextResetTime int64 `protobuf:"varint,5,opt,name=nextResetTime,proto3" json:"nextResetTime,omitempty"`
+	// 是否存在正在处理的交易。
+	Pending       bool `protobuf:"varint,6,opt,name=pending,proto3" json:"pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActvShopState) Reset() {
+	*x = ActvShopState{}
+	mi := &file_cspb_actv_struct_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActvShopState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActvShopState) ProtoMessage() {}
+
+func (x *ActvShopState) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_struct_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActvShopState.ProtoReflect.Descriptor instead.
+func (*ActvShopState) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_struct_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ActvShopState) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+func (x *ActvShopState) GetGoods() []*ActvGoodsState {
+	if x != nil {
+		return x.Goods
+	}
+	return nil
+}
+
+func (x *ActvShopState) GetNextSequence() uint64 {
+	if x != nil {
+		return x.NextSequence
+	}
+	return 0
+}
+
+func (x *ActvShopState) GetNextResetTime() int64 {
+	if x != nil {
+		return x.NextResetTime
+	}
+	return 0
+}
+
+func (x *ActvShopState) GetPending() bool {
+	if x != nil {
+		return x.Pending
+	}
+	return false
+}
+
 var File_cspb_actv_struct_proto protoreflect.FileDescriptor
 
 const file_cspb_actv_struct_proto_rawDesc = "" +
@@ -353,7 +791,39 @@ const file_cspb_actv_struct_proto_rawDesc = "" +
 	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12\x1a\n" +
 	"\bprogress\x18\x03 \x01(\x05R\bprogress\x12\x16\n" +
 	"\x06target\x18\x04 \x01(\x05R\x06target\x12\x1a\n" +
-	"\brewarded\x18\x05 \x01(\bR\brewarded*5\n" +
+	"\brewarded\x18\x05 \x01(\bR\brewarded\"\xb7\x01\n" +
+	"\x11SevenDayLoginData\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\x12\x1c\n" +
+	"\tloginDays\x18\x02 \x01(\x05R\tloginDays\x12(\n" +
+	"\x0ftodayLoginCount\x18\x03 \x01(\x05R\x0ftodayLoginCount\x12$\n" +
+	"\rnextResetTime\x18\x04 \x01(\x03R\rnextResetTime\x12\x1c\n" +
+	"\tcompleted\x18\x05 \x01(\bR\tcompleted\"s\n" +
+	"\rActvTaskState\x12\x16\n" +
+	"\x06taskId\x18\x01 \x01(\x05R\x06taskId\x12\x1a\n" +
+	"\bprogress\x18\x02 \x01(\x03R\bprogress\x12\x16\n" +
+	"\x06target\x18\x03 \x01(\x03R\x06target\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\x05R\x06status\"B\n" +
+	"\x0eActvGoodsState\x12\x18\n" +
+	"\agoodsId\x18\x01 \x01(\x05R\agoodsId\x12\x16\n" +
+	"\x06bought\x18\x02 \x01(\x03R\x06bought\"b\n" +
+	"\x0eActvRewardItem\x12\x1e\n" +
+	"\n" +
+	"rewardType\x18\x01 \x01(\x05R\n" +
+	"rewardType\x12\x1a\n" +
+	"\brewardId\x18\x02 \x01(\x05R\brewardId\x12\x14\n" +
+	"\x05count\x18\x03 \x01(\x03R\x05count\"\xc2\x01\n" +
+	"\x10TaskLotteryState\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\x12$\n" +
+	"\x05tasks\x18\x02 \x03(\v2\x0e.ActvTaskStateR\x05tasks\x12\"\n" +
+	"\fnextSequence\x18\x03 \x01(\x04R\fnextSequence\x12&\n" +
+	"\x0ependingRewards\x18\x04 \x01(\x05R\x0ependingRewards\x12$\n" +
+	"\rnextResetTime\x18\x05 \x01(\x03R\rnextResetTime\"\xb2\x01\n" +
+	"\rActvShopState\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\x12%\n" +
+	"\x05goods\x18\x03 \x03(\v2\x0f.ActvGoodsStateR\x05goods\x12\"\n" +
+	"\fnextSequence\x18\x04 \x01(\x04R\fnextSequence\x12$\n" +
+	"\rnextResetTime\x18\x05 \x01(\x03R\rnextResetTime\x12\x18\n" +
+	"\apending\x18\x06 \x01(\bR\apending*5\n" +
 	"\n" +
 	"ActvStatus\x12\x0f\n" +
 	"\vNOT_STARTED\x10\x00\x12\v\n" +
@@ -378,21 +848,29 @@ func file_cspb_actv_struct_proto_rawDescGZIP() []byte {
 }
 
 var file_cspb_actv_struct_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_cspb_actv_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_cspb_actv_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_cspb_actv_struct_proto_goTypes = []any{
-	(ActvStatus)(0),      // 0: ActvStatus
-	(ActvOwnerScope)(0),  // 1: ActvOwnerScope
-	(*ActvInfo)(nil),     // 2: ActvInfo
-	(*ActvProgress)(nil), // 3: ActvProgress
+	(ActvStatus)(0),           // 0: ActvStatus
+	(ActvOwnerScope)(0),       // 1: ActvOwnerScope
+	(*ActvInfo)(nil),          // 2: ActvInfo
+	(*ActvProgress)(nil),      // 3: ActvProgress
+	(*SevenDayLoginData)(nil), // 4: SevenDayLoginData
+	(*ActvTaskState)(nil),     // 5: ActvTaskState
+	(*ActvGoodsState)(nil),    // 6: ActvGoodsState
+	(*ActvRewardItem)(nil),    // 7: ActvRewardItem
+	(*TaskLotteryState)(nil),  // 8: TaskLotteryState
+	(*ActvShopState)(nil),     // 9: ActvShopState
 }
 var file_cspb_actv_struct_proto_depIdxs = []int32{
 	0, // 0: ActvInfo.status:type_name -> ActvStatus
 	1, // 1: ActvInfo.ownerScope:type_name -> ActvOwnerScope
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	5, // 2: TaskLotteryState.tasks:type_name -> ActvTaskState
+	6, // 3: ActvShopState.goods:type_name -> ActvGoodsState
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_cspb_actv_struct_proto_init() }
@@ -406,7 +884,7 @@ func file_cspb_actv_struct_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_actv_struct_proto_rawDesc), len(file_cspb_actv_struct_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   2,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -222,6 +222,559 @@ func (x *ClaimRewardReq) GetActvId() uint64 {
 	return 0
 }
 
+// 查询个人七日登录状态，日常更新由服务端主动推送。
+type GetSevenDayLoginReq struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 活动实例编号。
+	UID           uint64 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	ActvId        uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSevenDayLoginReq) Reset() {
+	*x = GetSevenDayLoginReq{}
+	mi := &file_cspb_actv_req_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSevenDayLoginReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSevenDayLoginReq) ProtoMessage() {}
+
+func (x *GetSevenDayLoginReq) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_req_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSevenDayLoginReq.ProtoReflect.Descriptor instead.
+func (*GetSevenDayLoginReq) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_req_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetSevenDayLoginReq) GetUID() uint64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *GetSevenDayLoginReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *GetSevenDayLoginReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *GetSevenDayLoginReq) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+// 查询个人任务抽奖活动。
+type GetTaskLotteryReq struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 主活动实例编号。
+	UID           uint64 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	ActvId        uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskLotteryReq) Reset() {
+	*x = GetTaskLotteryReq{}
+	mi := &file_cspb_actv_req_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskLotteryReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskLotteryReq) ProtoMessage() {}
+
+func (x *GetTaskLotteryReq) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_req_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskLotteryReq.ProtoReflect.Descriptor instead.
+func (*GetTaskLotteryReq) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_req_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetTaskLotteryReq) GetUID() uint64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *GetTaskLotteryReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *GetTaskLotteryReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *GetTaskLotteryReq) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+// 领取指定任务奖励。
+type ClaimActvTaskReq struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 主活动实例编号。
+	UID       uint64 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID  uint32 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID string `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	ActvId    uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	// 任务配置编号。
+	TaskId int32 `protobuf:"varint,2,opt,name=taskId,proto3" json:"taskId,omitempty"`
+	// 写请求序号，与抽奖共用，商店独立计数。
+	Sequence      uint64 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClaimActvTaskReq) Reset() {
+	*x = ClaimActvTaskReq{}
+	mi := &file_cspb_actv_req_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClaimActvTaskReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClaimActvTaskReq) ProtoMessage() {}
+
+func (x *ClaimActvTaskReq) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_req_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClaimActvTaskReq.ProtoReflect.Descriptor instead.
+func (*ClaimActvTaskReq) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_req_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ClaimActvTaskReq) GetUID() uint64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *ClaimActvTaskReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *ClaimActvTaskReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *ClaimActvTaskReq) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+func (x *ClaimActvTaskReq) GetTaskId() int32 {
+	if x != nil {
+		return x.TaskId
+	}
+	return 0
+}
+
+func (x *ClaimActvTaskReq) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+// 消耗普通资源抽奖。
+type DrawActvReq struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 主活动实例编号。
+	UID       uint64 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID  uint32 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID string `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	ActvId    uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	// 抽奖次数。
+	Count int32 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	// 写请求序号。
+	Sequence      uint64 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawActvReq) Reset() {
+	*x = DrawActvReq{}
+	mi := &file_cspb_actv_req_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawActvReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawActvReq) ProtoMessage() {}
+
+func (x *DrawActvReq) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_req_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawActvReq.ProtoReflect.Descriptor instead.
+func (*DrawActvReq) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_req_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *DrawActvReq) GetUID() uint64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *DrawActvReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *DrawActvReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *DrawActvReq) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+func (x *DrawActvReq) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *DrawActvReq) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+// 购买商店商品。
+type BuyActvShopReq struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 商店活动实例编号。
+	UID       uint64 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID  uint32 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID string `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	ActvId    uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	// 商品配置编号。
+	GoodsId int32 `protobuf:"varint,2,opt,name=goodsId,proto3" json:"goodsId,omitempty"`
+	// 购买份数。
+	Count int32 `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`
+	// 写请求序号。
+	Sequence      uint64 `protobuf:"varint,4,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BuyActvShopReq) Reset() {
+	*x = BuyActvShopReq{}
+	mi := &file_cspb_actv_req_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BuyActvShopReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BuyActvShopReq) ProtoMessage() {}
+
+func (x *BuyActvShopReq) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_req_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BuyActvShopReq.ProtoReflect.Descriptor instead.
+func (*BuyActvShopReq) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_req_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *BuyActvShopReq) GetUID() uint64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *BuyActvShopReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *BuyActvShopReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *BuyActvShopReq) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+func (x *BuyActvShopReq) GetGoodsId() int32 {
+	if x != nil {
+		return x.GoodsId
+	}
+	return 0
+}
+
+func (x *BuyActvShopReq) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *BuyActvShopReq) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+// 查询个人商店。
+type GetActvShopReq struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 商店活动实例编号。
+	UID           uint64 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	ActvId        uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetActvShopReq) Reset() {
+	*x = GetActvShopReq{}
+	mi := &file_cspb_actv_req_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetActvShopReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetActvShopReq) ProtoMessage() {}
+
+func (x *GetActvShopReq) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_req_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetActvShopReq.ProtoReflect.Descriptor instead.
+func (*GetActvShopReq) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_req_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetActvShopReq) GetUID() uint64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *GetActvShopReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *GetActvShopReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *GetActvShopReq) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
+// 按每日规则刷新商店，不提前重置限购。
+type RefreshActvShopReq struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 商店活动实例编号。
+	UID           uint64 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	ActvId        uint64 `protobuf:"varint,1,opt,name=actvId,proto3" json:"actvId,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefreshActvShopReq) Reset() {
+	*x = RefreshActvShopReq{}
+	mi := &file_cspb_actv_req_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefreshActvShopReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefreshActvShopReq) ProtoMessage() {}
+
+func (x *RefreshActvShopReq) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_actv_req_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefreshActvShopReq.ProtoReflect.Descriptor instead.
+func (*RefreshActvShopReq) Descriptor() ([]byte, []int) {
+	return file_cspb_actv_req_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RefreshActvShopReq) GetUID() uint64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *RefreshActvShopReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *RefreshActvShopReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *RefreshActvShopReq) GetActvId() uint64 {
+	if x != nil {
+		return x.ActvId
+	}
+	return 0
+}
+
 var File_cspb_actv_req_proto protoreflect.FileDescriptor
 
 const file_cspb_actv_req_proto_rawDesc = "" +
@@ -240,6 +793,48 @@ const file_cspb_actv_req_proto_rawDesc = "" +
 	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
 	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
 	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\"y\n" +
+	"\x13GetSevenDayLoginReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\"w\n" +
+	"\x11GetTaskLotteryReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\"\xaa\x01\n" +
+	"\x10ClaimActvTaskReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\x12\x16\n" +
+	"\x06taskId\x18\x02 \x01(\x05R\x06taskId\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\"\xa3\x01\n" +
+	"\vDrawActvReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\x05R\x05count\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\"\xc0\x01\n" +
+	"\x0eBuyActvShopReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\x12\x18\n" +
+	"\agoodsId\x18\x02 \x01(\x05R\agoodsId\x12\x14\n" +
+	"\x05count\x18\x03 \x01(\x05R\x05count\x12\x1a\n" +
+	"\bsequence\x18\x04 \x01(\x04R\bsequence\"t\n" +
+	"\x0eGetActvShopReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x16\n" +
+	"\x06actvId\x18\x01 \x01(\x04R\x06actvId\"x\n" +
+	"\x12RefreshActvShopReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x16\n" +
 	"\x06actvId\x18\x01 \x01(\x04R\x06actvIdB(Z&github.com/gogu-x/gogs/pb/cspb/pb_actvb\x06proto3"
 
 var (
@@ -254,11 +849,18 @@ func file_cspb_actv_req_proto_rawDescGZIP() []byte {
 	return file_cspb_actv_req_proto_rawDescData
 }
 
-var file_cspb_actv_req_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_cspb_actv_req_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_cspb_actv_req_proto_goTypes = []any{
-	(*GetActvListReq)(nil), // 0: GetActvListReq
-	(*GetProgressReq)(nil), // 1: GetProgressReq
-	(*ClaimRewardReq)(nil), // 2: ClaimRewardReq
+	(*GetActvListReq)(nil),      // 0: GetActvListReq
+	(*GetProgressReq)(nil),      // 1: GetProgressReq
+	(*ClaimRewardReq)(nil),      // 2: ClaimRewardReq
+	(*GetSevenDayLoginReq)(nil), // 3: GetSevenDayLoginReq
+	(*GetTaskLotteryReq)(nil),   // 4: GetTaskLotteryReq
+	(*ClaimActvTaskReq)(nil),    // 5: ClaimActvTaskReq
+	(*DrawActvReq)(nil),         // 6: DrawActvReq
+	(*BuyActvShopReq)(nil),      // 7: BuyActvShopReq
+	(*GetActvShopReq)(nil),      // 8: GetActvShopReq
+	(*RefreshActvShopReq)(nil),  // 9: RefreshActvShopReq
 }
 var file_cspb_actv_req_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -279,7 +881,7 @@ func file_cspb_actv_req_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_actv_req_proto_rawDesc), len(file_cspb_actv_req_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

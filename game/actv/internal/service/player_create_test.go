@@ -49,3 +49,34 @@ func TestPlayerCreationConfig(t *testing.T) {
 		t.Fatal("不同玩家必须有独立实例")
 	}
 }
+
+// TestLinkedPersonalCreation 验证每个玩家的主活动和商店独立创建、关联及持久化历史去重。
+func TestLinkedPersonalCreation(t *testing.T) {
+	tlog.NewLog("", 0)
+	rows := []*glconf.ActvOnlineCfg{{ID: 100, ContentID: 100, Type: 7002, Available: true, Duration: "7d"}, {ID: 101, ContentID: 101, Type: 7003, Available: true, TriggerType: 5, TriggerVal: "100"}}
+	glconf.SetActvOnlineCfgForTest(rows)
+	glconf.SetActvShopCfgForTest([]*glconf.ActvShopCfg{{CfgID: 101, CloseDelay: 86400}})
+	svc := service.NewActvService(1)
+	templates.Register(svc)
+	now := time.Now().Unix()
+	for _, uid := range []uint64{7, 8} {
+		svc.SetPlayerLoaded(uid)
+		acts := svc.CreatePlayerActvs(uid, rows, nil, now)
+		if len(acts) != 2 {
+			t.Fatalf("玩家%v实例数=%v", uid, len(acts))
+		}
+		main, shop := acts[0].GetMeta(), acts[1].GetMeta()
+		if main.GetOwnerScope() != service.ScopePlayer || shop.GetOwnerID() != service.OwnerID(uid) || shop.GetParentActvID() != main.GetActvID() {
+			t.Fatal("个人归属或父子关联错误")
+		}
+		if main.GetEndTs() != now+7*86400 || shop.GetEndTs() != now+8*86400 {
+			t.Fatal("个人生命周期或商店延长时间错误")
+		}
+		if len(svc.CreatePlayerActvs(uid, rows, nil, now)) != 0 {
+			t.Fatal("重复创建")
+		}
+	}
+	if svc.ListActvs(service.ScopePlayer, 7)[0].GetMeta().GetActvID() == svc.ListActvs(service.ScopePlayer, 8)[0].GetMeta().GetActvID() {
+		t.Fatal("玩家共享实例")
+	}
+}

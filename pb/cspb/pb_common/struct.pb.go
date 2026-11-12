@@ -21,6 +21,216 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// 普通资源余额。
+type AssetBalance struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 资源编号。
+	Id uint64 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	// 资源数量。
+	Count         int64 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssetBalance) Reset() {
+	*x = AssetBalance{}
+	mi := &file_cspb_common_struct_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssetBalance) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssetBalance) ProtoMessage() {}
+
+func (x *AssetBalance) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_common_struct_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssetBalance.ProtoReflect.Descriptor instead.
+func (*AssetBalance) Descriptor() ([]byte, []int) {
+	return file_cspb_common_struct_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *AssetBalance) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AssetBalance) GetCount() int64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+// 成长属性加成；100 表示提升 10%
+type GrowthBonuses struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 生命千分比加成
+	MaxHpPermille int32 `protobuf:"varint,1,opt,name=max_hp_permille,json=maxHpPermille,proto3" json:"max_hp_permille,omitempty"`
+	// 攻击千分比加成
+	AttackPermille int32 `protobuf:"varint,2,opt,name=attack_permille,json=attackPermille,proto3" json:"attack_permille,omitempty"`
+	// 防御千分比加成
+	DefensePermille int32 `protobuf:"varint,3,opt,name=defense_permille,json=defensePermille,proto3" json:"defense_permille,omitempty"`
+	// 速度千分比加成
+	SpeedPermille int32 `protobuf:"varint,4,opt,name=speed_permille,json=speedPermille,proto3" json:"speed_permille,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GrowthBonuses) Reset() {
+	*x = GrowthBonuses{}
+	mi := &file_cspb_common_struct_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrowthBonuses) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrowthBonuses) ProtoMessage() {}
+
+func (x *GrowthBonuses) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_common_struct_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrowthBonuses.ProtoReflect.Descriptor instead.
+func (*GrowthBonuses) Descriptor() ([]byte, []int) {
+	return file_cspb_common_struct_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GrowthBonuses) GetMaxHpPermille() int32 {
+	if x != nil {
+		return x.MaxHpPermille
+	}
+	return 0
+}
+
+func (x *GrowthBonuses) GetAttackPermille() int32 {
+	if x != nil {
+		return x.AttackPermille
+	}
+	return 0
+}
+
+func (x *GrowthBonuses) GetDefensePermille() int32 {
+	if x != nil {
+		return x.DefensePermille
+	}
+	return 0
+}
+
+func (x *GrowthBonuses) GetSpeedPermille() int32 {
+	if x != nil {
+		return x.SpeedPermille
+	}
+	return 0
+}
+
+// 角色权威战斗属性
+type RoleCombatStatsData struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 角色实例编号
+	RoleId string `protobuf:"bytes,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	// 最大生命值
+	MaxHp int64 `protobuf:"varint,2,opt,name=max_hp,json=maxHp,proto3" json:"max_hp,omitempty"`
+	// 攻击值
+	Attack int64 `protobuf:"varint,3,opt,name=attack,proto3" json:"attack,omitempty"`
+	// 防御值
+	Defense int64 `protobuf:"varint,4,opt,name=defense,proto3" json:"defense,omitempty"`
+	// 速度值
+	Speed         int64 `protobuf:"varint,5,opt,name=speed,proto3" json:"speed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoleCombatStatsData) Reset() {
+	*x = RoleCombatStatsData{}
+	mi := &file_cspb_common_struct_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoleCombatStatsData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoleCombatStatsData) ProtoMessage() {}
+
+func (x *RoleCombatStatsData) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_common_struct_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoleCombatStatsData.ProtoReflect.Descriptor instead.
+func (*RoleCombatStatsData) Descriptor() ([]byte, []int) {
+	return file_cspb_common_struct_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *RoleCombatStatsData) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *RoleCombatStatsData) GetMaxHp() int64 {
+	if x != nil {
+		return x.MaxHp
+	}
+	return 0
+}
+
+func (x *RoleCombatStatsData) GetAttack() int64 {
+	if x != nil {
+		return x.Attack
+	}
+	return 0
+}
+
+func (x *RoleCombatStatsData) GetDefense() int64 {
+	if x != nil {
+		return x.Defense
+	}
+	return 0
+}
+
+func (x *RoleCombatStatsData) GetSpeed() int64 {
+	if x != nil {
+		return x.Speed
+	}
+	return 0
+}
+
 // 公共请求头
 type Comm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -36,7 +246,7 @@ type Comm struct {
 
 func (x *Comm) Reset() {
 	*x = Comm{}
-	mi := &file_cspb_common_struct_proto_msgTypes[0]
+	mi := &file_cspb_common_struct_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48,7 +258,7 @@ func (x *Comm) String() string {
 func (*Comm) ProtoMessage() {}
 
 func (x *Comm) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_common_struct_proto_msgTypes[0]
+	mi := &file_cspb_common_struct_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -61,7 +271,7 @@ func (x *Comm) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Comm.ProtoReflect.Descriptor instead.
 func (*Comm) Descriptor() ([]byte, []int) {
-	return file_cspb_common_struct_proto_rawDescGZIP(), []int{0}
+	return file_cspb_common_struct_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Comm) GetUID() uint64 {
@@ -102,7 +312,7 @@ type TypIDVal struct {
 
 func (x *TypIDVal) Reset() {
 	*x = TypIDVal{}
-	mi := &file_cspb_common_struct_proto_msgTypes[1]
+	mi := &file_cspb_common_struct_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -114,7 +324,7 @@ func (x *TypIDVal) String() string {
 func (*TypIDVal) ProtoMessage() {}
 
 func (x *TypIDVal) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_common_struct_proto_msgTypes[1]
+	mi := &file_cspb_common_struct_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -127,7 +337,7 @@ func (x *TypIDVal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TypIDVal.ProtoReflect.Descriptor instead.
 func (*TypIDVal) Descriptor() ([]byte, []int) {
-	return file_cspb_common_struct_proto_rawDescGZIP(), []int{1}
+	return file_cspb_common_struct_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *TypIDVal) GetTyp() string {
@@ -162,7 +372,21 @@ var File_cspb_common_struct_proto protoreflect.FileDescriptor
 
 const file_cspb_common_struct_proto_rawDesc = "" +
 	"\n" +
-	"\x18cspb/common/struct.proto\"R\n" +
+	"\x18cspb/common/struct.proto\"4\n" +
+	"\fAssetBalance\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\x03R\x05count\"\xb2\x01\n" +
+	"\rGrowthBonuses\x12&\n" +
+	"\x0fmax_hp_permille\x18\x01 \x01(\x05R\rmaxHpPermille\x12'\n" +
+	"\x0fattack_permille\x18\x02 \x01(\x05R\x0eattackPermille\x12)\n" +
+	"\x10defense_permille\x18\x03 \x01(\x05R\x0fdefensePermille\x12%\n" +
+	"\x0espeed_permille\x18\x04 \x01(\x05R\rspeedPermille\"\x8d\x01\n" +
+	"\x13RoleCombatStatsData\x12\x17\n" +
+	"\arole_id\x18\x01 \x01(\tR\x06roleId\x12\x15\n" +
+	"\x06max_hp\x18\x02 \x01(\x03R\x05maxHp\x12\x16\n" +
+	"\x06attack\x18\x03 \x01(\x03R\x06attack\x12\x18\n" +
+	"\adefense\x18\x04 \x01(\x03R\adefense\x12\x14\n" +
+	"\x05speed\x18\x05 \x01(\x03R\x05speed\"R\n" +
 	"\x04comm\x12\x10\n" +
 	"\x03uID\x18\x01 \x01(\x04R\x03uID\x12\x1a\n" +
 	"\bserverID\x18\x02 \x01(\rR\bserverID\x12\x1c\n" +
@@ -185,10 +409,13 @@ func file_cspb_common_struct_proto_rawDescGZIP() []byte {
 	return file_cspb_common_struct_proto_rawDescData
 }
 
-var file_cspb_common_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_cspb_common_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_cspb_common_struct_proto_goTypes = []any{
-	(*Comm)(nil),     // 0: comm
-	(*TypIDVal)(nil), // 1: TypIDVal
+	(*AssetBalance)(nil),        // 0: AssetBalance
+	(*GrowthBonuses)(nil),       // 1: GrowthBonuses
+	(*RoleCombatStatsData)(nil), // 2: RoleCombatStatsData
+	(*Comm)(nil),                // 3: comm
+	(*TypIDVal)(nil),            // 4: TypIDVal
 }
 var file_cspb_common_struct_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -209,7 +436,7 @@ func file_cspb_common_struct_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_common_struct_proto_rawDesc), len(file_cspb_common_struct_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

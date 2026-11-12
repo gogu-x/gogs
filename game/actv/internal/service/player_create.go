@@ -5,6 +5,7 @@ import (
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
+	"strconv"
 )
 
 // CreatePlayerActvs 按配置创建缺少的个人活动；完成实例也参与去重。
@@ -23,7 +24,7 @@ func (as *ActvService) CreatePlayerActvs(
 		existing[actv.GetMeta().GetCfgID()] = true
 	}
 	var created []*Actv
-	for _, row := range trigger.PlayerOnceConfigs(rows, existing) {
+	for _, row := range trigger.PlayerCreationConfigs(rows, existing) {
 		cfgID := row.GetID()
 		scope, ok := as.TplScope(TemplateType(row.GetType()))
 		if !ok || scope != ScopePlayer {
@@ -36,11 +37,39 @@ func (as *ActvService) CreatePlayerActvs(
 			ActvID: as.playerIDs.NextID(), CfgID: cfgID, OwnerID: OwnerID(uid),
 			OwnerScope: ScopePlayer, TemplateType: TemplateType(row.GetType()), StartTs: now,
 		}
+		if duration, err := trigger.ParseDuration(row.GetDuration()); err != nil || duration < 0 {
+			continue
+		} else if duration > 0 {
+			meta.EndTs = now + duration
+		}
+		if row.GetTriggerType() == 5 {
+			parentCfg, err := strconv.ParseInt(row.GetTriggerVal(), 10, 32)
+			if err != nil {
+				continue
+			}
+			var parent *ActvMeta
+			for _, a := range as.ListActvs(ScopePlayer, OwnerID(uid)) {
+				if a.GetMeta().GetCfgID() == int32(parentCfg) {
+					parent = a.GetMeta()
+					break
+				}
+			}
+			shop := glconf.GetActvShopCfgNoErr(row.GetContentID())
+			if parent == nil || shop == nil || shop.GetCloseDelay() < 0 || shop.GetCloseDelay() > SettlementRetentionSeconds || parent.GetEndTs() <= 0 {
+				continue
+			}
+			meta.ParentActvID = parent.GetActvID()
+			meta.StartTs = parent.GetStartTs()
+			meta.EndTs = parent.GetEndTs() + shop.GetCloseDelay()
+			if now >= meta.EndTs {
+				continue
+			}
+		}
 		actv := as.NewActv(meta, NewActvConfig(row, meta))
 		if actv == nil || !as.AddActv(actv) {
 			continue
 		}
-		actv.GetExt().OnLoaded()
+		as.Loaded(actv)
 		actv.GetExt().OnStart()
 		meta.Started = true
 		meta.MarkDirty()

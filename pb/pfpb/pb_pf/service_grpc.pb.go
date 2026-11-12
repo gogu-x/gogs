@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v3.21.12
-// source: pfpb/platform.proto
+// source: pfpb/service.proto
 
 package pb_pf
 
@@ -231,7 +231,7 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "pfpb/platform.proto",
+	Metadata: "pfpb/service.proto",
 }
 
 const (
@@ -371,5 +371,5 @@ var OrderService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "pfpb/platform.proto",
+	Metadata: "pfpb/service.proto",
 }

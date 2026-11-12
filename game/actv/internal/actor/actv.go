@@ -77,7 +77,7 @@ func (actor *Actv) onActvDataLoaded(ctx tree.Context, value interface{}, err err
 
 func (actor *Actv) finishStartupLoad(ctx tree.Context) {
 	for _, actv := range actor.actvService.ListAllActvs() {
-		actv.GetExt().OnLoaded()
+		actor.actvService.Loaded(actv)
 	}
 	actor.ready = true
 	actor.drainPending(ctx)

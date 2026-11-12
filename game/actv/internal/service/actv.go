@@ -1,12 +1,14 @@
 package service
 
 import (
-	"github.com/gogu-x/tree/comm"
 	"time"
+
+	"github.com/gogu-x/tree/comm"
 
 	actvconf "github.com/gogu-x/gogs/game/actv/internal/conf"
 	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/pb/sspb"
+	"github.com/gogu-x/tree/task"
 	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/protobuf/proto"
 )
@@ -22,6 +24,7 @@ type ActvService struct {
 	actvs         map[int64]*Actv               // 全部活动实例，键为实例编号。
 	ownerActvs    map[ownerKey][]*Actv          // 每个归属者的活动实例，保持注册顺序。
 	orderedActvs  []*Actv                       // 全部活动实例，保持全局注册顺序，供 tick、事件和存盘遍历。
+	taskHubs      map[uint64]*task.Hub          // 每个玩家独立的任务事件入口。
 	loadedPlayers map[uint64]bool               // 活动数据已加载的玩家，“玩家是否已加载”的唯一数据来源。
 }
 
@@ -40,15 +43,18 @@ func NewActvService(serverID uint64) *ActvService {
 		actvs:         make(map[int64]*Actv),
 		ownerActvs:    make(map[ownerKey][]*Actv),
 		loadedPlayers: make(map[uint64]bool),
+		taskHubs:      make(map[uint64]*task.Hub),
 	}
 }
 
 // Actv 保存活动元数据和不参与序列化的模板运行时对象。
 type Actv struct {
-	Meta        *ActvMeta                 // 活动实例元数据。
-	Ext         ActvBehavior              `bson:"-"` // 活动模板运行时对象。
-	comps       map[int32]Component       // 模板注册的单条数据组件。
-	playerComps map[int32]PlayerComponent // 模板注册的玩家列表组件。
+	Meta         *ActvMeta                 // 活动实例元数据。
+	Ext          ActvBehavior              `bson:"-"` // 活动模板运行时对象。
+	comps        map[int32]Component       // 模板注册的单条数据组件。
+	playerComps  map[int32]PlayerComponent // 模板注册的玩家列表组件。
+	dataReady    bool                      // 组件存档已加载且运行态已初始化。
+	ownerService *ActvService              // 同一活动Actor内的实例查询入口。
 }
 
 // GetMeta 返回活动实例元数据。
@@ -69,17 +75,18 @@ func (actv *Actv) GetExt() ActvBehavior {
 
 // ActvMeta 保存活动实例的持久化元数据。
 type ActvMeta struct {
-	ActvID       int64        `bson:"_id"`           // 活动实例编号。
-	StartTs      int64        `bson:"start_ts"`      // 活动开始时间戳。
-	EndTs        int64        `bson:"end_ts"`        // 活动结束时间戳；0 表示不自动结束。
-	Started      bool         `bson:"started"`       // 活动是否已执行启动行为。
-	CfgID        int32        `bson:"cfg_id"`        // 活动配置编号。
-	OwnerID      OwnerID      `bson:"owner_id"`      // 活动归属对象编号。
-	OwnerScope   OwnerScope   `bson:"owner_scope"`   // 活动归属对象范围。
-	TemplateType TemplateType `bson:"template_type"` // 活动模板类型。
-	State        ActvState    `bson:"state"`         // 活动运行状态。
-	Dirty        bool         `bson:"-"`             // 是否需要存盘。
-	revision     uint64       `bson:"-"`             // 内存版本号，不写入活动文档。
+	ParentActvID int64        `bson:"parent_actv_id,omitempty"` // 同期父活动实例编号。
+	ActvID       int64        `bson:"_id"`                      // 活动实例编号。
+	StartTs      int64        `bson:"start_ts"`                 // 活动开始时间戳。
+	EndTs        int64        `bson:"end_ts"`                   // 活动结束时间戳；0 表示不自动结束。
+	Started      bool         `bson:"started"`                  // 活动是否已执行启动行为。
+	CfgID        int32        `bson:"cfg_id"`                   // 活动配置编号。
+	OwnerID      OwnerID      `bson:"owner_id"`                 // 活动归属对象编号。
+	OwnerScope   OwnerScope   `bson:"owner_scope"`              // 活动归属对象范围。
+	TemplateType TemplateType `bson:"template_type"`            // 活动模板类型。
+	State        ActvState    `bson:"state"`                    // 活动运行状态。
+	Dirty        bool         `bson:"-"`                        // 是否需要存盘。
+	revision     uint64       `bson:"-"`                        // 内存版本号，不写入活动文档。
 }
 
 // MarkDirty 标记活动元数据已修改并递增版本号。
@@ -210,6 +217,7 @@ func (as *ActvService) RemoveActvs(actvIDs []int64) {
 	removed := 0
 	for _, actvID := range actvIDs {
 		if actv := actvs[actvID]; actv != nil {
+			actv.closeTasks()
 			owners[actv.ownerKey()]++
 			delete(actvs, actvID)
 			removed++
@@ -272,6 +280,9 @@ func (as *ActvService) TplScope(typ TemplateType) (OwnerScope, bool) {
 
 // AddActv 将已创建或加载的活动实例加入归属索引。
 func (as *ActvService) AddActv(actv *Actv) bool {
+	if actv != nil {
+		actv.ownerService = as
+	}
 	if as == nil || actv == nil || actv.GetExt() == nil {
 		return false
 	}
@@ -377,6 +388,12 @@ func (as *ActvService) HandleEvent(event *sspb.Event) {
 	default:
 		return
 	}
+	if event.GetName() == gameevent.NameTaskProgress {
+		if progress, ok := gameevent.ReadTask(event); ok {
+			as.publishTasks(gameevent.PlayerUID(event), progress, time.Now().Unix())
+		}
+		return
+	}
 	now := time.Now().Unix()
 	for _, actv := range actvs {
 		behavior := actv.GetExt()
@@ -401,6 +418,7 @@ func (as *ActvService) StartDueActvs(now int64) {
 			continue
 		}
 		actv.GetExt().OnStart()
+		as.attachTasks(actv, now)
 		meta.Started = true
 		meta.MarkDirty()
 		tlog.Log.Info("[actv/ActvService.StartDueActvs] 活动启动, actv=%v scope=%v owner=%v",
@@ -432,6 +450,7 @@ func (as *ActvService) EndActv(actvID int64) bool {
 	if actv == nil || actv.GetExt() == nil || actv.IsEnded() {
 		return false
 	}
+	actv.closeTasks()
 	actv.GetExt().OnClosed()
 	meta := actv.GetMeta()
 	meta.State = StateEnded
@@ -440,3 +459,9 @@ func (as *ActvService) EndActv(actvID int64) bool {
 		meta.GetActvID(), meta.GetOwnerScope(), meta.GetOwnerID())
 	return true
 }
+
+// GetService 返回所属活动Actor内的实例索引，不允许跨Actor使用。
+func (actv *Actv) GetService() *ActvService { return actv.ownerService }
+
+// GetParentActvID 返回同一期父实例。
+func (meta *ActvMeta) GetParentActvID() int64 { return meta.ParentActvID }

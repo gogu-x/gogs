@@ -70,7 +70,7 @@ func (as *ActvService) CreateDueServerActs(plans []*trigger.Plan, now int64) []*
 					actvID, plan.CfgID, round.Round)
 				continue
 			}
-			actv.GetExt().OnLoaded() // 新实例没有存盘数据，组件为初始值。
+			as.Loaded(actv) // 新实例没有存盘数据，组件为初始值。
 			tlog.Log.Info("[actv/ActvService.CreateDueServerActvs] 创建活动实例, actv=%v config=%v round=%v start=%v end=%v",
 				actvID, plan.CfgID, round.Round, round.StartTs, round.EndTs)
 			created = append(created, actv)

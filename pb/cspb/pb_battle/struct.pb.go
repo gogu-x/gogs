@@ -1117,296 +1117,11 @@ func (x *BattleUnitResult) GetAlive() bool {
 	return false
 }
 
-// 战斗创建成功通知
-type BattleCreatedNtf struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 战斗编号
-	BattleId string `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
-	// 玩家编号
-	Uid uint64 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	// 逻辑帧时长，单位为毫秒
-	TickDurationMs int32 `protobuf:"varint,3,opt,name=tick_duration_ms,json=tickDurationMs,proto3" json:"tick_duration_ms,omitempty"`
-	// 参战单位名单。战斗创建时即已确定，随创建通知一并下发，
-	// 客户端可在进入战斗页的第一时间就把双方单位摆好，而不是等某个单位先行动
-	Units         []*BattleUnitResult `protobuf:"bytes,4,rep,name=units,proto3" json:"units,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BattleCreatedNtf) Reset() {
-	*x = BattleCreatedNtf{}
-	mi := &file_cspb_battle_struct_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BattleCreatedNtf) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BattleCreatedNtf) ProtoMessage() {}
-
-func (x *BattleCreatedNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_struct_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BattleCreatedNtf.ProtoReflect.Descriptor instead.
-func (*BattleCreatedNtf) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *BattleCreatedNtf) GetBattleId() string {
-	if x != nil {
-		return x.BattleId
-	}
-	return ""
-}
-
-func (x *BattleCreatedNtf) GetUid() uint64 {
-	if x != nil {
-		return x.Uid
-	}
-	return 0
-}
-
-func (x *BattleCreatedNtf) GetTickDurationMs() int32 {
-	if x != nil {
-		return x.TickDurationMs
-	}
-	return 0
-}
-
-func (x *BattleCreatedNtf) GetUnits() []*BattleUnitResult {
-	if x != nil {
-		return x.Units
-	}
-	return nil
-}
-
-// 一条战斗事件推送
-type BattleActionNtf struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 战斗编号
-	BattleId string `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
-	// 玩家编号
-	Uid uint64 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	// 战斗事件
-	Event         *BattleEvent `protobuf:"bytes,3,opt,name=event,proto3" json:"event,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BattleActionNtf) Reset() {
-	*x = BattleActionNtf{}
-	mi := &file_cspb_battle_struct_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BattleActionNtf) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BattleActionNtf) ProtoMessage() {}
-
-func (x *BattleActionNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_struct_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BattleActionNtf.ProtoReflect.Descriptor instead.
-func (*BattleActionNtf) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *BattleActionNtf) GetBattleId() string {
-	if x != nil {
-		return x.BattleId
-	}
-	return ""
-}
-
-func (x *BattleActionNtf) GetUid() uint64 {
-	if x != nil {
-		return x.Uid
-	}
-	return 0
-}
-
-func (x *BattleActionNtf) GetEvent() *BattleEvent {
-	if x != nil {
-		return x.Event
-	}
-	return nil
-}
-
-// 已完成的战斗结果
-type BattleFinishedNtf struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 战斗编号
-	BattleId string `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
-	// 玩家编号
-	Uid uint64 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	// 战斗结算结果
-	Outcome BattleOutcome `protobuf:"varint,3,opt,name=outcome,proto3,enum=BattleOutcome" json:"outcome,omitempty"`
-	// 参战单位结果列表
-	Units []*BattleUnitResult `protobuf:"bytes,4,rep,name=units,proto3" json:"units,omitempty"`
-	// 战斗结果校验值
-	Checksum string `protobuf:"bytes,5,opt,name=checksum,proto3" json:"checksum,omitempty"`
-	// 战斗类型，游戏服按爬塔、副本、首领等类型分发结算奖励，
-	// 仅凭结算结果和单位状态无法确定业务类型
-	BattleType    BattleType `protobuf:"varint,6,opt,name=battle_type,json=battleType,proto3,enum=BattleType" json:"battle_type,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BattleFinishedNtf) Reset() {
-	*x = BattleFinishedNtf{}
-	mi := &file_cspb_battle_struct_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BattleFinishedNtf) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BattleFinishedNtf) ProtoMessage() {}
-
-func (x *BattleFinishedNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_struct_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BattleFinishedNtf.ProtoReflect.Descriptor instead.
-func (*BattleFinishedNtf) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *BattleFinishedNtf) GetBattleId() string {
-	if x != nil {
-		return x.BattleId
-	}
-	return ""
-}
-
-func (x *BattleFinishedNtf) GetUid() uint64 {
-	if x != nil {
-		return x.Uid
-	}
-	return 0
-}
-
-func (x *BattleFinishedNtf) GetOutcome() BattleOutcome {
-	if x != nil {
-		return x.Outcome
-	}
-	return BattleOutcome_BATTLE_OUTCOME_UNSPECIFIED
-}
-
-func (x *BattleFinishedNtf) GetUnits() []*BattleUnitResult {
-	if x != nil {
-		return x.Units
-	}
-	return nil
-}
-
-func (x *BattleFinishedNtf) GetChecksum() string {
-	if x != nil {
-		return x.Checksum
-	}
-	return ""
-}
-
-func (x *BattleFinishedNtf) GetBattleType() BattleType {
-	if x != nil {
-		return x.BattleType
-	}
-	return BattleType_BATTLE_TYPE_UNSPECIFIED
-}
-
-// 游戏服已处理战斗结算结果的确认通知
-type BattleResultConfirmedNtf struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 战斗编号
-	BattleId string `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
-	// 玩家编号
-	Uid           uint64 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BattleResultConfirmedNtf) Reset() {
-	*x = BattleResultConfirmedNtf{}
-	mi := &file_cspb_battle_struct_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BattleResultConfirmedNtf) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BattleResultConfirmedNtf) ProtoMessage() {}
-
-func (x *BattleResultConfirmedNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_struct_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BattleResultConfirmedNtf.ProtoReflect.Descriptor instead.
-func (*BattleResultConfirmedNtf) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *BattleResultConfirmedNtf) GetBattleId() string {
-	if x != nil {
-		return x.BattleId
-	}
-	return ""
-}
-
-func (x *BattleResultConfirmedNtf) GetUid() uint64 {
-	if x != nil {
-		return x.Uid
-	}
-	return 0
-}
-
 var File_cspb_battle_struct_proto protoreflect.FileDescriptor
 
 const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\n" +
-	"\x18cspb/battle/struct.proto\x1a\x18cspb/common/growth.proto\"I\n" +
+	"\x18cspb/battle/struct.proto\x1a\x18cspb/common/struct.proto\"I\n" +
 	"\tRoleSkill\x12&\n" +
 	"\x0fskill_config_id\x18\x01 \x01(\x05R\rskillConfigId\x12\x14\n" +
 	"\x05level\x18\x02 \x01(\x05R\x05level\"\x87\x01\n" +
@@ -1464,27 +1179,7 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x04team\x18\x02 \x01(\x0e2\v.BattleTeamR\x04team\x12\x0e\n" +
 	"\x02hp\x18\x03 \x01(\x03R\x02hp\x12\x15\n" +
 	"\x06max_hp\x18\x04 \x01(\x03R\x05maxHp\x12\x14\n" +
-	"\x05alive\x18\x05 \x01(\bR\x05alive\"\x94\x01\n" +
-	"\x10BattleCreatedNtf\x12\x1b\n" +
-	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12(\n" +
-	"\x10tick_duration_ms\x18\x03 \x01(\x05R\x0etickDurationMs\x12'\n" +
-	"\x05units\x18\x04 \x03(\v2\x11.BattleUnitResultR\x05units\"d\n" +
-	"\x0fBattleActionNtf\x12\x1b\n" +
-	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12\"\n" +
-	"\x05event\x18\x03 \x01(\v2\f.BattleEventR\x05event\"\xdf\x01\n" +
-	"\x11BattleFinishedNtf\x12\x1b\n" +
-	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12(\n" +
-	"\aoutcome\x18\x03 \x01(\x0e2\x0e.BattleOutcomeR\aoutcome\x12'\n" +
-	"\x05units\x18\x04 \x03(\v2\x11.BattleUnitResultR\x05units\x12\x1a\n" +
-	"\bchecksum\x18\x05 \x01(\tR\bchecksum\x12,\n" +
-	"\vbattle_type\x18\x06 \x01(\x0e2\v.BattleTypeR\n" +
-	"battleType\"I\n" +
-	"\x18BattleResultConfirmedNtf\x12\x1b\n" +
-	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid*\x98\x01\n" +
+	"\x05alive\x18\x05 \x01(\bR\x05alive*\x98\x01\n" +
 	"\n" +
 	"BattleType\x12\x1b\n" +
 	"\x17BATTLE_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
@@ -1559,47 +1254,38 @@ func file_cspb_battle_struct_proto_rawDescGZIP() []byte {
 }
 
 var file_cspb_battle_struct_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_cspb_battle_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_cspb_battle_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_cspb_battle_struct_proto_goTypes = []any{
-	(BattleType)(0),                  // 0: BattleType
-	(BattleTeam)(0),                  // 1: BattleTeam
-	(BattleOutcome)(0),               // 2: BattleOutcome
-	(TargetRule)(0),                  // 3: TargetRule
-	(EffectType)(0),                  // 4: EffectType
-	(StatusType)(0),                  // 5: StatusType
-	(BattleEventType)(0),             // 6: BattleEventType
-	(BattleEventReason)(0),           // 7: BattleEventReason
-	(*RoleSkill)(nil),                // 8: RoleSkill
-	(*RoleEquip)(nil),                // 9: RoleEquip
-	(*Role)(nil),                     // 10: Role
-	(*BattleEvent)(nil),              // 11: BattleEvent
-	(*BattleUnitResult)(nil),         // 12: BattleUnitResult
-	(*BattleCreatedNtf)(nil),         // 13: BattleCreatedNtf
-	(*BattleActionNtf)(nil),          // 14: BattleActionNtf
-	(*BattleFinishedNtf)(nil),        // 15: BattleFinishedNtf
-	(*BattleResultConfirmedNtf)(nil), // 16: BattleResultConfirmedNtf
-	(*pb_common.GrowthBonuses)(nil),  // 17: GrowthBonuses
+	(BattleType)(0),                 // 0: BattleType
+	(BattleTeam)(0),                 // 1: BattleTeam
+	(BattleOutcome)(0),              // 2: BattleOutcome
+	(TargetRule)(0),                 // 3: TargetRule
+	(EffectType)(0),                 // 4: EffectType
+	(StatusType)(0),                 // 5: StatusType
+	(BattleEventType)(0),            // 6: BattleEventType
+	(BattleEventReason)(0),          // 7: BattleEventReason
+	(*RoleSkill)(nil),               // 8: RoleSkill
+	(*RoleEquip)(nil),               // 9: RoleEquip
+	(*Role)(nil),                    // 10: Role
+	(*BattleEvent)(nil),             // 11: BattleEvent
+	(*BattleUnitResult)(nil),        // 12: BattleUnitResult
+	(*pb_common.GrowthBonuses)(nil), // 13: GrowthBonuses
 }
 var file_cspb_battle_struct_proto_depIdxs = []int32{
 	8,  // 0: Role.skills:type_name -> RoleSkill
 	9,  // 1: Role.equips:type_name -> RoleEquip
-	17, // 2: Role.growth_bonus:type_name -> GrowthBonuses
+	13, // 2: Role.growth_bonus:type_name -> GrowthBonuses
 	6,  // 3: BattleEvent.type:type_name -> BattleEventType
 	4,  // 4: BattleEvent.effect_type:type_name -> EffectType
 	5,  // 5: BattleEvent.status_type:type_name -> StatusType
 	7,  // 6: BattleEvent.reason:type_name -> BattleEventReason
 	2,  // 7: BattleEvent.outcome:type_name -> BattleOutcome
 	1,  // 8: BattleUnitResult.team:type_name -> BattleTeam
-	12, // 9: BattleCreatedNtf.units:type_name -> BattleUnitResult
-	11, // 10: BattleActionNtf.event:type_name -> BattleEvent
-	2,  // 11: BattleFinishedNtf.outcome:type_name -> BattleOutcome
-	12, // 12: BattleFinishedNtf.units:type_name -> BattleUnitResult
-	0,  // 13: BattleFinishedNtf.battle_type:type_name -> BattleType
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_cspb_battle_struct_proto_init() }
@@ -1613,7 +1299,7 @@ func file_cspb_battle_struct_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_battle_struct_proto_rawDesc), len(file_cspb_battle_struct_proto_rawDesc)),
 			NumEnums:      8,
-			NumMessages:   9,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
