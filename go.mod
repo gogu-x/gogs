@@ -39,3 +39,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260921155816-b14227669459 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260921155816-b14227669459 // indirect
 )
+
+// 本地共同开发任务分发器，发布 tree 新版本后改用对应版本。
+replace github.com/gogu-x/tree => ../tree

@@ -16,9 +16,6 @@ func OnGetRoleEquipment(ctx *core.Context, req *pb_equipment.GetRoleEquipmentReq
 	ack := &pb_equipment.GetRoleEquipmentAck{Data: data, RequestId: req.GetRequestId(), Code: pb_common.ErrCode_OK}
 	if code != pb_common.ErrCode_OK {
 		ack.Code = pb_common.ErrCode_EQUIPMENT_UNAVAILABLE
-		if code == pb_common.ErrCode_INTERNAL {
-			ack.Code = pb_common.ErrCode_CONFIG_UNAVAILABLE
-		}
 		tlog.Log.Error("[ctl_equipment/OnGetRoleEquipment] 组装装备视图失败, pid=%v code=%v", uid, code)
 	}
 	ctx.CastPlayerMsg(uid, ack)
@@ -41,9 +38,6 @@ func OnChangeRoleEquipment(ctx *core.Context, req *pb_equipment.ChangeRoleEquipm
 	ack := &pb_equipment.ChangeRoleEquipmentAck{RequestId: req.GetRequestId(), Code: pb_common.ErrCode_OK}
 	if code != pb_common.ErrCode_OK {
 		ack.Code = pb_common.ErrCode_INVALID_EQUIPMENT
-		if code == pb_common.ErrCode_INTERNAL {
-			ack.Code = pb_common.ErrCode_CONFIG_UNAVAILABLE
-		}
 		tlog.Log.Error("[ctl_equipment/OnChangeRoleEquipment] 装备变更校验失败, pid=%v slot=%v equipment=%v code=%v", uid, slot, equipmentID, code)
 		ctx.CastPlayerMsg(uid, ack)
 		return
@@ -52,9 +46,6 @@ func OnChangeRoleEquipment(ctx *core.Context, req *pb_equipment.ChangeRoleEquipm
 	data, code := equipment.BuildRoleEquipmentData(roleMgr, equipmentMgr)
 	if code != pb_common.ErrCode_OK {
 		ack.Code = pb_common.ErrCode_EQUIPMENT_UNAVAILABLE
-		if code == pb_common.ErrCode_INTERNAL {
-			ack.Code = pb_common.ErrCode_CONFIG_UNAVAILABLE
-		}
 		tlog.Log.Error("[ctl_equipment/OnChangeRoleEquipment] 装备视图刷新失败, pid=%v code=%v", uid, code)
 		ctx.CastPlayerMsg(uid, ack)
 		return

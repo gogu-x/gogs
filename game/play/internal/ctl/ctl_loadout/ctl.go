@@ -18,8 +18,7 @@ func GetSoulJade(ctx *core.Context, req *pb_souljade.GetRoleSoulJadeReq) {
 
 	if req == nil {
 		ack.Code = pb_common.ErrCode_PARAM
-		tlog.Log.Info("[ctl_loadout/GetSoulJade] 请求为空, code=%v, pid=%v",
-			ack.GetCode(), uid)
+		tlog.Log.Info("[ctl_loadout/GetSoulJade] 请求为空, code=%v, pid=%v", ack.GetCode(), uid)
 		return
 	}
 	requestID := req.GetRequestId()
@@ -27,26 +26,22 @@ func GetSoulJade(ctx *core.Context, req *pb_souljade.GetRoleSoulJadeReq) {
 	p := ctx.GetPlayer()
 	if p == nil {
 		ack.Code = pb_common.ErrCode_LOADOUT_UNAVAILABLE
-		tlog.Log.Info("[ctl_loadout/GetSoulJade] 玩家数据不可用, request=%v, code=%v, pid=%v",
-			requestID, ack.GetCode(), uid)
+		tlog.Log.Info("[ctl_loadout/GetSoulJade] 玩家数据不可用, request=%v, code=%v, pid=%v", requestID, ack.GetCode(), uid)
 		return
 	}
 	data := p.BuildSoulJadeData()
 	ack.Data = data
 	if data == nil {
 		ack.Code = pb_common.ErrCode_LOADOUT_UNAVAILABLE
-		tlog.Log.Info("[ctl_loadout/GetSoulJade] 养成快照不可用, request=%v, code=%v, pid=%v",
-			requestID, ack.GetCode(), uid)
+		tlog.Log.Info("[ctl_loadout/GetSoulJade] 养成快照不可用, request=%v, code=%v, pid=%v", requestID, ack.GetCode(), uid)
 		return
 	}
 	if data.GetRoleId() == "" {
 		ack.Code = pb_common.ErrCode_LOADOUT_UNAVAILABLE
-		tlog.Log.Info("[ctl_loadout/GetSoulJade] 角色编号为空, request=%v, code=%v, pid=%v",
-			requestID, ack.GetCode(), uid)
+		tlog.Log.Info("[ctl_loadout/GetSoulJade] 角色编号为空, request=%v, code=%v, pid=%v", requestID, ack.GetCode(), uid)
 		return
 	}
-	tlog.Log.Info("[ctl_loadout/GetSoulJade] 返回魂玉数据, request=%v, code=%v, pid=%v",
-		requestID, ack.GetCode(), uid)
+	tlog.Log.Info("[ctl_loadout/GetSoulJade] 返回魂玉数据, request=%v, code=%v, pid=%v", requestID, ack.GetCode(), uid)
 }
 
 // GetTalent returns an explicit status and the current authoritative snapshot.
