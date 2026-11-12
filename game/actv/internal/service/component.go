@@ -1,8 +1,6 @@
 package service
 
 import (
-	"fmt"
-
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -41,7 +39,7 @@ type ComponentHolder interface {
 //   - 单条数据组件：归属者与活动实例一致（服务器/联盟随启动加载，玩家独有活动随玩家上线加载）；
 //   - 玩家列表组件：归属者为条目对应的玩家，随该玩家上线加载。
 type ActvDataDoc struct {
-	ID         string     `bson:"_id"`         // 文档编号，格式为 "{actv_id}_{comp}_{owner_id}"。
+	ID         string     `bson:"_id"`         // 独立生成的文档编号，不包含业务字段。
 	ActvID     int64      `bson:"actv_id"`     // 所属活动实例编号。
 	Comp       int32      `bson:"comp"`        // 组件编号。
 	OwnerScope OwnerScope `bson:"owner_scope"` // 数据归属者范围。
@@ -51,10 +49,24 @@ type ActvDataDoc struct {
 	dirty      bool       // 快照是否待存盘，不落库。
 }
 
-// DataDocID 返回组件数据文档编号。同一活动内组件编号唯一，单条组件只有一个归属者，
-// 玩家列表组件的归属者均为玩家，因此 actv_id + comp + owner_id 不会冲突。
-func DataDocID(actvID int64, compID int32, ownerID OwnerID) string {
-	return fmt.Sprintf("%d_%d_%d", actvID, compID, ownerID)
+// dataOwnerKey 仅用于内存中定位同一组件数据，不作为数据库主键。
+type dataOwnerKey struct {
+	comp  int32   // 组件编号。
+	owner OwnerID // 归属者编号。
+}
+
+// dataDocID 为新数据分配独立编号，重复存盘复用同一编号。
+func (actv *Actv) dataDocID(compID int32, ownerID OwnerID) string {
+	if actv.dataIDs == nil {
+		actv.dataIDs = make(map[dataOwnerKey]string)
+	}
+	key := dataOwnerKey{comp: compID, owner: ownerID}
+	if id := actv.dataIDs[key]; id != "" {
+		return id
+	}
+	id := bson.NewObjectID().Hex()
+	actv.dataIDs[key] = id
+	return id
 }
 
 // IsDirty 返回组件数据快照是否待存盘。
@@ -76,9 +88,9 @@ func (doc *ActvDataDoc) GetID() string {
 	return doc.ID
 }
 
-func newDataSnapshot(actvID int64, compID int32, scope OwnerScope, ownerID OwnerID, raw bson.Raw, revision uint64) *ActvDataDoc {
+func (actv *Actv) newDataSnapshot(actvID int64, compID int32, scope OwnerScope, ownerID OwnerID, raw bson.Raw, revision uint64) *ActvDataDoc {
 	return &ActvDataDoc{
-		ID:         DataDocID(actvID, compID, ownerID),
+		ID:         actv.dataDocID(compID, ownerID),
 		ActvID:     actvID,
 		Comp:       compID,
 		OwnerScope: scope,

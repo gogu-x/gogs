@@ -62,14 +62,22 @@ func (actv *Actv) LoadData(doc *ActvDataDoc) error {
 			return fmt.Errorf("component data owner mismatch, comp=%d owner=%d/%d expect=%d/%d",
 				doc.Comp, doc.OwnerScope, doc.OwnerID, meta.GetOwnerScope(), meta.GetOwnerID())
 		}
-		return comp.Load(doc.Data)
+		if err := comp.Load(doc.Data); err != nil {
+			return err
+		}
+		actv.rememberDataID(doc)
+		return nil
 	}
 	if comp := actv.playerComps[doc.Comp]; comp != nil {
 		if doc.OwnerScope != ScopePlayer || doc.OwnerID <= 0 {
 			return fmt.Errorf("player component data requires player owner, comp=%d owner=%d/%d",
 				doc.Comp, doc.OwnerScope, doc.OwnerID)
 		}
-		return comp.Load(uint64(doc.OwnerID), doc.Data)
+		if err := comp.Load(uint64(doc.OwnerID), doc.Data); err != nil {
+			return err
+		}
+		actv.rememberDataID(doc)
+		return nil
 	}
 	return fmt.Errorf("component not registered, comp=%d", doc.Comp)
 }
@@ -87,7 +95,7 @@ func (actv *Actv) appendDirtyComps(docs []*ActvDataDoc) []*ActvDataDoc {
 			tlog.Log.Error("[actv/Actv.appendDirtyComps] 组件数据编码失败, actv=%v comp=%v err=%v", actvID, compID, err)
 			continue
 		}
-		docs = append(docs, newDataSnapshot(actvID, compID, meta.GetOwnerScope(), meta.GetOwnerID(), raw, comp.Revision()))
+		docs = append(docs, actv.newDataSnapshot(actvID, compID, meta.GetOwnerScope(), meta.GetOwnerID(), raw, comp.Revision()))
 	}
 	return docs
 }
@@ -101,7 +109,7 @@ func (actv *Actv) appendDirtyPlayer(docs []*ActvDataDoc, comp PlayerComponent, u
 			actvID, comp.CompID(), uid, err)
 		return docs
 	}
-	return append(docs, newDataSnapshot(actvID, comp.CompID(), ScopePlayer, OwnerID(uid), raw, comp.Revision(uid)))
+	return append(docs, actv.newDataSnapshot(actvID, comp.CompID(), ScopePlayer, OwnerID(uid), raw, comp.Revision(uid)))
 }
 
 // DirtyData 返回全部已加载活动组件的脏数据快照。
@@ -324,5 +332,14 @@ func (as *ActvService) UnloadEndedPlayer(uid uint64, actvIDs []int64) {
 func (actv *Actv) unloadPlayer(uid uint64) {
 	for _, comp := range actv.playerComps {
 		comp.Unload(uid)
+		delete(actv.dataIDs, dataOwnerKey{comp: comp.CompID(), owner: OwnerID(uid)})
 	}
+}
+
+// rememberDataID 恢复存档原有编号，后续保存更新同一条文档。
+func (actv *Actv) rememberDataID(doc *ActvDataDoc) {
+	if actv.dataIDs == nil {
+		actv.dataIDs = make(map[dataOwnerKey]string)
+	}
+	actv.dataIDs[dataOwnerKey{comp: doc.Comp, owner: doc.GetOwnerID()}] = doc.GetID()
 }

@@ -49,6 +49,7 @@ func NewActvService(serverID uint64) *ActvService {
 
 // Actv 保存活动元数据和不参与序列化的模板运行时对象。
 type Actv struct {
+	dataIDs      map[dataOwnerKey]string   // 已加载或新分配的组件文档编号。
 	Meta         *ActvMeta                 // 活动实例元数据。
 	Ext          ActvBehavior              `bson:"-"` // 活动模板运行时对象。
 	comps        map[int32]Component       // 模板注册的单条数据组件。

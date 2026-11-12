@@ -238,7 +238,7 @@ func TestServiceLoadSaveUnload(t *testing.T) {
 		t.Fatalf("player dirty data count = %d, want 2", len(playerDocs))
 	}
 	for _, doc := range playerDocs {
-		if doc.OwnerScope != service.ScopePlayer || doc.OwnerID != 7 || doc.GetID() != service.DataDocID(doc.ActvID, doc.Comp, 7) {
+		if doc.OwnerScope != service.ScopePlayer || doc.OwnerID != 7 || len(doc.GetID()) != 24 {
 			t.Fatalf("unexpected player doc %+v", doc)
 		}
 		svc.ClearDataDirty(doc)
@@ -247,7 +247,7 @@ func TestServiceLoadSaveUnload(t *testing.T) {
 	if len(serverDocs) != 1 {
 		t.Fatalf("after clear dirty count = %d, want 1 (server instance)", len(serverDocs))
 	}
-	if doc := serverDocs[0]; doc.OwnerScope != service.ScopeServer || doc.OwnerID != 1 || doc.GetID() != "10_1_1" {
+	if doc := serverDocs[0]; doc.OwnerScope != service.ScopeServer || doc.OwnerID != 1 || len(doc.GetID()) != 24 {
 		t.Fatalf("unexpected server doc %+v", doc)
 	}
 
@@ -288,7 +288,7 @@ func (b *dupBehavior) OnInit() {
 // TestDataDocBSON 校验存盘文档字段：私有字段不落库，归属者字段与 ActvMeta 同名同类型，可按 int32/int64 过滤。
 func TestDataDocBSON(t *testing.T) {
 	doc := &service.ActvDataDoc{
-		ID: service.DataDocID(10, 2, 7), ActvID: 10, Comp: 2,
+		ID: bson.NewObjectID().Hex(), ActvID: 10, Comp: 2,
 		OwnerScope: service.ScopePlayer, OwnerID: 7, Data: mustRaw(t, memberData{Score: 3}),
 	}
 	raw := mustRaw(t, doc)
@@ -306,7 +306,7 @@ func TestDataDocBSON(t *testing.T) {
 		t.Fatalf("owner_id encoded as %T %v", plain["owner_id"], plain["owner_id"])
 	}
 	var decoded service.ActvDataDoc
-	if err := bson.Unmarshal(raw, &decoded); err != nil || decoded.OwnerID != 7 || decoded.GetID() != "10_2_7" {
+	if err := bson.Unmarshal(raw, &decoded); err != nil || decoded.OwnerID != 7 || decoded.GetID() != doc.GetID() {
 		t.Fatalf("decoded %+v err=%v", decoded, err)
 	}
 }
