@@ -81,19 +81,19 @@ func (guild *Guild) HandleMessage(ctx tree.Context, message interface{}) {
 func (guild *Guild) onCreateGuild(ctx tree.Context, request *pb_guild.CreateGuildReq) {
 	ack := guild.store.Create(request)
 	if ack != nil && ack.GetCode() == pb_common.ErrCode_OK && ack.GetGuild() != nil {
-		guild.notifyActivityOwnerCreated(ctx, ack.GetGuild().GetGuildId())
+		guild.notifyActvOwnerCreated(ctx, ack.GetGuild().GetGuildId())
 	}
 	ctx.Response(ack, nil)
 }
 
-// notifyActivityOwnerCreated 通过单向事件通知活动服务加载联盟活动。
-func (guild *Guild) notifyActivityOwnerCreated(ctx tree.Context, guildID uint64) {
+// notifyActvOwnerCreated 通过单向事件通知活动服务加载联盟活动。
+func (guild *Guild) notifyActvOwnerCreated(ctx tree.Context, guildID uint64) {
 	if guildID == 0 {
 		return
 	}
-	activityPID, ok := ctx.Lookup(def.ActorActivity)
-	if !ok || !ctx.Send(activityPID, &ipb.CreateGuildActivityOwner{GuildID: guildID}) {
-		tlog.Log.Error("[guild/Guild.notifyActivityOwnerCreated] 联盟活动创建事件发送失败, guild=%v", guildID)
+	actvPID, ok := ctx.Lookup(def.ActorActv)
+	if !ok || !ctx.Send(actvPID, &ipb.CreateGuildActvOwner{GuildID: guildID}) {
+		tlog.Log.Error("[guild/Guild.notifyActvOwnerCreated] 联盟活动创建事件发送失败, guild=%v", guildID)
 	}
 }
 
@@ -167,7 +167,7 @@ func (guild *Guild) onGuildsLoaded(ctx tree.Context, value interface{}, err erro
 	guild.store.ReplaceAll(guilds)
 	guild.store.Range(func(owner *internal.Guild) bool {
 		if owner != nil && !owner.IsDeleted() {
-			guild.notifyActivityOwnerCreated(ctx, owner.GetID())
+			guild.notifyActvOwnerCreated(ctx, owner.GetID())
 		}
 		return true
 	})
@@ -234,7 +234,7 @@ func (guild *Guild) drainPending(ctx tree.Context) {
 			continue
 		}
 		if createAck, ok := response.(*pb_guild.CreateGuildAck); ok && createAck.GetCode() == pb_common.ErrCode_OK && createAck.GetGuild() != nil {
-			guild.notifyActivityOwnerCreated(ctx, createAck.GetGuild().GetGuildId())
+			guild.notifyActvOwnerCreated(ctx, createAck.GetGuild().GetGuildId())
 		}
 		item.request.Respond(response, nil)
 	}

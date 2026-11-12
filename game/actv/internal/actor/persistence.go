@@ -8,24 +8,25 @@ import (
 	"github.com/gogu-x/tree/timer"
 )
 
-const activitySaveTickerType = timer.TimerType(1000012)
+const actvSaveTickerType = timer.TimerType(1000012)
 
-// activityPersistenceModel adapts activity metadata to Mongo lifecycle storage.
-type activityPersistenceModel struct {
+// actvPersistenceModel adapts actv metadata to Mongo lifecycle storage.
+type actvPersistenceModel struct {
 	service *service.ActvService
 }
 
-func newActivityPersistenceModel(actvService *service.ActvService) *activityPersistenceModel {
-	return &activityPersistenceModel{service: actvService}
+func newActvPersistenceModel(actvService *service.ActvService) *actvPersistenceModel {
+	return &actvPersistenceModel{service: actvService}
 }
 
-func (*activityPersistenceModel) GetCollection() string { return "activity" }
+// GetCollection 保留历史集合名，代码重命名不迁移已有存档。
+func (*actvPersistenceModel) GetCollection() string { return "activity" }
 
-func (*activityPersistenceModel) GetPrototype() interface{} { return (*service.ActvMeta)(nil) }
+func (*actvPersistenceModel) GetPrototype() interface{} { return (*service.ActvMeta)(nil) }
 
-func (*activityPersistenceModel) GetIDField() string { return "_id" }
+func (*actvPersistenceModel) GetIDField() string { return "_id" }
 
-func (*activityPersistenceModel) GetKey(value interface{}) interface{} {
+func (*actvPersistenceModel) GetKey(value interface{}) interface{} {
 	meta, ok := value.(*service.ActvMeta)
 	if !ok || meta == nil {
 		return nil
@@ -33,7 +34,7 @@ func (*activityPersistenceModel) GetKey(value interface{}) interface{} {
 	return meta.GetActvID()
 }
 
-func (*activityPersistenceModel) Clone(value interface{}) interface{} {
+func (*actvPersistenceModel) Clone(value interface{}) interface{} {
 	meta, ok := value.(*service.ActvMeta)
 	if !ok || meta == nil {
 		return nil
@@ -43,7 +44,7 @@ func (*activityPersistenceModel) Clone(value interface{}) interface{} {
 	return &snapshot
 }
 
-func (model *activityPersistenceModel) Range(callback func(interface{}) bool) {
+func (model *actvPersistenceModel) Range(callback func(interface{}) bool) {
 	if model == nil || model.service == nil || callback == nil {
 		return
 	}
@@ -57,9 +58,9 @@ func (model *activityPersistenceModel) Range(callback func(interface{}) bool) {
 	}
 }
 
-func (*activityPersistenceModel) GetSaveInterval() time.Duration { return activityOwnerSaveInterval }
+func (*actvPersistenceModel) GetSaveInterval() time.Duration { return actvOwnerSaveInterval }
 
-func (model *activityPersistenceModel) AfterSave(_ tree.Context, value interface{}) error {
+func (model *actvPersistenceModel) AfterSave(_ tree.Context, value interface{}) error {
 	snapshot, ok := value.(*service.ActvMeta)
 	if !ok || snapshot == nil || model == nil || model.service == nil {
 		return nil
@@ -71,31 +72,32 @@ func (model *activityPersistenceModel) AfterSave(_ tree.Context, value interface
 	return nil
 }
 
-func (*activityPersistenceModel) MackDirty(value interface{}) bool {
+func (*actvPersistenceModel) MackDirty(value interface{}) bool {
 	meta, ok := value.(*service.ActvMeta)
 	return ok && meta != nil && meta.IsDirty()
 }
 
-func (*activityPersistenceModel) GetTickerType() timer.TimerType { return activitySaveTickerType }
+func (*actvPersistenceModel) GetTickerType() timer.TimerType { return actvSaveTickerType }
 
-const activityDataSaveTickerType = timer.TimerType(1000013)
+const actvDataSaveTickerType = timer.TimerType(1000013)
 
-// activityDataPersistenceModel 将活动组件数据适配到 activity_data 集合，与元数据集合分开存放。
-type activityDataPersistenceModel struct {
+// actvDataPersistenceModel 将活动组件数据适配到历史组件集合，与元数据集合分开存放。
+type actvDataPersistenceModel struct {
 	service *service.ActvService
 }
 
-func newActivityDataPersistenceModel(actvService *service.ActvService) *activityDataPersistenceModel {
-	return &activityDataPersistenceModel{service: actvService}
+func newActvDataPersistenceModel(actvService *service.ActvService) *actvDataPersistenceModel {
+	return &actvDataPersistenceModel{service: actvService}
 }
 
-func (*activityDataPersistenceModel) GetCollection() string { return "activity_data" }
+// GetCollection 保留历史组件集合名，继续读取已有玩家进度。
+func (*actvDataPersistenceModel) GetCollection() string { return "activity_data" }
 
-func (*activityDataPersistenceModel) GetPrototype() interface{} { return (*service.ActvDataDoc)(nil) }
+func (*actvDataPersistenceModel) GetPrototype() interface{} { return (*service.ActvDataDoc)(nil) }
 
-func (*activityDataPersistenceModel) GetIDField() string { return "_id" }
+func (*actvDataPersistenceModel) GetIDField() string { return "_id" }
 
-func (*activityDataPersistenceModel) GetKey(value interface{}) interface{} {
+func (*actvDataPersistenceModel) GetKey(value interface{}) interface{} {
 	doc, ok := value.(*service.ActvDataDoc)
 	if !ok || doc == nil || doc.GetID() == "" {
 		return nil
@@ -104,7 +106,7 @@ func (*activityDataPersistenceModel) GetKey(value interface{}) interface{} {
 }
 
 // Clone 直接返回快照：Range 产出的文档已在 Actor 线程内完成编码，不再被修改。
-func (*activityDataPersistenceModel) Clone(value interface{}) interface{} {
+func (*actvDataPersistenceModel) Clone(value interface{}) interface{} {
 	doc, ok := value.(*service.ActvDataDoc)
 	if !ok || doc == nil {
 		return nil
@@ -112,7 +114,7 @@ func (*activityDataPersistenceModel) Clone(value interface{}) interface{} {
 	return doc
 }
 
-func (model *activityDataPersistenceModel) Range(callback func(interface{}) bool) {
+func (model *actvDataPersistenceModel) Range(callback func(interface{}) bool) {
 	if model == nil || model.service == nil || callback == nil {
 		return
 	}
@@ -123,11 +125,11 @@ func (model *activityDataPersistenceModel) Range(callback func(interface{}) bool
 	}
 }
 
-func (*activityDataPersistenceModel) GetSaveInterval() time.Duration {
-	return activityOwnerSaveInterval
+func (*actvDataPersistenceModel) GetSaveInterval() time.Duration {
+	return actvOwnerSaveInterval
 }
 
-func (model *activityDataPersistenceModel) AfterSave(_ tree.Context, value interface{}) error {
+func (model *actvDataPersistenceModel) AfterSave(_ tree.Context, value interface{}) error {
 	doc, ok := value.(*service.ActvDataDoc)
 	if !ok || doc == nil || model == nil || model.service == nil {
 		return nil
@@ -136,11 +138,11 @@ func (model *activityDataPersistenceModel) AfterSave(_ tree.Context, value inter
 	return nil
 }
 
-func (*activityDataPersistenceModel) MackDirty(value interface{}) bool {
+func (*actvDataPersistenceModel) MackDirty(value interface{}) bool {
 	doc, ok := value.(*service.ActvDataDoc)
 	return ok && doc.IsDirty()
 }
 
-func (*activityDataPersistenceModel) GetTickerType() timer.TimerType {
-	return activityDataSaveTickerType
+func (*actvDataPersistenceModel) GetTickerType() timer.TimerType {
+	return actvDataSaveTickerType
 }

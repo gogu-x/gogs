@@ -13,7 +13,7 @@ type ShopBehavior struct {
 }
 
 // Create 为商店活动实例创建独立的运行时行为对象。
-func (*ShopBehavior) Create(actv *service.Actv, cfg conf.ActivityConfig) service.ActvBehavior {
+func (*ShopBehavior) Create(actv *service.Actv, cfg conf.ActvConfig) service.ActvBehavior {
 	behavior := &ShopBehavior{}
 	behavior.Bind(actv, cfg)
 	return behavior

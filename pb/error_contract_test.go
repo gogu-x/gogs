@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
+	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/gogs/pb/cspb/pb_equipment"
@@ -73,7 +73,7 @@ func TestStatusFieldsPreserveNumericCodes(t *testing.T) {
 		&pb_talent.LearnRoleTalentAck{},
 		&pb_talent.ResetRoleTalentAck{},
 		&pb_battle.StartBattleAck{},
-		&pb_activity.GetActivityListAck{},
+		&pb_actv.GetActvListAck{},
 	}
 	for _, message := range messages {
 		reflection := message.ProtoReflect()

@@ -34,6 +34,177 @@ type ActvOnlineCfg struct {
 	LevelVal            int32   `bson:"level_val"`             // 等级条件值
 }
 
+// GetID returns the configured field value.
+func (cfg *ActvOnlineCfg) GetID() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.ID
+}
+
+// GetContentID returns the configured field value.
+func (cfg *ActvOnlineCfg) GetContentID() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.ContentID
+}
+
+// GetAvailable returns the configured field value.
+func (cfg *ActvOnlineCfg) GetAvailable() bool {
+	if cfg == nil {
+		var zero bool
+		return zero
+	}
+	return cfg.Available
+}
+
+// GetTab returns the configured field value.
+func (cfg *ActvOnlineCfg) GetTab() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.Tab
+}
+
+// GetType returns the configured field value.
+func (cfg *ActvOnlineCfg) GetType() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.Type
+}
+
+// GetAcrossServerGroup returns the configured field value.
+func (cfg *ActvOnlineCfg) GetAcrossServerGroup() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.AcrossServerGroup
+}
+
+// GetServerGroups returns the configured field value.
+func (cfg *ActvOnlineCfg) GetServerGroups() []int32 {
+	if cfg == nil {
+		var zero []int32
+		return zero
+	}
+	return cfg.ServerGroups
+}
+
+// GetTriggerType returns the configured field value.
+func (cfg *ActvOnlineCfg) GetTriggerType() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.TriggerType
+}
+
+// GetTriggerVal returns the configured field value.
+func (cfg *ActvOnlineCfg) GetTriggerVal() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.TriggerVal
+}
+
+// GetReopen returns the configured field value.
+func (cfg *ActvOnlineCfg) GetReopen() bool {
+	if cfg == nil {
+		var zero bool
+		return zero
+	}
+	return cfg.Reopen
+}
+
+// GetOpenDayLimit returns the configured field value.
+func (cfg *ActvOnlineCfg) GetOpenDayLimit() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.OpenDayLimit
+}
+
+// GetTriggerRept returns the configured field value.
+func (cfg *ActvOnlineCfg) GetTriggerRept() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.TriggerRept
+}
+
+// GetForecastBeforeStart returns the configured field value.
+func (cfg *ActvOnlineCfg) GetForecastBeforeStart() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.ForecastBeforeStart
+}
+
+// GetDuration returns the configured field value.
+func (cfg *ActvOnlineCfg) GetDuration() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.Duration
+}
+
+// GetCloseAfterEnd returns the configured field value.
+func (cfg *ActvOnlineCfg) GetCloseAfterEnd() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.CloseAfterEnd
+}
+
+// GetSpecialType returns the configured field value.
+func (cfg *ActvOnlineCfg) GetSpecialType() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.SpecialType
+}
+
+// GetSpecialVal returns the configured field value.
+func (cfg *ActvOnlineCfg) GetSpecialVal() string {
+	if cfg == nil {
+		var zero string
+		return zero
+	}
+	return cfg.SpecialVal
+}
+
+// GetLevelCondition returns the configured field value.
+func (cfg *ActvOnlineCfg) GetLevelCondition() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.LevelCondition
+}
+
+// GetLevelVal returns the configured field value.
+func (cfg *ActvOnlineCfg) GetLevelVal() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.LevelVal
+}
+
 func loadActvOnlineCfg(dbURI, dbName, confName string) (*CsvConf, error) {
 	table, err := readCsv(dbURI, dbName, confName, &ActvOnlineCfg{})
 	if err != nil {
@@ -82,4 +253,11 @@ func GetActvOnlineCfgInterface(id int32) interface{} {
 		return table.GetNoErr(id)
 	}
 	return nil
+}
+
+// SetActvOnlineCfgForTest installs an in-memory configuration snapshot without database access.
+func SetActvOnlineCfgForTest(records []*ActvOnlineCfg) error {
+	return installRecordsForTest(&ActvOnlineCfg{}, interfacesOf(records), func(table *CsvConf) {
+		csvActvOnlineCfg.Store(table)
+	})
 }

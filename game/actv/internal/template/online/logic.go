@@ -1,5 +1,5 @@
-//go:generate make -C ../../../../.. router GEN_DIR=game/actv/internal/template/online
-//go:generate make -C ../../../../.. deepcopy GEN_DIR=game/actv/internal/template/online
+//go:generate actv-router-gen
+//go:generate deepcopy-gen
 
 // Package online 实现在线活动行为和独立状态组件。
 package online
@@ -8,7 +8,7 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/game/actv/internal/template/base"
-	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
+	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/sspb"
 )
 
@@ -20,7 +20,7 @@ type Behavior struct {
 }
 
 // Create 为在线活动实例创建独立的运行时行为对象。
-func (*Behavior) Create(actv *service.Actv, cfg conf.ActivityConfig) service.ActvBehavior {
+func (*Behavior) Create(actv *service.Actv, cfg conf.ActvConfig) service.ActvBehavior {
 	behavior := &Behavior{}
 	behavior.Bind(actv, cfg)
 	return behavior
@@ -60,29 +60,19 @@ func (b *Behavior) Settle(uid uint64) {
 	b.member.MarkDirty(uid)
 }
 
-// handleJoinActivity 处理在线活动加入请求。
-// @activity.request
-func (b *Behavior) handleJoinActivity(uid uint64, request *pb_activity.JoinActivityReq) {
-	// 服务器活动中按 uid 取该玩家的列表条目；玩家已上线加载，不存在时自动新建。
-	p := b.member.Get(uid)
-	if p == nil {
-		return
-	}
-	p.Target = b.ActvCfg.GetTarget()
-	b.member.MarkDirty(uid)
-}
-
 // handleGetProgress 处理在线活动进度查询请求。
-// @activity.request
-func (b *Behavior) handleGetProgress(uid uint64, request *pb_activity.GetProgressReq) {
+// @actv.request
+func (b *Behavior) handleGetProgress(uid uint64, request *pb_actv.GetProgressReq) {
+	// 业务实现后自行构造响应并调用 PushToPlayer。
 }
 
 // handleClaimReward 处理在线活动领奖请求。
-// @activity.request
-func (b *Behavior) handleClaimReward(uid uint64, request *pb_activity.ClaimRewardReq) {
+// @actv.request
+func (b *Behavior) handleClaimReward(uid uint64, request *pb_actv.ClaimRewardReq) {
+	// 业务实现后自行构造响应并调用 PushToPlayer。
 }
 
 // handleUserLogin 处理玩家上线事件。
-// @activity.event 1 "onUserLogin"
+// @actv.event 1 "onUserLogin"
 func (b *Behavior) handleUserLogin(event *sspb.Event) {
 }

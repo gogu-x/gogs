@@ -33,7 +33,7 @@ const (
 )
 
 // ErrUnsupported 表示配置的时间类型当前版本尚未支持。
-var ErrUnsupported = errors.New("unsupported activity trigger type")
+var ErrUnsupported = errors.New("unsupported actv trigger type")
 
 // Plan 是一条活动配置解析后的时间规则，所有时间为 Unix 秒。
 // 第 k 轮（k 从 0 开始）开始时间 = FirstStartTs + k*RepeatInterval；不循环时只有第 0 轮。
@@ -69,10 +69,10 @@ func (plan *Plan) InstanceID(round int32) int64 {
 // 配置未启用、时间类型不支持或字段格式错误时返回错误。
 func NewPlan(cfg *glconf.ActvOnlineCfg, openTs int64, loc *time.Location) (*Plan, error) {
 	if cfg == nil || cfg.GetID() <= 0 {
-		return nil, fmt.Errorf("activity config is empty")
+		return nil, fmt.Errorf("actv config is empty")
 	}
 	if !cfg.GetAvailable() {
-		return nil, fmt.Errorf("activity config %d is not available", cfg.GetID())
+		return nil, fmt.Errorf("actv config %d is not available", cfg.GetID())
 	}
 	if loc == nil {
 		loc = time.Local
@@ -147,13 +147,13 @@ func BuildPlans(cfgs []*glconf.ActvOnlineCfg, openTs int64, loc *time.Location) 
 			continue
 		}
 		if err != nil {
-			tlog.Log.Error("[activity/trigger.BuildPlans] 活动配置时间规则无效，跳过, config=%v err=%v", cfg.GetID(), err)
+			tlog.Log.Error("[actv/trigger.BuildPlans] 活动配置时间规则无效，跳过, config=%v err=%v", cfg.GetID(), err)
 			continue
 		}
 		plans = append(plans, plan)
 	}
 	for triggerType, count := range unsupported {
-		tlog.Log.Info("[activity/trigger.BuildPlans] 活动时间类型暂不支持，跳过, triggerType=%v count=%v", triggerType, count)
+		tlog.Log.Info("[actv/trigger.BuildPlans] 活动时间类型暂不支持，跳过, triggerType=%v count=%v", triggerType, count)
 	}
 	return plans
 }

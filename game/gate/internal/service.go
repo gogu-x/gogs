@@ -385,6 +385,10 @@ func (g *GateActor) onPushToMsg(ctx tree.Context, msg interface{}) {
 	if !ok {
 		return
 	}
+	if generation := push.GetGeneration(); generation != 0 && generation != current.generation {
+		tlog.Log.Debug("[gate/GateActor.onPushToMsg] 忽略旧会话响应, pid=%v generation=%v", push.GetUID(), generation)
+		return
+	}
 	if !ctx.TrySend(current.pid, push) {
 		g.closeCurrent(ctx, push.UID, current, "outbound mailbox is full")
 	}

@@ -36,7 +36,7 @@ type ComponentHolder interface {
 	PlayerComponents() []PlayerComponent
 }
 
-// ActvDataDoc 是 activity_data 集合中的一条组件数据，与活动元数据 ActvMeta 分开存放。
+// ActvDataDoc 是 actv_data 集合中的一条组件数据，与活动元数据 ActvMeta 分开存放。
 // 归属者表示该条数据随谁加载：
 //   - 单条数据组件：归属者与活动实例一致（服务器/联盟随启动加载，玩家独有活动随玩家上线加载）；
 //   - 玩家列表组件：归属者为条目对应的玩家，随该玩家上线加载。
@@ -53,8 +53,8 @@ type ActvDataDoc struct {
 
 // DataDocID 返回组件数据文档编号。同一活动内组件编号唯一，单条组件只有一个归属者，
 // 玩家列表组件的归属者均为玩家，因此 actv_id + comp + owner_id 不会冲突。
-func DataDocID(activityID int64, compID int32, ownerID OwnerID) string {
-	return fmt.Sprintf("%d_%d_%d", activityID, compID, ownerID)
+func DataDocID(actvID int64, compID int32, ownerID OwnerID) string {
+	return fmt.Sprintf("%d_%d_%d", actvID, compID, ownerID)
 }
 
 // IsDirty 返回组件数据快照是否待存盘。
@@ -76,10 +76,10 @@ func (doc *ActvDataDoc) GetID() string {
 	return doc.ID
 }
 
-func newDataSnapshot(activityID int64, compID int32, scope OwnerScope, ownerID OwnerID, raw bson.Raw, revision uint64) *ActvDataDoc {
+func newDataSnapshot(actvID int64, compID int32, scope OwnerScope, ownerID OwnerID, raw bson.Raw, revision uint64) *ActvDataDoc {
 	return &ActvDataDoc{
-		ID:         DataDocID(activityID, compID, ownerID),
-		ActvID:     activityID,
+		ID:         DataDocID(actvID, compID, ownerID),
+		ActvID:     actvID,
 		Comp:       compID,
 		OwnerScope: scope,
 		OwnerID:    ownerID,

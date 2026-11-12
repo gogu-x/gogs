@@ -11,7 +11,7 @@ import (
 
 // RoleAttributes contains compiled battle attributes.
 //
-//go:generate make -C ../../../.. accessor GEN_DIR=battle/battle/internal/battleconfig STRUCTS=RoleAttributes
+//go:generate accessor-gen
 type RoleAttributes struct {
 	MaxHP   int64 // Maximum health.
 	Attack  int64 // Attack power.

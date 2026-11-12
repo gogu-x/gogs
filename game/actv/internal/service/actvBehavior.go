@@ -2,14 +2,14 @@ package service
 
 import (
 	"github.com/gogu-x/gogs/game/actv/internal/conf"
-	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
+	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/sspb"
 	"google.golang.org/protobuf/proto"
 )
 
 // ActvTemplate 创建指定活动实例和配置对应的活动行为对象。
 type ActvTemplate interface {
-	Create(actv *Actv, conf conf.ActivityConfig) ActvBehavior
+	Create(actv *Actv, conf conf.ActvConfig) ActvBehavior
 }
 
 // ActvBehavior 定义活动实例的生命周期、信息、请求和事件处理行为。
@@ -23,7 +23,7 @@ type ActvBehavior interface {
 	OnStart()
 	OnTicker()
 	OnClosed()
-	OnPack() *pb_activity.ActivityInfo
+	OnPack() *pb_actv.ActvInfo
 	HandleEvent(event *sspb.Event)
 	HandleRequest(uid uint64, request proto.Message)
 }

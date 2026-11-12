@@ -26,6 +26,7 @@ type Event struct {
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	EventTyp      int32                  `protobuf:"varint,2,opt,name=eventTyp,proto3" json:"eventTyp,omitempty"`
 	Args          map[string]int32       `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	ExtArgs       map[string]string      `protobuf:"bytes,7,rep,name=ext_args,json=extArgs,proto3" json:"ext_args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // 通用扩展参数，支持无精度损失的整数文本等业务值。
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -81,18 +82,29 @@ func (x *Event) GetArgs() map[string]int32 {
 	return nil
 }
 
+func (x *Event) GetExtArgs() map[string]string {
+	if x != nil {
+		return x.ExtArgs
+	}
+	return nil
+}
+
 var File_sspb_struct_proto protoreflect.FileDescriptor
 
 const file_sspb_struct_proto_rawDesc = "" +
 	"\n" +
-	"\x11sspb/struct.proto\"\x96\x01\n" +
+	"\x11sspb/struct.proto\"\x94\x02\n" +
 	"\x05event\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\beventTyp\x18\x02 \x01(\x05R\beventTyp\x12$\n" +
-	"\x04args\x18\x03 \x03(\v2\x10.event.ArgsEntryR\x04args\x1a7\n" +
+	"\x04args\x18\x03 \x03(\v2\x10.event.ArgsEntryR\x04args\x12.\n" +
+	"\bext_args\x18\a \x03(\v2\x13.event.ExtArgsEntryR\aextArgs\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01B Z\x1egithub.com/gogu-x/gogs/pb/sspbb\x06proto3"
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
+	"\fExtArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06J\x04\b\x06\x10\aB Z\x1egithub.com/gogu-x/gogs/pb/sspbb\x06proto3"
 
 var (
 	file_sspb_struct_proto_rawDescOnce sync.Once
@@ -106,18 +118,20 @@ func file_sspb_struct_proto_rawDescGZIP() []byte {
 	return file_sspb_struct_proto_rawDescData
 }
 
-var file_sspb_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_sspb_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_sspb_struct_proto_goTypes = []any{
 	(*Event)(nil), // 0: event
 	nil,           // 1: event.ArgsEntry
+	nil,           // 2: event.ExtArgsEntry
 }
 var file_sspb_struct_proto_depIdxs = []int32{
 	1, // 0: event.args:type_name -> event.ArgsEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 1: event.ext_args:type_name -> event.ExtArgsEntry
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_sspb_struct_proto_init() }
@@ -131,7 +145,7 @@ func file_sspb_struct_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sspb_struct_proto_rawDesc), len(file_sspb_struct_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

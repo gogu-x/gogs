@@ -8,7 +8,6 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	templates "github.com/gogu-x/gogs/game/actv/internal/template"
 	"github.com/gogu-x/gogs/game/actv/internal/trigger"
-	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/db/mongorpc"
 	"github.com/gogu-x/tree/timer"
@@ -16,71 +15,67 @@ import (
 )
 
 const (
-	// defaultActivityServerID 表示未传入服务器编号时使用的默认编号。
-	defaultActivityServerID = uint64(1)
-	// activityOwnerSaveInterval 表示活动记录的定时存盘间隔。
-	activityOwnerSaveInterval = time.Minute
-	// maxPendingActivityRequests 表示活动 Actor 加载常驻归属数据期间暂存请求的数量上限。
-	maxPendingActivityRequests = 1024
+	// defaultActvServerID 表示未传入服务器编号时使用的默认编号。
+	defaultActvServerID = uint64(1)
+	// actvOwnerSaveInterval 表示活动记录的定时存盘间隔。
+	actvOwnerSaveInterval = time.Minute
+	// maxPendingActvRequests 表示活动 Actor 加载常驻归属数据期间暂存玩家事件与请求的总数量上限。
+	maxPendingActvRequests = 10240
 )
 
-// pendingActivityRequest 保存活动 Actor 加载期间暂存的消息和请求信封。
-type pendingActivityRequest struct {
+// pendingActvRequest 保存活动 Actor 加载期间暂存的单向消息。
+type pendingActvRequest struct {
 	message interface{}
-	request *tree.Envelope
 }
 
-// Activity 统一管理不同归属对象的活动状态及其存盘生命周期。
-type Activity struct {
-	serverID       uint64
-	router         tree.Router
-	wheel          *timer.TimeWheel
-	system         *tree.Tree
-	selfPID        tree.PID
-	store          *mongorpc.Store
-	lifecycle      *mongorpc.Lifecycle
-	model          *activityPersistenceModel
-	dataModel      *activityDataPersistenceModel
-	actvService    *service.ActvService
-	ready          bool
-	loadErr        error
-	pending        []pendingActivityRequest
-	pendingEvents  []*sspb.Event
-	pendingLogins  map[uint64]bool             // 启动加载期间上线、待 ready 后加载的玩家。
-	players        map[uint64]*playerLoadState // 玩家活动数据的加载/释放状态。
-	serverOpened   bool
-	serverClosing  bool
-	triggerStarted bool            // 触发创建定时器是否已启动。
-	triggerPlans   []*trigger.Plan // 服务器归属活动的时间规则，触发启动时解析一次。
+// Actv 统一管理不同归属对象的活动状态及其存盘生命周期。
+type Actv struct {
+	creationTrigger *trigger.Engine // 统一配置触发创建引擎。
+	serverID        uint64
+	router          tree.Router
+	wheel           *timer.TimeWheel
+	system          *tree.Tree
+	selfPID         tree.PID
+	store           *mongorpc.Store
+	lifecycle       *mongorpc.Lifecycle
+	model           *actvPersistenceModel
+	dataModel       *actvDataPersistenceModel
+	actvService     *service.ActvService
+	ready           bool
+	loadErr         error
+	pending         []pendingActvRequest
+	players         map[uint64]*playerLoadState // 玩家活动数据的加载/释放状态。
+	serverOpened    bool
+	serverClosing   bool
+	triggerStarted  bool // 触发创建定时器是否已启动。
 }
 
-// NewActivity 创建可选服务器编号对应的全局活动 Actor。
-func NewActivity() *Activity {
+// NewActv 创建可选服务器编号对应的全局活动 Actor。
+func NewActv() *Actv {
 	serverID := uint64(conf.ServerID)
 	if serverID == 0 {
-		serverID = defaultActivityServerID
+		serverID = defaultActvServerID
 	}
-	return &Activity{
-		serverID:      serverID,
-		actvService:   service.NewActvService(serverID),
-		pendingLogins: make(map[uint64]bool),
-		players:       make(map[uint64]*playerLoadState),
+	return &Actv{
+		serverID:    serverID,
+		actvService: service.NewActvService(serverID),
+		players:     make(map[uint64]*playerLoadState),
 	}
 }
 
 // Name 返回全局活动 Actor 的名称。
-func (actor *Activity) Name() string { return def.ActorActivity }
+func (actor *Actv) Name() string { return def.ActorActv }
 
 // OnInit 注册消息路由、存盘生命周期、时间轮和活动模板。
 // 启动时先创建索引，再加载服务器/联盟活动元数据，最后加载这些活动的单条组件数据。
-func (actor *Activity) OnInit(ctx tree.Context) {
+func (actor *Actv) OnInit(ctx tree.Context) {
 	actor.registerHandlers()
 	actor.registerTimers(ctx)
 	actor.store = mongorpc.NewStore(def.Mongo)
 	actor.lifecycle = mongorpc.NewLifecycle(actor.store, actor.wheel, ctx)
 	templates.Register(actor.actvService)
-	actor.model = newActivityPersistenceModel(actor.actvService)
-	actor.dataModel = newActivityDataPersistenceModel(actor.actvService)
+	actor.model = newActvPersistenceModel(actor.actvService)
+	actor.dataModel = newActvDataPersistenceModel(actor.actvService)
 	for _, model := range []mongorpc.Model{actor.model, actor.dataModel} {
 		if err := actor.lifecycle.Register(model); err != nil {
 			actor.failLoad(ctx, err)
@@ -88,9 +83,9 @@ func (actor *Activity) OnInit(ctx tree.Context) {
 		}
 	}
 	actor.ensureIndexes(ctx)
-	if !actor.lifecycle.LoadAll(ctx, (*service.ActvMeta)(nil), retainedActivityFilter(bson.M{
+	if !actor.lifecycle.LoadAll(ctx, (*service.ActvMeta)(nil), retainedActvFilter(bson.M{
 		"owner_scope": bson.M{"$in": bson.A{int32(service.ScopeServer), int32(service.ScopeGuild)}},
-	}, time.Now().Unix()), actor.onActivitiesLoaded) {
+	}, time.Now().Unix()), actor.onActvsLoaded) {
 		actor.failLoad(ctx, nil)
 		return
 	}
@@ -98,12 +93,12 @@ func (actor *Activity) OnInit(ctx tree.Context) {
 }
 
 // HandleMessage 将全局活动消息分发给已注册的处理方法。
-func (actor *Activity) HandleMessage(ctx tree.Context, message interface{}) {
+func (actor *Actv) HandleMessage(ctx tree.Context, message interface{}) {
 	actor.router.Route(ctx, message)
 }
 
 // OnStop 停止活动存盘生命周期和时间轮。
-func (actor *Activity) OnStop(_ tree.Context) {
+func (actor *Actv) OnStop(_ tree.Context) {
 	if actor.lifecycle != nil {
 		actor.lifecycle.Stop()
 	}

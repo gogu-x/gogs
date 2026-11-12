@@ -46,6 +46,7 @@ type generator struct {
 }
 
 func main() {
+	referenceFlag := flag.String("reference-dir", "", "optional dependency source directory; read only")
 	rootFlag := flag.String("dir", ".", "root directory to scan recursively")
 	flag.Parse()
 
@@ -60,6 +61,22 @@ func main() {
 	}
 	if err := g.loadPackages(); err != nil {
 		fatal(err)
+	}
+	if *referenceFlag != "" {
+		referenceRoot, err := filepath.Abs(*referenceFlag)
+		if err != nil {
+			fatal(err)
+		}
+		reference := &generator{root: referenceRoot, packages: make(map[string]*packageInfo), byImport: make(map[string]*packageInfo)}
+		if err := reference.loadPackages(); err != nil {
+			fatal(err)
+		}
+		// 依赖类型仅参与识别，不加入生成列表，避免改写公共库。
+		for importPath, pkg := range reference.byImport {
+			if g.byImport[importPath] == nil {
+				g.byImport[importPath] = pkg
+			}
+		}
 	}
 	if err := g.generate(); err != nil {
 		fatal(err)

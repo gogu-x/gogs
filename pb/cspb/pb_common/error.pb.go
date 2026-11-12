@@ -98,19 +98,19 @@ const (
 	// 战斗进行中
 	ErrCode_BATTLE_IN_PROGRESS ErrCode = -5005
 	// 活动服务不可用
-	ErrCode_ACTIVITY_UNAVAILABLE ErrCode = -6001
+	ErrCode_ACTV_UNAVAILABLE ErrCode = -6001
 	// 活动不存在
-	ErrCode_ACTIVITY_NOT_FOUND ErrCode = -6002
+	ErrCode_ACTV_NOT_FOUND ErrCode = -6002
 	// 活动未开放
-	ErrCode_ACTIVITY_NOT_OPEN ErrCode = -6003
+	ErrCode_ACTV_NOT_OPEN ErrCode = -6003
 	// 尚未参与活动
-	ErrCode_ACTIVITY_NOT_JOINED ErrCode = -6004
+	ErrCode_ACTV_NOT_JOINED ErrCode = -6004
 	// 已参与活动
-	ErrCode_ACTIVITY_ALREADY_JOINED ErrCode = -6005
+	ErrCode_ACTV_ALREADY_JOINED ErrCode = -6005
 	// 未满足活动奖励领取条件
-	ErrCode_ACTIVITY_REWARD_NOT_READY ErrCode = -6006
+	ErrCode_ACTV_REWARD_NOT_READY ErrCode = -6006
 	// 活动奖励已领取
-	ErrCode_ACTIVITY_REWARD_ALREADY_CLAIMED ErrCode = -6007
+	ErrCode_ACTV_REWARD_ALREADY_CLAIMED ErrCode = -6007
 )
 
 // Enum value maps for ErrCode.
@@ -152,58 +152,58 @@ var (
 		-5003: "BATTLE_CREATE_FAILED",
 		-5004: "INVALID_BATTLE_REQUEST",
 		-5005: "BATTLE_IN_PROGRESS",
-		-6001: "ACTIVITY_UNAVAILABLE",
-		-6002: "ACTIVITY_NOT_FOUND",
-		-6003: "ACTIVITY_NOT_OPEN",
-		-6004: "ACTIVITY_NOT_JOINED",
-		-6005: "ACTIVITY_ALREADY_JOINED",
-		-6006: "ACTIVITY_REWARD_NOT_READY",
-		-6007: "ACTIVITY_REWARD_ALREADY_CLAIMED",
+		-6001: "ACTV_UNAVAILABLE",
+		-6002: "ACTV_NOT_FOUND",
+		-6003: "ACTV_NOT_OPEN",
+		-6004: "ACTV_NOT_JOINED",
+		-6005: "ACTV_ALREADY_JOINED",
+		-6006: "ACTV_REWARD_NOT_READY",
+		-6007: "ACTV_REWARD_ALREADY_CLAIMED",
 	}
 	ErrCode_value = map[string]int32{
-		"OK":                              0,
-		"UNKNOWN":                         -1,
-		"PARAM":                           -2,
-		"UNAUTHORIZED":                    -1001,
-		"LOGIN_IN_PROGRESS":               -1002,
-		"SERVER_NOT_FOUND":                -1003,
-		"USERNAME_EXISTS":                 -2001,
-		"WRONG_PASSWORD":                  -2002,
-		"INTERNAL":                        -2003,
-		"ACCOUNT_NOT_FOUND":               -2004,
-		"GUILD_EXISTS":                    -3001,
-		"GUILD_NOT_FOUND":                 -3002,
-		"ALREADY_IN_GUILD":                -3003,
-		"NOT_IN_GUILD":                    -3004,
-		"LOADOUT_UNAVAILABLE":             -4001,
-		"CONFIG_UNAVAILABLE":              -4002,
-		"STALE_REVISION":                  -4003,
-		"INVALID_SLOT":                    -4004,
-		"ITEM_NOT_OWNED":                  -4005,
-		"INVALID_ITEM_STATE":              -4006,
-		"EQUIPMENT_UNAVAILABLE":           -4101,
-		"INVALID_EQUIPMENT":               -4102,
-		"DUPLICATE_JADE":                  -4201,
-		"MAX_LEVEL_REACHED":               -4202,
-		"INSUFFICIENT_ESSENCE":            -4203,
-		"AFFIX_GENERATION_FAILED":         -4204,
-		"INVALID_TALENT_NODE":             -4301,
-		"TALENT_ALREADY_LEARNED":          -4302,
-		"TALENT_PREREQUISITE_MISSING":     -4303,
-		"INSUFFICIENT_TALENT_POINTS":      -4304,
-		"INVALID_TALENT_BRANCH":           -4305,
-		"BATTLE_UNAVAILABLE":              -5001,
-		"BATTLE_TIMEOUT":                  -5002,
-		"BATTLE_CREATE_FAILED":            -5003,
-		"INVALID_BATTLE_REQUEST":          -5004,
-		"BATTLE_IN_PROGRESS":              -5005,
-		"ACTIVITY_UNAVAILABLE":            -6001,
-		"ACTIVITY_NOT_FOUND":              -6002,
-		"ACTIVITY_NOT_OPEN":               -6003,
-		"ACTIVITY_NOT_JOINED":             -6004,
-		"ACTIVITY_ALREADY_JOINED":         -6005,
-		"ACTIVITY_REWARD_NOT_READY":       -6006,
-		"ACTIVITY_REWARD_ALREADY_CLAIMED": -6007,
+		"OK":                          0,
+		"UNKNOWN":                     -1,
+		"PARAM":                       -2,
+		"UNAUTHORIZED":                -1001,
+		"LOGIN_IN_PROGRESS":           -1002,
+		"SERVER_NOT_FOUND":            -1003,
+		"USERNAME_EXISTS":             -2001,
+		"WRONG_PASSWORD":              -2002,
+		"INTERNAL":                    -2003,
+		"ACCOUNT_NOT_FOUND":           -2004,
+		"GUILD_EXISTS":                -3001,
+		"GUILD_NOT_FOUND":             -3002,
+		"ALREADY_IN_GUILD":            -3003,
+		"NOT_IN_GUILD":                -3004,
+		"LOADOUT_UNAVAILABLE":         -4001,
+		"CONFIG_UNAVAILABLE":          -4002,
+		"STALE_REVISION":              -4003,
+		"INVALID_SLOT":                -4004,
+		"ITEM_NOT_OWNED":              -4005,
+		"INVALID_ITEM_STATE":          -4006,
+		"EQUIPMENT_UNAVAILABLE":       -4101,
+		"INVALID_EQUIPMENT":           -4102,
+		"DUPLICATE_JADE":              -4201,
+		"MAX_LEVEL_REACHED":           -4202,
+		"INSUFFICIENT_ESSENCE":        -4203,
+		"AFFIX_GENERATION_FAILED":     -4204,
+		"INVALID_TALENT_NODE":         -4301,
+		"TALENT_ALREADY_LEARNED":      -4302,
+		"TALENT_PREREQUISITE_MISSING": -4303,
+		"INSUFFICIENT_TALENT_POINTS":  -4304,
+		"INVALID_TALENT_BRANCH":       -4305,
+		"BATTLE_UNAVAILABLE":          -5001,
+		"BATTLE_TIMEOUT":              -5002,
+		"BATTLE_CREATE_FAILED":        -5003,
+		"INVALID_BATTLE_REQUEST":      -5004,
+		"BATTLE_IN_PROGRESS":          -5005,
+		"ACTV_UNAVAILABLE":            -6001,
+		"ACTV_NOT_FOUND":              -6002,
+		"ACTV_NOT_OPEN":               -6003,
+		"ACTV_NOT_JOINED":             -6004,
+		"ACTV_ALREADY_JOINED":         -6005,
+		"ACTV_REWARD_NOT_READY":       -6006,
+		"ACTV_REWARD_ALREADY_CLAIMED": -6007,
 	}
 )
 
@@ -238,7 +238,7 @@ var File_cspb_common_error_proto protoreflect.FileDescriptor
 
 const file_cspb_common_error_proto_rawDesc = "" +
 	"\n" +
-	"\x17cspb/common/error.proto*\xe4\n" +
+	"\x17cspb/common/error.proto*\xc8\n" +
 	"\n" +
 	"\aErrCode\x12\x06\n" +
 	"\x02OK\x10\x00\x12\x14\n" +
@@ -276,14 +276,14 @@ const file_cspb_common_error_proto_rawDesc = "" +
 	"\x0eBATTLE_TIMEOUT\x10\xf6\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12!\n" +
 	"\x14BATTLE_CREATE_FAILED\x10\xf5\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12#\n" +
 	"\x16INVALID_BATTLE_REQUEST\x10\xf4\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1f\n" +
-	"\x12BATTLE_IN_PROGRESS\x10\xf3\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12!\n" +
-	"\x14ACTIVITY_UNAVAILABLE\x10\x8f\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1f\n" +
-	"\x12ACTIVITY_NOT_FOUND\x10\x8e\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1e\n" +
-	"\x11ACTIVITY_NOT_OPEN\x10\x8d\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12 \n" +
-	"\x13ACTIVITY_NOT_JOINED\x10\x8c\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12$\n" +
-	"\x17ACTIVITY_ALREADY_JOINED\x10\x8b\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12&\n" +
-	"\x19ACTIVITY_REWARD_NOT_READY\x10\x8a\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12,\n" +
-	"\x1fACTIVITY_REWARD_ALREADY_CLAIMED\x10\x89\xd1\xff\xff\xff\xff\xff\xff\xff\x01B*Z(github.com/gogu-x/gogs/pb/cspb/pb_commonb\x06proto3"
+	"\x12BATTLE_IN_PROGRESS\x10\xf3\xd8\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1d\n" +
+	"\x10ACTV_UNAVAILABLE\x10\x8f\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1b\n" +
+	"\x0eACTV_NOT_FOUND\x10\x8e\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1a\n" +
+	"\rACTV_NOT_OPEN\x10\x8d\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12\x1c\n" +
+	"\x0fACTV_NOT_JOINED\x10\x8c\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12 \n" +
+	"\x13ACTV_ALREADY_JOINED\x10\x8b\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12\"\n" +
+	"\x15ACTV_REWARD_NOT_READY\x10\x8a\xd1\xff\xff\xff\xff\xff\xff\xff\x01\x12(\n" +
+	"\x1bACTV_REWARD_ALREADY_CLAIMED\x10\x89\xd1\xff\xff\xff\xff\xff\xff\xff\x01B*Z(github.com/gogu-x/gogs/pb/cspb/pb_commonb\x06proto3"
 
 var (
 	file_cspb_common_error_proto_rawDescOnce sync.Once

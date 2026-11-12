@@ -5,42 +5,31 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/game/actv/internal/service"
+	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/ipb"
+	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/tlog"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-// maxPendingPlayerRequests 表示单个玩家活动数据加载期间暂存请求的数量上限。
+// maxPendingPlayerRequests 表示单个玩家活动数据加载期间暂存事件和请求的总数量上限。
 const maxPendingPlayerRequests = 64
 
-// playerLoadState 记录单个玩家活动数据加载/释放过程中的状态和暂存请求。
+// playerLoadState 记录单个玩家活动数据加载/释放过程中的状态和暂存消息。
 // “是否已加载”不在此记录，统一查询 service.IsPlayerLoaded。
 // 状态对象被替换或删除后，旧加载回调通过指针比对识别为过期并丢弃。
 type playerLoadState struct {
-	loading   bool                     // 正在加载玩家活动数据。
-	releasing bool                     // 正在存盘释放的数据，完成前不发起新加载。
-	reload    bool                     // 释放完成后需要重新加载。
-	pending   []pendingActivityRequest // 玩家数据就绪前暂存的请求。
-	metas     *[]service.ActvMeta      // 已返回的玩家独有活动元数据。
-	docs      *[]service.ActvDataDoc   // 已返回的随玩家加载的组件数据。
-}
-
-// onPlayerSessionOpened 玩家上线时加载其活动数据。
-func (actor *Activity) onPlayerSessionOpened(ctx tree.Context, message *ipb.PlayerSessionOpened) {
-	uid := message.GetUID()
-	if uid == 0 {
-		return
-	}
-	if !actor.ready {
-		actor.pendingLogins[uid] = true
-		return
-	}
-	actor.ensurePlayerLoaded(ctx, uid)
+	loading   bool                   // 正在加载玩家活动数据。
+	releasing bool                   // 正在存盘释放的数据，完成前不发起新加载。
+	reload    bool                   // 释放完成后需要重新加载。
+	pending   []pendingActvRequest   // 玩家数据就绪前按顺序暂存的事件与请求。
+	metas     *[]service.ActvMeta    // 已返回的玩家独有活动元数据。
+	docs      *[]service.ActvDataDoc // 已返回的随玩家加载的组件数据。
 }
 
 // ensurePlayerLoaded 返回玩家加载状态，并在未加载时发起加载。
-func (actor *Activity) ensurePlayerLoaded(ctx tree.Context, uid uint64) *playerLoadState {
+func (actor *Actv) ensurePlayerLoaded(ctx tree.Context, uid uint64) *playerLoadState {
 	state := actor.players[uid]
 	if state == nil {
 		state = &playerLoadState{}
@@ -57,12 +46,12 @@ func (actor *Activity) ensurePlayerLoaded(ctx tree.Context, uid uint64) *playerL
 	return state
 }
 
-// startPlayerLoad 先加载结算期内的玩家独有活动元数据，再限定组件数据的加载范围。
-func (actor *Activity) startPlayerLoad(ctx tree.Context, uid uint64, state *playerLoadState) {
+// startPlayerLoad 先加载玩家全部活动元数据以检查创建历史，再限定组件数据的加载范围。
+func (actor *Actv) startPlayerLoad(ctx tree.Context, uid uint64, state *playerLoadState) {
 	state.loading = true
-	metaFilter := retainedActivityFilter(bson.M{
+	metaFilter := bson.M{
 		"owner_scope": int32(service.ScopePlayer), "owner_id": int64(uid),
-	}, time.Now().Unix())
+	}
 	if !actor.lifecycle.LoadAll(
 		ctx, (*service.ActvMeta)(nil), metaFilter,
 		func(callbackCtx tree.Context, value interface{}, err error) {
@@ -78,7 +67,7 @@ func (actor *Activity) startPlayerLoad(ctx tree.Context, uid uint64, state *play
 			metas, ok := value.(*[]service.ActvMeta)
 			if !ok || metas == nil {
 				actor.onPlayerLoadFinished(
-					callbackCtx, uid, state, fmt.Errorf("invalid player activity load result %T", value),
+					callbackCtx, uid, state, fmt.Errorf("invalid player actv load result %T", value),
 				)
 				return
 			}
@@ -87,22 +76,22 @@ func (actor *Activity) startPlayerLoad(ctx tree.Context, uid uint64, state *play
 		},
 	) {
 		actor.onPlayerLoadFinished(
-			ctx, uid, state, fmt.Errorf("player activity load request could not be sent"),
+			ctx, uid, state, fmt.Errorf("player actv load request could not be sent"),
 		)
 	}
 }
 
 // loadPlayerComponents 只读取有效个人活动及相关共享活动中的玩家条目，避免加载过期历史数据。
-func (actor *Activity) loadPlayerComponents(ctx tree.Context, uid uint64, state *playerLoadState) {
+func (actor *Actv) loadPlayerComponents(ctx tree.Context, uid uint64, state *playerLoadState) {
 	now := time.Now().Unix()
-	activityIDs := actor.actvService.SharedActivityIDs(actor.playerGuildID(uid), now)
+	actvIDs := actor.actvService.SharedActvIDs(actor.playerGuildID(uid), now)
 	for index := range *state.metas {
 		meta := &(*state.metas)[index]
 		if !meta.IsExpired(now) {
-			activityIDs = append(activityIDs, meta.GetActvID())
+			actvIDs = append(actvIDs, meta.GetActvID())
 		}
 	}
-	if len(activityIDs) == 0 {
+	if len(actvIDs) == 0 {
 		actor.onPlayerLoadFinished(
 			ctx, uid, state, nil,
 		)
@@ -110,7 +99,7 @@ func (actor *Activity) loadPlayerComponents(ctx tree.Context, uid uint64, state 
 	}
 	dataFilter := bson.M{
 		"owner_scope": int32(service.ScopePlayer), "owner_id": int64(uid),
-		"actv_id": bson.M{"$in": activityIDs},
+		"actv_id": bson.M{"$in": actvIDs},
 	}
 	if !actor.lifecycle.LoadAll(
 		ctx, (*service.ActvDataDoc)(nil), dataFilter,
@@ -118,7 +107,7 @@ func (actor *Activity) loadPlayerComponents(ctx tree.Context, uid uint64, state 
 			if err == nil {
 				docs, ok := value.(*[]service.ActvDataDoc)
 				if !ok || docs == nil {
-					err = fmt.Errorf("invalid player activity data load result %T", value)
+					err = fmt.Errorf("invalid player actv data load result %T", value)
 				}
 				state.docs = docs
 			}
@@ -128,13 +117,13 @@ func (actor *Activity) loadPlayerComponents(ctx tree.Context, uid uint64, state 
 		},
 	) {
 		actor.onPlayerLoadFinished(
-			ctx, uid, state, fmt.Errorf("player activity data load request could not be sent"),
+			ctx, uid, state, fmt.Errorf("player actv data load request could not be sent"),
 		)
 	}
 }
 
-// onPlayerLoadFinished 在加载结束后恢复玩家数据并放行暂存请求。
-func (actor *Activity) onPlayerLoadFinished(
+// onPlayerLoadFinished 在加载结束后恢复数据、检测活动创建，再按顺序分发暂存事件与请求。
+func (actor *Actv) onPlayerLoadFinished(
 	ctx tree.Context, uid uint64, state *playerLoadState, err error,
 ) {
 	if actor.players[uid] != state || !state.loading {
@@ -142,26 +131,26 @@ func (actor *Activity) onPlayerLoadFinished(
 	}
 	state.loading = false
 	if err != nil {
-		tlog.Log.Error("[activity/Activity.onPlayerLoadFinished] 玩家活动数据加载失败, pid=%v err=%v", uid, err)
+		tlog.Log.Error("[actv/Actv.onPlayerLoadFinished] 玩家活动数据加载失败, pid=%v err=%v", uid, err)
 		delete(actor.players, uid)
-		respondPending(state.pending, err)
+		respondPending(ctx, state.pending, err)
 		return
 	}
 	actor.applyPlayerData(uid, state)
+	actor.initializePlayerActvs(uid, state)
 	state.metas, state.docs = nil, nil
 	actor.settleEndedPlayer(ctx, uid, state)
 	pending := state.pending
 	state.pending = nil
 	for _, item := range pending {
-		message, _ := item.message.(*ipb.PlayerActivityMessage)
-		response, handleErr := actor.handlePlayerActivityMessage(message)
-		item.request.Respond(response, handleErr)
+		actor.replayPending(ctx, item)
 	}
+
 }
 
 // settleEndedPlayer 对已结束活动调用模块结算，结算结果存盘成功后卸载该玩家条目。
 // 存盘期间玩家被释放时，条目由释放流程存盘卸载，回调识别为过期后不再处理。
-func (actor *Activity) settleEndedPlayer(ctx tree.Context, uid uint64, state *playerLoadState) {
+func (actor *Actv) settleEndedPlayer(ctx tree.Context, uid uint64, state *playerLoadState) {
 	docs, settled := actor.actvService.SettleEndedPlayer(uid, actor.playerGuildID(uid))
 	if len(docs) == 0 {
 		return
@@ -175,7 +164,7 @@ func (actor *Activity) settleEndedPlayer(ctx tree.Context, uid uint64, state *pl
 }
 
 // applyPlayerData 恢复玩家独有活动实例，并将组件数据挂入对应活动的组件。
-func (actor *Activity) applyPlayerData(uid uint64, state *playerLoadState) {
+func (actor *Actv) applyPlayerData(uid uint64, state *playerLoadState) {
 	restored := make([]*service.Actv, 0)
 	if state.metas != nil {
 		for index := range *state.metas {
@@ -186,7 +175,7 @@ func (actor *Activity) applyPlayerData(uid uint64, state *playerLoadState) {
 			if actor.actvService.GetActvByID(meta.GetActvID()) != nil {
 				continue
 			}
-			if actor.restoreActivity(meta) {
+			if actor.restoreActv(meta) {
 				restored = append(restored, actor.actvService.GetActvByID(meta.GetActvID()))
 			}
 		}
@@ -199,7 +188,7 @@ func (actor *Activity) applyPlayerData(uid uint64, state *playerLoadState) {
 		actv.GetExt().OnLoaded()
 	}
 	actor.actvService.NotifyPlayerLoaded(uid, actor.playerGuildID(uid))
-	tlog.Log.Info("[activity/Activity.applyPlayerData] 玩家活动数据加载完成, pid=%v activities=%v data=%v",
+	tlog.Log.Info("[actv/Actv.applyPlayerData] 玩家活动数据加载完成, pid=%v actvs=%v data=%v",
 		uid, len(restored), docCount(state.docs))
 }
 
@@ -210,50 +199,71 @@ func docCount(docs *[]service.ActvDataDoc) int {
 	return len(*docs)
 }
 
-// dispatchPlayerRequest 玩家数据已就绪时直接处理请求，否则发起加载并按玩家暂存。
-func (actor *Activity) dispatchPlayerRequest(ctx tree.Context, request *tree.Envelope, message *ipb.PlayerActivityMessage) {
-	uid := message.GetUID()
+// initializePlayer 是唯一允许启动玩家活动加载的入口，业务事件和请求不调用此方法。
+func (actor *Actv) initializePlayer(ctx tree.Context, event *sspb.Event) {
+	uid := gameevent.PlayerUID(event)
 	if uid == 0 {
-		response, err := actor.handlePlayerActivityMessage(message)
-		request.Respond(response, err)
+		logPlayerInputFailure(event, fmt.Errorf("player initialization requires uid"))
 		return
 	}
-	state := actor.ensurePlayerLoaded(ctx, uid)
-	if actor.players[uid] != state {
-		request.Respond(nil, fmt.Errorf("player activity data load failed"))
-		return
-	}
+	actor.ensurePlayerLoaded(ctx, uid)
+}
+
+// dispatchPlayerRequest 只处理请求：初始化期间暂存，未初始化则拒绝，不隐式加载数据。
+func (actor *Actv) dispatchPlayerRequest(ctx tree.Context, message *ipb.PlayerActvMessage) {
+	uid := message.GetUID()
 	if actor.actvService.IsPlayerLoaded(uid) {
-		response, err := actor.handlePlayerActivityMessage(message)
-		request.Respond(response, err)
+		actor.handlePlayerActvMessage(ctx, message)
 		return
 	}
+	if state := actor.players[uid]; state != nil && (state.loading || state.reload) {
+		state.queuePending(message)
+		return
+	}
+	logActvFailure(message, fmt.Errorf("player actv is not initialized"))
+}
+
+// queuePending 初始化只暂存原始消息，沿用收件顺序，事件与请求各自由独立入口回放。
+func (state *playerLoadState) queuePending(message interface{}) {
 	if len(state.pending) >= maxPendingPlayerRequests {
-		request.Respond(nil, fmt.Errorf("player activity data is still loading"))
+		logPlayerInputFailure(message, fmt.Errorf("player actv initialization queue full"))
 		return
 	}
-	state.pending = append(state.pending, pendingActivityRequest{message: message, request: request})
+	state.pending = append(state.pending, pendingActvRequest{message: message})
+}
+
+// replayPending 只恢复初始化期间的收件顺序，不解析 UID、不加载数据、不执行模板业务。
+func (actor *Actv) replayPending(ctx tree.Context, item pendingActvRequest) {
+	switch message := item.message.(type) {
+	case *sspb.Event:
+		actor.onEvent(ctx, message)
+	case *ipb.PlayerActvMessage:
+		actor.onPlayerActvMessage(ctx, message)
+	}
+}
+
+// logPlayerInputFailure 记录事件或请求加载失败，保留事件归属及名称便于定位。
+func logPlayerInputFailure(message interface{}, err error) {
+	if event, ok := message.(*sspb.Event); ok {
+		tlog.Log.Error(
+			"[actv/logPlayerInputFailure] 玩家活动事件处理失败, pid=%v event=%v err=%v",
+			gameevent.PlayerUID(event), event.GetName(), err,
+		)
+		return
+	}
+	request, _ := message.(*ipb.PlayerActvMessage)
+	logActvFailure(request, err)
 }
 
 // onPlayerOwnerReleased 存盘玩家相关的脏数据并从内存卸载。
 // 存盘完成前该玩家的新加载会被推迟，避免读到旧数据。
-func (actor *Activity) onPlayerOwnerReleased(ctx tree.Context, message *ipb.PlayerActivityOwnerReleased) {
-	uid := message.GetUID()
+func (actor *Actv) onPlayerOwnerReleased(ctx tree.Context, message *sspb.Event) {
+	uid := gameevent.PlayerUID(message)
 	if uid == 0 {
 		return
 	}
-	if !actor.ready {
-		delete(actor.pendingLogins, uid)
-		actor.dropGlobalPending(uid)
-		return
-	}
 	state := actor.players[uid]
-	if state == nil || state.releasing {
-		return
-	}
-	if state.loading {
-		delete(actor.players, uid)
-		respondPending(state.pending, fmt.Errorf("player activity owner released"))
+	if state == nil || state.loading || state.releasing {
 		return
 	}
 	actor.actvService.NotifyPlayerUnload(uid, actor.playerGuildID(uid))
@@ -278,7 +288,7 @@ func (actor *Activity) onPlayerOwnerReleased(ctx tree.Context, message *ipb.Play
 
 // saveDocs 存盘一批元数据和组件数据快照，全部完成（无论成败）后回调；reason 仅用于日志。
 // 失败的数据仍为脏数据，由定时存盘继续处理。
-func (actor *Activity) saveDocs(
+func (actor *Actv) saveDocs(
 	ctx tree.Context,
 	reason string,
 	uid uint64,
@@ -293,52 +303,37 @@ func (actor *Activity) saveDocs(
 	}
 	finish := func(callbackCtx tree.Context, err error) {
 		if err != nil {
-			tlog.Log.Error("[activity/Activity.saveDocs] 玩家活动数据存盘失败, reason=%v pid=%v err=%v", reason, uid, err)
+			tlog.Log.Error("[actv/Actv.saveDocs] 玩家活动数据存盘失败, reason=%v pid=%v err=%v", reason, uid, err)
 		}
 		remaining--
 		if remaining == 0 {
-			tlog.Log.Info("[activity/Activity.saveDocs] 玩家活动数据存盘完成, reason=%v pid=%v metas=%v data=%v",
+			tlog.Log.Info("[actv/Actv.saveDocs] 玩家活动数据存盘完成, reason=%v pid=%v metas=%v data=%v",
 				reason, uid, len(metas), len(docs))
 			done(callbackCtx)
 		}
 	}
 	for _, meta := range metas {
 		if !actor.lifecycle.Save(ctx, (*service.ActvMeta)(nil), meta, finish) {
-			finish(ctx, fmt.Errorf("activity meta save not scheduled, activity=%v", meta.GetActvID()))
+			finish(ctx, fmt.Errorf("actv meta save not scheduled, actv=%v", meta.GetActvID()))
 		}
 	}
 	for _, doc := range docs {
 		if !actor.lifecycle.Save(ctx, (*service.ActvDataDoc)(nil), doc, finish) {
-			finish(ctx, fmt.Errorf("activity data save not scheduled, id=%v", doc.GetID()))
+			finish(ctx, fmt.Errorf("actv data save not scheduled, id=%v", doc.GetID()))
 		}
 	}
 }
 
-// dropGlobalPending 拒绝启动加载期间该玩家暂存的请求，避免释放后再被加载而无人释放。
-func (actor *Activity) dropGlobalPending(uid uint64) {
-	kept := actor.pending[:0]
-	for _, item := range actor.pending {
-		message, ok := item.message.(*ipb.PlayerActivityMessage)
-		if ok && message.GetUID() == uid {
-			item.request.Respond(nil, fmt.Errorf("player activity owner released"))
-			continue
-		}
-		kept = append(kept, item)
-	}
-	actor.pending = kept
-}
-
-func respondPending(pending []pendingActivityRequest, err error) {
+// respondPending 统一结束加载失败或已释放玩家的暂存请求。
+func respondPending(ctx tree.Context, pending []pendingActvRequest, err error) {
 	for _, item := range pending {
-		if item.request != nil {
-			item.request.Respond(nil, err)
-		}
+		logPlayerInputFailure(item.message, err)
 	}
 }
 
 // playerGuildID 返回玩家所属联盟编号，用于按归属索引定位与玩家相关的联盟活动。
 // 活动 Actor 目前还拿不到联盟成员关系，统一返回 0：只处理服务器活动，联盟活动的玩家条目不加载、不通知。
 // 接入成员关系后在此返回真实联盟编号；加载与释放必须使用同一编号，保证条目能完整卸载。
-func (actor *Activity) playerGuildID(uint64) service.OwnerID {
+func (actor *Actv) playerGuildID(uint64) service.OwnerID {
 	return 0
 }

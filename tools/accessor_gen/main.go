@@ -11,22 +11,38 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
 func main() {
 	dir := flag.String("dir", ".", "source directory")
 	flag.Parse()
-	if len(flag.Args()) == 0 {
-		panic("provide structure names")
+	names := flag.Args()
+	if len(names) == 0 {
+		line, _ := strconv.Atoi(os.Getenv("GOLINE"))
+		var err error
+		names, err = discoverStructs(*dir, os.Getenv("GOFILE"), line)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "accessor-gen:", err)
+			os.Exit(1)
+		}
 	}
+	if err := generateAccessors(*dir, names); err != nil {
+		fmt.Fprintln(os.Stderr, "accessor-gen:", err)
+		os.Exit(1)
+	}
+}
+
+// generateAccessors 为指定结构体生成访问方法，保留显式结构体参数用法。
+func generateAccessors(directory string, names []string) error {
 	wanted := map[string]bool{}
-	for _, name := range flag.Args() {
+	for _, name := range names {
 		wanted[name] = true
 	}
-	files, err := filepath.Glob(filepath.Join(*dir, "*.go"))
+	files, err := filepath.Glob(filepath.Join(directory, "*.go"))
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fset := token.NewFileSet()
 	for _, path := range files {
@@ -37,7 +53,7 @@ func main() {
 			fset, path, nil, 0,
 		)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		for _, decl := range source.Decls {
 			general, ok := decl.(*ast.GenDecl)
@@ -58,7 +74,7 @@ func main() {
 				for _, field := range structure.Fields.List {
 					var fieldType bytes.Buffer
 					if err := format.Node(&fieldType, fset, field.Type); err != nil {
-						panic(err)
+						return err
 					}
 					for _, name := range field.Names {
 						fmt.Fprintf(
@@ -73,16 +89,17 @@ func main() {
 				}
 				formatted, err := format.Source(out.Bytes())
 				if err != nil {
-					panic(err)
+					return err
 				}
-				if err := os.WriteFile(filepath.Join(*dir, strings.ToLower(typeSpec.Name.Name)+"_accessors.go"), formatted, 0644); err != nil {
-					panic(err)
+				if err := os.WriteFile(filepath.Join(directory, strings.ToLower(typeSpec.Name.Name)+"_accessors.go"), formatted, 0644); err != nil {
+					return err
 				}
 				delete(wanted, typeSpec.Name.Name)
 			}
 		}
 	}
 	if len(wanted) > 0 {
-		panic(fmt.Sprintf("structures not found: %v", wanted))
+		return fmt.Errorf("structures not found: %v", wanted)
 	}
+	return nil
 }

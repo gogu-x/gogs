@@ -204,3 +204,6 @@ func (c *PlayerComp[T]) ClearDirty(uid uint64, revision uint64) {
 		delete(c.dirty, uid)
 	}
 }
+
+// GetData 返回单条组件已加载的内存数据。
+func (c *Comp[T]) GetData() *T { return &c.Data }

@@ -4,7 +4,7 @@ package pbregister
 import (
 	"github.com/gogu-x/tree/codec"
 
-	pb_activity "github.com/gogu-x/gogs/pb/cspb/pb_activity"
+	pb_actv "github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	pb_auth "github.com/gogu-x/gogs/pb/cspb/pb_auth"
 	pb_battle "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	pb_chat "github.com/gogu-x/gogs/pb/cspb/pb_chat"
@@ -20,14 +20,15 @@ import (
 
 func init() {
 	codec.RegisterMsg(
-		&pb_activity.GetActivityListAck{},
-		&pb_activity.JoinActivityAck{},
-		&pb_activity.GetProgressAck{},
-		&pb_activity.ClaimRewardAck{},
-		&pb_activity.GetActivityListReq{},
-		&pb_activity.JoinActivityReq{},
-		&pb_activity.GetProgressReq{},
-		&pb_activity.ClaimRewardReq{},
+		&pb_actv.GetActvListAck{},
+		&pb_actv.GetProgressAck{},
+		&pb_actv.ClaimRewardAck{},
+		&pb_actv.GetActvListReq{},
+		&pb_actv.GetProgressReq{},
+		&pb_actv.ClaimRewardReq{},
+		&pb_actv.GetSevenDayLoginReq{},
+		&pb_actv.GetSevenDayLoginAck{},
+		&pb_actv.SevenDayLoginNtf{},
 		&pb_auth.LoginGameAck{},
 		&pb_auth.LoginGameReq{},
 		&pb_battle.StartBattleAck{},
@@ -38,6 +39,7 @@ func init() {
 		&pb_battle.BattleResultConfirmedNtf{},
 		&pb_chat.ChatAck{},
 		&pb_chat.ChatReq{},
+		&pb_common.ErrorNtf{},
 		&pb_common.GetRoleCombatStatsReq{},
 		&pb_common.GetRoleCombatStatsAck{},
 		&pb_equipment.GetRoleEquipmentReq{},

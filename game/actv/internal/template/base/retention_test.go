@@ -17,7 +17,7 @@ func TestSettlementRetention(t *testing.T) {
 		t.Fatal("settlement deadline must be exactly fourteen days after end")
 	}
 	if (&service.ActvMeta{}).IsExpired(now) {
-		t.Fatal("activity without end time must remain resident")
+		t.Fatal("actv without end time must remain resident")
 	}
 	svc := service.NewActvService(1)
 	svc.RegTpl(testTemplate, &testBehavior{}, service.ScopeServer)
@@ -34,31 +34,31 @@ func TestSettlementRetention(t *testing.T) {
 	)
 	valid.GetMeta().EndTs = now - service.SettlementRetentionSeconds + 1
 	before := svc.ListAllActvs()
-	if ids := svc.SharedActivityIDs(0, now); len(ids) != 1 || ids[0] != 102 {
-		t.Fatalf("expired activity included in player load: %v", ids)
+	if ids := svc.SharedActvIDs(0, now); len(ids) != 1 || ids[0] != 102 {
+		t.Fatalf("expired actv included in player load: %v", ids)
 	}
-	svc.RemoveExpiredActivities(now)
+	svc.RemoveExpiredActvs(now)
 	if svc.GetActvByID(101) == nil {
-		t.Fatal("dirty expired activity must remain until saved")
+		t.Fatal("dirty expired actv must remain until saved")
 	}
 	expired.GetMeta().SetDirty(false)
 	behavior.inst.ClearDirty(behavior.inst.Revision())
-	svc.RemoveExpiredActivities(now)
+	svc.RemoveExpiredActvs(now)
 	if svc.GetActvByID(101) == nil {
 		t.Fatal("dirty player component must prevent expiry removal")
 	}
 	behavior.member.ClearDirty(7, behavior.member.Revision(7))
-	svc.RemoveExpiredActivities(now)
+	svc.RemoveExpiredActvs(now)
 	if svc.GetActvByID(101) != nil || svc.GetActvByID(102) == nil || len(svc.ListServerActvs()) != 1 {
-		t.Fatal("expiry must remove only expired clean activity from all indexes")
+		t.Fatal("expiry must remove only expired clean actv from all indexes")
 	}
 	if len(before) != 2 || before[0] != expired {
 		t.Fatal("cleanup must preserve existing iteration views")
 	}
 }
 
-// TestBatchRemoveActivities 验证跨归属批量删除、重复编号及旧遍历视图。
-func TestBatchRemoveActivities(t *testing.T) {
+// TestBatchRemoveActvs 验证跨归属批量删除、重复编号及旧遍历视图。
+func TestBatchRemoveActvs(t *testing.T) {
 	svc := service.NewActvService(1)
 	svc.RegTpl(testTemplate, &testBehavior{}, service.ScopeServer)
 	newTestActv(

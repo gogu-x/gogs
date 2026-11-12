@@ -33,3 +33,8 @@ router:
 	"$(ROUTER_GEN_BIN)" -dir "$(GEN_DIR)"
 
 build: c proto register deepcopy
+
+.PHONY: install-generators
+# 将本仓库生成器安装到已在 PATH 中的用户目录。
+install-generators:
+	bash tools/install-generators.sh

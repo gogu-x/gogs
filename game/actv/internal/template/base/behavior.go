@@ -4,22 +4,24 @@ package base
 import (
 	"github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/game/actv/internal/service"
-	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
+	"github.com/gogu-x/gogs/ipb"
+	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/sspb"
 	"google.golang.org/protobuf/proto"
+	"time"
 )
 
 // BaseBehavior 为绑定单个活动实例的模块提供默认生命周期、组件注册和通用信息行为。
 // 活动模块可嵌入该结构，只覆盖自身需要定制的方法。
 type BaseBehavior struct {
-	Actv        *service.Actv       // 当前活动实例，元数据修改直接作用于存盘对象。
-	ActvCfg     conf.ActivityConfig // 当前活动实例配置。
+	Actv        *service.Actv   // 当前活动实例，元数据修改直接作用于存盘对象。
+	ActvCfg     conf.ActvConfig // 当前活动实例配置。
 	comps       []service.Component
 	playerComps []service.PlayerComponent
 }
 
 // Bind 绑定活动实例和配置，供模板 Create 调用。
-func (b *BaseBehavior) Bind(actv *service.Actv, cfg conf.ActivityConfig) {
+func (b *BaseBehavior) Bind(actv *service.Actv, cfg conf.ActvConfig) {
 	b.Actv = actv
 	b.ActvCfg = cfg
 }
@@ -71,6 +73,31 @@ func (*BaseBehavior) HandleEvent(*sspb.Event) {}
 func (*BaseBehavior) HandleRequest(uint64, proto.Message) {}
 
 // OnPack 根据活动元数据和配置组装客户端活动信息。
-func (*BaseBehavior) OnPack() *pb_activity.ActivityInfo {
-	return &pb_activity.ActivityInfo{}
+func (b *BaseBehavior) OnPack() *pb_actv.ActvInfo {
+	if b == nil || b.Actv == nil {
+		return nil
+	}
+	meta := b.Meta()
+	if meta == nil {
+		return nil
+	}
+	now := time.Now().Unix()
+	start, end := meta.GetStartTs(), meta.GetEndTs()
+	status := pb_actv.ActvStatus_ONGOING
+	switch {
+	case b.Actv.IsEnded() || end > 0 && now >= end:
+		status = pb_actv.ActvStatus_ENDED
+	case start > now:
+		status = pb_actv.ActvStatus_NOT_STARTED
+	}
+	return &pb_actv.ActvInfo{
+		Id: uint64(meta.GetActvID()), CfgId: meta.GetCfgID(), TemplateType: int32(meta.GetTemplateType()),
+		OwnerScope: pb_actv.ActvOwnerScope(meta.GetOwnerScope()), OwnerId: uint64(meta.GetOwnerID()),
+		Status: status, StartTime: start, EndTime: end,
+	}
+}
+
+// PushToPlayer 按玩家编号向当前在线会话推送，不依赖正在处理的请求。
+func (*BaseBehavior) PushToPlayer(uid uint64, message proto.Message) bool {
+	return ipb.PushToPlayer(uid, message)
 }

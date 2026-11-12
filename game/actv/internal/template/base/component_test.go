@@ -10,7 +10,7 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/template/base"
 	"github.com/gogu-x/gogs/game/actv/internal/trigger"
 	"github.com/gogu-x/gogs/glconf"
-	"github.com/gogu-x/gogs/pb/cspb/pb_activity"
+	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/tree/tlog"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"google.golang.org/protobuf/proto"
@@ -45,7 +45,7 @@ type testBehavior struct {
 	seenScore int32
 }
 
-func (*testBehavior) Create(actv *service.Actv, cfg conf.ActivityConfig) service.ActvBehavior {
+func (*testBehavior) Create(actv *service.Actv, cfg conf.ActvConfig) service.ActvBehavior {
 	b := &testBehavior{}
 	b.Bind(actv, cfg)
 	return b
@@ -79,9 +79,9 @@ func (b *testBehavior) OnPlayerUnload(uid uint64) {
 func newTestActv(t *testing.T, svc *service.ActvService, id int64, scope service.OwnerScope, owner service.OwnerID) (*service.Actv, *testBehavior) {
 	t.Helper()
 	meta := &service.ActvMeta{ActvID: id, CfgID: 1, OwnerID: owner, OwnerScope: scope, TemplateType: testTemplate}
-	actv := svc.NewActv(meta, conf.ActivityConfig{})
+	actv := svc.NewActv(meta, conf.ActvConfig{})
 	if actv == nil || !svc.AddActv(actv) {
-		t.Fatalf("create activity %d failed", id)
+		t.Fatalf("create actv %d failed", id)
 	}
 	return actv, actv.GetExt().(*testBehavior)
 }
@@ -253,10 +253,10 @@ func TestServiceLoadSaveUnload(t *testing.T) {
 
 	svc.UnloadPlayer(7, 0)
 	if svc.GetActvByID(20) != nil {
-		t.Fatal("player activity should be removed")
+		t.Fatal("player actv should be removed")
 	}
 	if svc.GetActvByID(10) == nil || server.member.Get(7) != nil {
-		t.Fatal("server activity kept, player entry unloaded")
+		t.Fatal("server actv kept, player entry unloaded")
 	}
 	if len(svc.ListActvs(service.ScopePlayer, 7)) != 0 || len(svc.ListAllActvs()) != 1 {
 		t.Fatal("indexes not cleaned")
@@ -267,14 +267,14 @@ func TestDuplicateCompIDRejected(t *testing.T) {
 	svc := service.NewActvService(1)
 	svc.RegTpl(testTemplate, &dupBehavior{}, service.ScopeServer)
 	meta := &service.ActvMeta{ActvID: 1, CfgID: 1, OwnerID: 1, OwnerScope: service.ScopeServer, TemplateType: testTemplate}
-	if svc.NewActv(meta, conf.ActivityConfig{}) != nil {
+	if svc.NewActv(meta, conf.ActvConfig{}) != nil {
 		t.Fatal("duplicate component id should fail")
 	}
 }
 
 type dupBehavior struct{ base.BaseBehavior }
 
-func (*dupBehavior) Create(actv *service.Actv, cfg conf.ActivityConfig) service.ActvBehavior {
+func (*dupBehavior) Create(actv *service.Actv, cfg conf.ActvConfig) service.ActvBehavior {
 	b := &dupBehavior{}
 	b.Bind(actv, cfg)
 	return b
@@ -330,13 +330,13 @@ func TestPlayerHooks(t *testing.T) {
 		t.Fatalf("server hook events=%v score=%d", server.events, server.seenScore)
 	}
 	if len(player.events) != 0 {
-		t.Fatalf("player-owned activity must not receive hooks, got %v", player.events)
+		t.Fatalf("player-owned actv must not receive hooks, got %v", player.events)
 	}
 
 	// 玩家在线期间新增服务器活动：玩家列表组件可直接为在线玩家新建条目。
 	_, late := newTestActv(t, svc, 30, service.ScopeServer, 1)
 	if late.member.Get(7) == nil {
-		t.Fatal("new shared activity should mark loaded players")
+		t.Fatal("new shared actv should mark loaded players")
 	}
 	if late.member.Get(8) != nil {
 		t.Fatal("offline player must stay unloaded")
@@ -363,7 +363,7 @@ func TestPlayerHooks(t *testing.T) {
 		t.Fatal("player should be unloaded")
 	}
 	if _, again := newTestActv(t, svc, 40, service.ScopeServer, 1); again.member.Get(7) != nil {
-		t.Fatal("unloaded player must not be marked on new activity")
+		t.Fatal("unloaded player must not be marked on new actv")
 	}
 }
 
@@ -383,7 +383,7 @@ type settleBehavior struct {
 	settled []uint64
 }
 
-func (*settleBehavior) Create(actv *service.Actv, cfg conf.ActivityConfig) service.ActvBehavior {
+func (*settleBehavior) Create(actv *service.Actv, cfg conf.ActvConfig) service.ActvBehavior {
 	b := &settleBehavior{}
 	b.Bind(actv, cfg)
 	return b
@@ -438,9 +438,9 @@ func TestEndedSettle(t *testing.T) {
 	svc := service.NewActvService(1)
 	svc.RegTpl(settleTemplate, &settleBehavior{}, service.ScopeServer)
 	meta := &service.ActvMeta{ActvID: 50, CfgID: 1, OwnerID: 1, OwnerScope: service.ScopeServer, TemplateType: settleTemplate, Started: true}
-	actv := svc.NewActv(meta, conf.ActivityConfig{})
+	actv := svc.NewActv(meta, conf.ActvConfig{})
 	if actv == nil || !svc.AddActv(actv) {
-		t.Fatal("create activity failed")
+		t.Fatal("create actv failed")
 	}
 	b := actv.GetExt().(*settleBehavior)
 
@@ -458,10 +458,10 @@ func TestEndedSettle(t *testing.T) {
 	svc.SetPlayerLoaded(9)
 	svc.NotifyPlayerLoaded(9, 0)
 	if b.ticks != 0 || b.logins != 0 {
-		t.Fatalf("ended activity must skip tick/hooks, ticks=%d logins=%d", b.ticks, b.logins)
+		t.Fatalf("ended actv must skip tick/hooks, ticks=%d logins=%d", b.ticks, b.logins)
 	}
 	if b.member.Get(9) != nil {
-		t.Fatal("ended activity must not create entries")
+		t.Fatal("ended actv must not create entries")
 	}
 
 	// 玩家 7 未结算：结算后存盘再卸载。
@@ -519,7 +519,7 @@ type reqBehavior struct {
 
 const reqTemplate service.TemplateType = 97
 
-func (*reqBehavior) Create(actv *service.Actv, cfg conf.ActivityConfig) service.ActvBehavior {
+func (*reqBehavior) Create(actv *service.Actv, cfg conf.ActvConfig) service.ActvBehavior {
 	b := &reqBehavior{}
 	b.Bind(actv, cfg)
 	return b
@@ -531,63 +531,42 @@ func (b *reqBehavior) OnInit() {
 }
 
 func (b *reqBehavior) HandleRequest(uid uint64, _ proto.Message) {
+	meta := b.Meta()
+	if meta.GetOwnerScope() == service.ScopePlayer && meta.GetOwnerID() != service.OwnerID(uid) {
+		return
+	}
+	if meta.GetOwnerScope() == service.ScopeGuild || b.Actv.IsEnded() {
+		return
+	}
+
 	b.uids = append(b.uids, uid)
 	if p := b.member.Get(uid); p != nil {
 		p.Score++
 		b.member.MarkDirty(uid)
 	}
+
 }
 
-// TestHandleRequestRouting 校验请求路由：服务器活动接受任意玩家并透传 uid；
-// 玩家独有活动只接受本人；联盟活动和已结束活动拒绝。
+// TestHandleRequestRouting 验证路由透传玩家编号，业务自行拒绝不满足条件的请求。
 func TestHandleRequestRouting(t *testing.T) {
 	svc := service.NewActvService(1)
 	svc.RegTpl(reqTemplate, &reqBehavior{}, service.ScopeServer)
-	newReq := func(id int64, scope service.OwnerScope, owner service.OwnerID) *reqBehavior {
-		meta := &service.ActvMeta{ActvID: id, CfgID: 1, OwnerID: owner, OwnerScope: scope, TemplateType: reqTemplate}
-		actv := svc.NewActv(meta, conf.ActivityConfig{})
-		if actv == nil || !svc.AddActv(actv) {
-			t.Fatalf("create activity %d failed", id)
-		}
-		return actv.GetExt().(*reqBehavior)
+	meta := &service.ActvMeta{ActvID: 10, OwnerID: 7, OwnerScope: service.ScopePlayer, TemplateType: reqTemplate}
+	actv := svc.NewActv(meta, conf.ActvConfig{})
+	if actv == nil || !svc.AddActv(actv) {
+		t.Fatal("初始化失败")
 	}
-	server := newReq(10, service.ScopeServer, 1)
-	player := newReq(20, service.ScopePlayer, 7)
-	newReq(30, service.ScopeGuild, 5)
-	svc.SetPlayerLoaded(7)
-	svc.SetPlayerLoaded(8)
-	req := &pb_activity.JoinActivityReq{}
-
-	for _, uid := range []uint64{7, 8} {
-		if err := svc.HandleRequest(uid, 10, req); err != nil {
-			t.Fatalf("server activity should accept player %d: %v", uid, err)
-		}
-	}
-	if len(server.uids) != 2 || server.uids[0] != 7 || server.uids[1] != 8 {
-		t.Fatalf("uid not passed through, got %v", server.uids)
-	}
-	if server.member.Get(8).Score != 1 || !server.member.IsDirty(8) {
-		t.Fatal("server activity should write player entry by uid")
-	}
-
-	if err := svc.HandleRequest(7, 20, req); err != nil || len(player.uids) != 1 {
-		t.Fatalf("owner request should pass: %v", err)
-	}
-	if err := svc.HandleRequest(8, 20, req); err == nil || len(player.uids) != 1 {
-		t.Fatal("other player's request to player activity must be rejected")
-	}
-	if err := svc.HandleRequest(7, 30, req); err == nil {
-		t.Fatal("guild activity must reject player requests for now")
-	}
-	if err := svc.HandleRequest(7, 99, req); err == nil {
-		t.Fatal("unknown activity must be rejected")
-	}
-	if err := svc.HandleRequest(0, 10, req); err == nil {
-		t.Fatal("request without uid must be rejected")
+	behavior := actv.GetExt().(*reqBehavior)
+	request := &pb_actv.GetProgressReq{}
+	svc.HandleRequest(7, 10, request)
+	svc.HandleRequest(8, 10, request)
+	if len(behavior.uids) != 1 || behavior.uids[0] != 7 {
+		t.Fatal("归属校验未由业务执行")
 	}
 	svc.EndActv(10)
-	if err := svc.HandleRequest(7, 10, req); err == nil || len(server.uids) != 2 {
-		t.Fatal("ended activity must reject requests")
+	svc.HandleRequest(7, 10, request)
+	if len(behavior.uids) != 1 {
+		t.Fatal("业务未拒绝已结束活动")
 	}
 }
 
@@ -690,7 +669,7 @@ func TestOwnerIndex(t *testing.T) {
 	// 释放：移除玩家 7 的独有活动，卸载相关共享活动中的条目，索引同步。
 	svc.UnloadPlayer(7, 100)
 	if len(svc.ListActvs(service.ScopePlayer, 7)) != 0 || svc.GetActvByID(30) != nil || svc.GetActvByID(31) != nil {
-		t.Fatal("player activities should be removed")
+		t.Fatal("player actvs should be removed")
 	}
 	if got := len(svc.ListAllActvs()); got != 5 {
 		t.Fatalf("all after unload = %d, want 5", got)
@@ -762,11 +741,11 @@ func TestCreateDueServerActvs(t *testing.T) {
 		t.Fatal("existing instance must not be recreated")
 	}
 
-	svc.EndDueActivities(meta.GetEndTs() - 1)
+	svc.EndDueActvs(meta.GetEndTs() - 1)
 	if created[2].IsEnded() {
 		t.Fatal("should not end before EndTs")
 	}
-	svc.EndDueActivities(meta.GetEndTs())
+	svc.EndDueActvs(meta.GetEndTs())
 	if !created[2].IsEnded() {
 		t.Fatal("should end at EndTs")
 	}

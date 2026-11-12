@@ -11,25 +11,25 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-func (actor *Activity) failLoad(ctx tree.Context, err error) {
+func (actor *Actv) failLoad(ctx tree.Context, err error) {
 	actor.loadErr = err
 	actor.ready = true
-	tlog.Log.Error("[activity/Activity.failLoad] 活动数据加载失败, err=%v", err)
+	tlog.Log.Error("[actv/Actv.failLoad] 活动数据加载失败, err=%v", err)
 	actor.drainPending(ctx)
 }
 
-// onActivitiesLoaded 恢复服务器/联盟活动实例，并继续加载它们的单条组件数据。
-func (actor *Activity) onActivitiesLoaded(ctx tree.Context, value interface{}, err error) {
+// onActvsLoaded 恢复服务器/联盟活动实例，并继续加载它们的单条组件数据。
+func (actor *Actv) onActvsLoaded(ctx tree.Context, value interface{}, err error) {
 	if err != nil {
 		actor.failLoad(ctx, err)
 		return
 	}
 	loaded, ok := value.(*[]service.ActvMeta)
 	if !ok || loaded == nil {
-		actor.failLoad(ctx, fmt.Errorf("invalid activity load result %T", value))
+		actor.failLoad(ctx, fmt.Errorf("invalid actv load result %T", value))
 		return
 	}
-	activityIDs := bson.A{}
+	actvIDs := bson.A{}
 	for index := range *loaded {
 		meta := &(*loaded)[index]
 		scope := meta.GetOwnerScope()
@@ -39,43 +39,43 @@ func (actor *Activity) onActivitiesLoaded(ctx tree.Context, value interface{}, e
 		if meta.GetOwnerID() <= 0 || (scope == service.ScopeServer && uint64(meta.GetOwnerID()) != actor.serverID) {
 			continue
 		}
-		if actor.restoreActivity(meta) {
-			activityIDs = append(activityIDs, meta.GetActvID())
+		if actor.restoreActv(meta) {
+			actvIDs = append(actvIDs, meta.GetActvID())
 		}
 	}
-	tlog.Log.Info("[activity/Activity.onActivitiesLoaded] 服务器和联盟活动元数据加载完成, count=%v restored=%v", len(*loaded), len(activityIDs))
-	if len(activityIDs) == 0 {
+	tlog.Log.Info("[actv/Actv.onActvsLoaded] 服务器和联盟活动元数据加载完成, count=%v restored=%v", len(*loaded), len(actvIDs))
+	if len(actvIDs) == 0 {
 		actor.finishStartupLoad(ctx)
 		return
 	}
 	// 只加载归属于服务器/联盟的单条数据；玩家列表条目归属玩家，随玩家上线加载。
 	filter := bson.M{
-		"actv_id":     bson.M{"$in": activityIDs},
+		"actv_id":     bson.M{"$in": actvIDs},
 		"owner_scope": bson.M{"$in": bson.A{int32(service.ScopeServer), int32(service.ScopeGuild)}},
 	}
-	if !actor.lifecycle.LoadAll(ctx, (*service.ActvDataDoc)(nil), filter, actor.onActivityDataLoaded) {
-		actor.failLoad(ctx, fmt.Errorf("activity data load request could not be sent"))
+	if !actor.lifecycle.LoadAll(ctx, (*service.ActvDataDoc)(nil), filter, actor.onActvDataLoaded) {
+		actor.failLoad(ctx, fmt.Errorf("actv data load request could not be sent"))
 	}
 }
 
-// onActivityDataLoaded 将服务器/联盟活动的单条组件数据交给对应组件恢复。
-func (actor *Activity) onActivityDataLoaded(ctx tree.Context, value interface{}, err error) {
+// onActvDataLoaded 将服务器/联盟活动的单条组件数据交给对应组件恢复。
+func (actor *Actv) onActvDataLoaded(ctx tree.Context, value interface{}, err error) {
 	if err != nil {
 		actor.failLoad(ctx, err)
 		return
 	}
 	docs, ok := value.(*[]service.ActvDataDoc)
 	if !ok || docs == nil {
-		actor.failLoad(ctx, fmt.Errorf("invalid activity data load result %T", value))
+		actor.failLoad(ctx, fmt.Errorf("invalid actv data load result %T", value))
 		return
 	}
 	// 启动只加载服务器/联盟自己的单条数据，不含玩家条目，因此不会产生待结算条目。
 	actor.actvService.ApplyDataDocs(*docs, 0)
-	tlog.Log.Info("[activity/Activity.onActivityDataLoaded] 服务器和联盟活动组件数据加载完成, count=%v", len(*docs))
+	tlog.Log.Info("[actv/Actv.onActvDataLoaded] 服务器和联盟活动组件数据加载完成, count=%v", len(*docs))
 	actor.finishStartupLoad(ctx)
 }
 
-func (actor *Activity) finishStartupLoad(ctx tree.Context) {
+func (actor *Actv) finishStartupLoad(ctx tree.Context) {
 	for _, actv := range actor.actvService.ListAllActvs() {
 		actv.GetExt().OnLoaded()
 	}
@@ -83,17 +83,17 @@ func (actor *Activity) finishStartupLoad(ctx tree.Context) {
 	actor.drainPending(ctx)
 }
 
-func (actor *Activity) restoreActivity(meta *service.ActvMeta) bool {
+func (actor *Actv) restoreActv(meta *service.ActvMeta) bool {
 	if actor == nil || actor.actvService == nil || meta == nil || meta.GetActvID() <= 0 || meta.GetCfgID() <= 0 || meta.GetOwnerID() <= 0 {
 		return false
 	}
 	if meta.IsExpired(time.Now().Unix()) {
-		tlog.Log.Info("[activity/Activity.restoreActivity] 活动超过十四天结算期，跳过恢复, activity=%v end=%v", meta.GetActvID(), meta.GetEndTs())
+		tlog.Log.Info("[actv/Actv.restoreActv] 活动超过十四天结算期，跳过恢复, actv=%v end=%v", meta.GetActvID(), meta.GetEndTs())
 		return false
 	}
 	configRow := glconf.GetActvOnlineCfgNoErr(meta.GetCfgID())
 	if configRow == nil {
-		tlog.Log.Error("[activity/Activity.restoreActivity] 活动配置不存在，跳过实例恢复, activity=%v config=%v", meta.GetActvID(), meta.GetCfgID())
+		tlog.Log.Error("[actv/Actv.restoreActv] 活动配置不存在，跳过实例恢复, actv=%v config=%v", meta.GetActvID(), meta.GetCfgID())
 		return false
 	}
 	templateType := meta.GetTemplateType()
@@ -102,11 +102,11 @@ func (actor *Activity) restoreActivity(meta *service.ActvMeta) bool {
 		meta.TemplateType = templateType
 	}
 	if templateType != service.TemplateType(configRow.GetType()) {
-		tlog.Log.Error("[activity/Activity.restoreActivity] 活动模板类型与配置不一致，跳过实例恢复, activity=%v config=%v template=%v cfgTemplate=%v",
+		tlog.Log.Error("[actv/Actv.restoreActv] 活动模板类型与配置不一致，跳过实例恢复, actv=%v config=%v template=%v cfgTemplate=%v",
 			meta.GetActvID(), meta.GetCfgID(), templateType, configRow.GetType())
 		return false
 	}
-	actv := actor.actvService.NewActv(meta, service.NewActivityConfig(configRow, meta))
+	actv := actor.actvService.NewActv(meta, service.NewActvConfig(configRow, meta))
 	if actv == nil || !actor.actvService.AddActv(actv) {
 		return false
 	}

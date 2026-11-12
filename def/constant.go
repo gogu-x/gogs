@@ -15,8 +15,8 @@ const (
 	// Guild 联盟 Actor，全局唯一，持有联盟聚合和联盟活动。
 	Guild = "Guild"
 
-	// ActorActivity 活动 Actor，全局唯一，管理服务器归属活动。
-	ActorActivity = "ACTIVITY"
+	// ActorActv 活动 Actor，全局唯一，管理服务器归属活动。
+	ActorActv = "ACTV"
 
 	// GameGate 旧 gRPC 网关 Actor，新架构已由 NATS 替代，保留供旧代码引用
 	GameGate = "GAMEGATE"

@@ -1,10 +1,9 @@
 package conf
 
-// ActivityConfig 表示一个活动配置行及其运行时触发信息。
+// ActvConfig 表示一个活动配置行及其运行时触发信息。
 // 源配置行只由对应活动实例的运行时模块持有，不参与活动实例存盘。
-type ActivityConfig struct {
+type ActvConfig struct {
 	ID                    uint64 // 活动配置行 ID。
-	Name                  string // 活动名称。
 	Type                  int32  // 绑定的活动模块类型。
 	ConfigRow             any    // 配置适配器提供的源配置表行。
 	Scope                 int32  // 活动实例归属范围。
@@ -17,23 +16,15 @@ type ActivityConfig struct {
 }
 
 // GetID 返回活动配置行 ID。
-func (config *ActivityConfig) GetID() uint64 {
+func (config *ActvConfig) GetID() uint64 {
 	if config == nil {
 		return 0
 	}
 	return config.ID
 }
 
-// GetName 返回活动名称。
-func (config *ActivityConfig) GetName() string {
-	if config == nil {
-		return ""
-	}
-	return config.Name
-}
-
 // GetType 返回绑定的活动模块类型。
-func (config *ActivityConfig) GetType() int32 {
+func (config *ActvConfig) GetType() int32 {
 	if config == nil {
 		return 0
 	}
@@ -41,7 +32,7 @@ func (config *ActivityConfig) GetType() int32 {
 }
 
 // GetScope 返回活动实例归属范围。
-func (config *ActivityConfig) GetScope() int32 {
+func (config *ActvConfig) GetScope() int32 {
 	if config == nil {
 		return 1
 	}
@@ -49,7 +40,7 @@ func (config *ActivityConfig) GetScope() int32 {
 }
 
 // GetStartTime 返回配置的 Unix 秒级开始时间。
-func (config *ActivityConfig) GetStartTime() int64 {
+func (config *ActvConfig) GetStartTime() int64 {
 	if config == nil {
 		return 0
 	}
@@ -57,7 +48,7 @@ func (config *ActivityConfig) GetStartTime() int64 {
 }
 
 // GetEndTime 返回配置的 Unix 秒级结束时间。
-func (config *ActivityConfig) GetEndTime() int64 {
+func (config *ActvConfig) GetEndTime() int64 {
 	if config == nil {
 		return 0
 	}
@@ -65,17 +56,17 @@ func (config *ActivityConfig) GetEndTime() int64 {
 }
 
 // IsOnDemand 返回活动实例是否只由外部触发创建。
-func (config *ActivityConfig) IsOnDemand() bool {
+func (config *ActvConfig) IsOnDemand() bool {
 	return config != nil && config.OnDemand
 }
 
 // IsRepeating 返回配置是否按间隔重复触发。
-func (config *ActivityConfig) IsRepeating() bool {
+func (config *ActvConfig) IsRepeating() bool {
 	return config != nil && config.Repeating
 }
 
 // GetRepeatIntervalSeconds 返回配置的重复触发间隔秒数。
-func (config *ActivityConfig) GetRepeatIntervalSeconds() int64 {
+func (config *ActvConfig) GetRepeatIntervalSeconds() int64 {
 	if config == nil {
 		return 0
 	}
@@ -83,7 +74,7 @@ func (config *ActivityConfig) GetRepeatIntervalSeconds() int64 {
 }
 
 // GetTarget 返回活动完成目标。
-func (config *ActivityConfig) GetTarget() int32 {
+func (config *ActvConfig) GetTarget() int32 {
 	if config == nil {
 		return 0
 	}

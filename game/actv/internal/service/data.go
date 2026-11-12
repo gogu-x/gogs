@@ -54,7 +54,7 @@ func (actv *Actv) checkCompID(compID int32) error {
 // 单条数据组件要求归属者与活动实例一致；玩家列表组件要求归属者为玩家。
 func (actv *Actv) LoadData(doc *ActvDataDoc) error {
 	if actv == nil || doc == nil {
-		return fmt.Errorf("activity data is nil")
+		return fmt.Errorf("actv data is nil")
 	}
 	meta := actv.GetMeta()
 	if comp := actv.comps[doc.Comp]; comp != nil {
@@ -77,31 +77,31 @@ func (actv *Actv) LoadData(doc *ActvDataDoc) error {
 // appendDirtyComps 追加单条数据组件的脏数据快照，归属者与活动实例一致。
 func (actv *Actv) appendDirtyComps(docs []*ActvDataDoc) []*ActvDataDoc {
 	meta := actv.GetMeta()
-	activityID := meta.GetActvID()
+	actvID := meta.GetActvID()
 	for compID, comp := range actv.comps {
 		if !comp.IsDirty() {
 			continue
 		}
 		raw, err := comp.Save()
 		if err != nil {
-			tlog.Log.Error("[activity/Actv.appendDirtyComps] 组件数据编码失败, activity=%v comp=%v err=%v", activityID, compID, err)
+			tlog.Log.Error("[actv/Actv.appendDirtyComps] 组件数据编码失败, actv=%v comp=%v err=%v", actvID, compID, err)
 			continue
 		}
-		docs = append(docs, newDataSnapshot(activityID, compID, meta.GetOwnerScope(), meta.GetOwnerID(), raw, comp.Revision()))
+		docs = append(docs, newDataSnapshot(actvID, compID, meta.GetOwnerScope(), meta.GetOwnerID(), raw, comp.Revision()))
 	}
 	return docs
 }
 
 // appendDirtyPlayer 追加指定玩家在玩家列表组件中的脏数据快照，归属者为该玩家。
 func (actv *Actv) appendDirtyPlayer(docs []*ActvDataDoc, comp PlayerComponent, uid uint64) []*ActvDataDoc {
-	activityID := actv.GetMeta().GetActvID()
+	actvID := actv.GetMeta().GetActvID()
 	raw, err := comp.Save(uid)
 	if err != nil {
-		tlog.Log.Error("[activity/Actv.appendDirtyPlayer] 玩家组件数据编码失败, activity=%v comp=%v pid=%v err=%v",
-			activityID, comp.CompID(), uid, err)
+		tlog.Log.Error("[actv/Actv.appendDirtyPlayer] 玩家组件数据编码失败, actv=%v comp=%v pid=%v err=%v",
+			actvID, comp.CompID(), uid, err)
 		return docs
 	}
-	return append(docs, newDataSnapshot(activityID, comp.CompID(), ScopePlayer, OwnerID(uid), raw, comp.Revision(uid)))
+	return append(docs, newDataSnapshot(actvID, comp.CompID(), ScopePlayer, OwnerID(uid), raw, comp.Revision(uid)))
 }
 
 // DirtyData 返回全部已加载活动组件的脏数据快照。
@@ -231,13 +231,13 @@ func (as *ActvService) isPlayerShared(actv *Actv, guildID OwnerID) bool {
 // 调用方需先取走该玩家的脏数据快照。
 func (as *ActvService) UnloadPlayer(uid uint64, guildID OwnerID) {
 	delete(as.loadedPlayers, uid)
-	activities := as.ListActvs(ScopePlayer, OwnerID(uid))
-	ids := make([]int64, 0, len(activities))
-	for _, actv := range activities {
+	actvs := as.ListActvs(ScopePlayer, OwnerID(uid))
+	ids := make([]int64, 0, len(actvs))
+	for _, actv := range actvs {
 		ids = append(ids, actv.GetMeta().GetActvID())
 	}
 	as.RemoveActvs(ids)
-	tlog.Log.Info("[activity/ActvService.UnloadPlayer] 卸载玩家活动数据, pid=%v activities=%v", uid, len(ids))
+	tlog.Log.Info("[actv/ActvService.UnloadPlayer] 卸载玩家活动数据, pid=%v actvs=%v", uid, len(ids))
 	as.rangePlayerShared(guildID, func(actv *Actv) {
 		actv.unloadPlayer(uid)
 	})
@@ -252,7 +252,7 @@ func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc, guildID OwnerID) {
 		doc := &docs[index]
 		actv := as.GetActvByID(doc.ActvID)
 		if actv == nil {
-			tlog.Log.Error("[activity/ActvService.ApplyDataDocs] 组件数据所属活动实例未加载，跳过, activity=%v comp=%v owner=%v/%v",
+			tlog.Log.Error("[actv/ActvService.ApplyDataDocs] 组件数据所属活动实例未加载，跳过, actv=%v comp=%v owner=%v/%v",
 				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID)
 			continue
 		}
@@ -260,12 +260,12 @@ func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc, guildID OwnerID) {
 			continue
 		}
 		if _, isPlayerComp := actv.playerComps[doc.Comp]; isPlayerComp && !as.isPlayerShared(actv, guildID) {
-			tlog.Log.Error("[activity/ActvService.ApplyDataDocs] 玩家条目所属活动与玩家无关，跳过, activity=%v comp=%v owner=%v/%v guild=%v",
+			tlog.Log.Error("[actv/ActvService.ApplyDataDocs] 玩家条目所属活动与玩家无关，跳过, actv=%v comp=%v owner=%v/%v guild=%v",
 				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID, guildID)
 			continue
 		}
 		if err := actv.LoadData(doc); err != nil {
-			tlog.Log.Error("[activity/ActvService.ApplyDataDocs] 组件数据恢复失败，跳过, activity=%v comp=%v owner=%v/%v err=%v",
+			tlog.Log.Error("[actv/ActvService.ApplyDataDocs] 组件数据恢复失败，跳过, actv=%v comp=%v owner=%v/%v err=%v",
 				doc.ActvID, doc.Comp, doc.OwnerScope, doc.OwnerID, err)
 		}
 	}
@@ -288,7 +288,7 @@ func (as *ActvService) SettleEndedPlayer(uid uint64, guildID OwnerID) ([]*ActvDa
 			return
 		}
 		settler.Settle(uid)
-		tlog.Log.Info("[activity/ActvService.SettleEndedPlayer] 已结束活动玩家结算, activity=%v pid=%v", actv.GetMeta().GetActvID(), uid)
+		tlog.Log.Info("[actv/ActvService.SettleEndedPlayer] 已结束活动玩家结算, actv=%v pid=%v", actv.GetMeta().GetActvID(), uid)
 		before := len(docs)
 		for _, comp := range actv.playerComps {
 			if comp.IsDirty(uid) {
@@ -306,9 +306,9 @@ func (as *ActvService) SettleEndedPlayer(uid uint64, guildID OwnerID) ([]*ActvDa
 
 // UnloadEndedPlayer 结算存盘完成后，从指定已结束活动中卸载玩家条目；仍为脏数据的组件保留，
 // 由定时存盘或玩家释放继续处理。
-func (as *ActvService) UnloadEndedPlayer(uid uint64, activityIDs []int64) {
-	for _, activityID := range activityIDs {
-		actv := as.GetActvByID(activityID)
+func (as *ActvService) UnloadEndedPlayer(uid uint64, actvIDs []int64) {
+	for _, actvID := range actvIDs {
+		actv := as.GetActvByID(actvID)
 		if actv == nil || !actv.IsEnded() {
 			continue
 		}

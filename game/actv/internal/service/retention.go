@@ -11,8 +11,8 @@ func (meta *ActvMeta) IsExpired(now int64) bool {
 	return end > 0 && now >= end && now-end >= SettlementRetentionSeconds
 }
 
-// SharedActivityIDs 返回玩家相关且未过期的共享活动编号，限定玩家组件的加载范围。
-func (as *ActvService) SharedActivityIDs(guildID OwnerID, now int64) []int64 {
+// SharedActvIDs 返回玩家相关且未过期的共享活动编号，限定玩家组件的加载范围。
+func (as *ActvService) SharedActvIDs(guildID OwnerID, now int64) []int64 {
 	var ids []int64
 	as.rangePlayerShared(guildID, func(actv *Actv) {
 		if !actv.GetMeta().IsExpired(now) {
@@ -22,9 +22,9 @@ func (as *ActvService) SharedActivityIDs(guildID OwnerID, now int64) []int64 {
 	return ids
 }
 
-// RemoveExpiredActivities 批量移除已过结算期且无脏数据的实例。
+// RemoveExpiredActvs 批量移除已过结算期且无脏数据的实例。
 // 脏数据继续由定时存盘处理，成功后下一轮清理，避免丢弃尚未落库的变更。
-func (as *ActvService) RemoveExpiredActivities(now int64) {
+func (as *ActvService) RemoveExpiredActvs(now int64) {
 	var ids []int64
 	for _, actv := range as.ListAllActvs() {
 		if actv.GetMeta().IsExpired(now) && !actv.hasDirtyData() {

@@ -5,8 +5,25 @@ import "github.com/gogu-x/tree"
 
 // PushToMsg 将编码后的客户端协议消息发送到指定玩家的在线会话。
 type PushToMsg struct {
-	UID uint64      // 目标玩家 ID。
-	Msg interface{} // 要推送给客户端的协议消息。
+	UID        uint64      // 目标玩家 ID。
+	Msg        interface{} // 要推送给客户端的协议消息。
+	Generation uint64      // 目标会话版本；0 表示沿用向当前会话推送的旧行为。
+}
+
+// GetUID 返回推送目标玩家编号。
+func (message *PushToMsg) GetUID() uint64 {
+	if message == nil {
+		return 0
+	}
+	return message.UID
+}
+
+// GetGeneration 返回推送绑定的会话版本。
+func (message *PushToMsg) GetGeneration() uint64 {
+	if message == nil {
+		return 0
+	}
+	return message.Generation
 }
 
 // BanUID 将玩家加入当前网关的内存封禁列表。
@@ -108,11 +125,11 @@ type StopAcceptingPlayer struct {
 // SaveAllGuilds 请求联盟 Actor 存盘所有已变更的联盟数据。
 type SaveAllGuilds struct{}
 
-// SaveAllActivities 请求活动 Actor 存盘所有已变更的活动数据。
-type SaveAllActivities struct{}
+// SaveAllActvs 请求活动 Actor 存盘所有已变更的活动数据。
+type SaveAllActvs struct{}
 
-// PlayerActivityMessage 将玩家活动请求从玩家 Actor 转发到全局活动 Actor。
-type PlayerActivityMessage struct {
+// PlayerActvMessage 将玩家活动请求从玩家 Actor 转发到全局活动 Actor。
+type PlayerActvMessage struct {
 	UID        uint64      // 玩家唯一 ID。
 	ActvID     uint64      // 活动实例 ID；活动列表请求为 0。
 	Generation uint64      // 当前网关会话版本。
@@ -121,7 +138,7 @@ type PlayerActivityMessage struct {
 }
 
 // GetUID 返回活动请求所属玩家的编号。
-func (message *PlayerActivityMessage) GetUID() uint64 {
+func (message *PlayerActvMessage) GetUID() uint64 {
 	if message == nil {
 		return 0
 	}
@@ -129,7 +146,7 @@ func (message *PlayerActivityMessage) GetUID() uint64 {
 }
 
 // GetActvID 返回活动请求目标实例的编号。
-func (message *PlayerActivityMessage) GetActvID() uint64 {
+func (message *PlayerActvMessage) GetActvID() uint64 {
 	if message == nil {
 		return 0
 	}
@@ -137,7 +154,7 @@ func (message *PlayerActivityMessage) GetActvID() uint64 {
 }
 
 // GetGeneration 返回转发活动请求时使用的网关会话版本。
-func (message *PlayerActivityMessage) GetGeneration() uint64 {
+func (message *PlayerActvMessage) GetGeneration() uint64 {
 	if message == nil {
 		return 0
 	}
@@ -145,31 +162,26 @@ func (message *PlayerActivityMessage) GetGeneration() uint64 {
 }
 
 // GetOnline 返回转发活动请求时玩家是否在线。
-func (message *PlayerActivityMessage) GetOnline() bool {
+func (message *PlayerActvMessage) GetOnline() bool {
 	return message != nil && message.Online
 }
 
 // GetMessage 返回需要处理的活动业务请求。
-func (message *PlayerActivityMessage) GetMessage() interface{} {
+func (message *PlayerActvMessage) GetMessage() interface{} {
 	if message == nil {
 		return nil
 	}
 	return message.Message
 }
 
-// PlayerActivityOwnerReleased 通知活动 Actor 保存并释放离线玩家的活动数据。
-type PlayerActivityOwnerReleased struct {
-	UID uint64 // 玩家唯一 ID。
-}
-
-// CreatePlayerActivity 请求活动 Actor 为玩家创建一份按需活动实例。
-type CreatePlayerActivity struct {
+// CreatePlayerActv 请求活动 Actor 为玩家创建一份按需活动实例。
+type CreatePlayerActv struct {
 	UID      uint64 // 活动归属玩家 ID。
 	ConfigID uint64 // 要创建活动对应的配置 ID。
 }
 
 // GetConfigID 返回请求创建活动对应的配置 ID。
-func (message *CreatePlayerActivity) GetConfigID() uint64 {
+func (message *CreatePlayerActv) GetConfigID() uint64 {
 	if message == nil {
 		return 0
 	}
@@ -177,21 +189,21 @@ func (message *CreatePlayerActivity) GetConfigID() uint64 {
 }
 
 // GetUID 返回按需活动实例的归属玩家 ID。
-func (message *CreatePlayerActivity) GetUID() uint64 {
+func (message *CreatePlayerActv) GetUID() uint64 {
 	if message == nil {
 		return 0
 	}
 	return message.UID
 }
 
-// CreatePlayerActivityAck 返回按需活动实例创建结果。
-type CreatePlayerActivityAck struct {
+// CreatePlayerActvAck 返回按需活动实例创建结果。
+type CreatePlayerActvAck struct {
 	InstanceID uint64 // 创建或已存在的活动实例 ID。
 	Created    bool   // 本次请求是否新建了活动实例。
 }
 
 // GetInstanceID 返回创建或已存在的活动实例 ID。
-func (message *CreatePlayerActivityAck) GetInstanceID() uint64 {
+func (message *CreatePlayerActvAck) GetInstanceID() uint64 {
 	if message == nil {
 		return 0
 	}
@@ -199,25 +211,17 @@ func (message *CreatePlayerActivityAck) GetInstanceID() uint64 {
 }
 
 // GetCreated 返回本次请求是否新建了活动实例。
-func (message *CreatePlayerActivityAck) GetCreated() bool {
+func (message *CreatePlayerActvAck) GetCreated() bool {
 	return message != nil && message.Created
 }
 
-// GetUID 返回需要释放活动数据的玩家编号。
-func (message *PlayerActivityOwnerReleased) GetUID() uint64 {
-	if message == nil {
-		return 0
-	}
-	return message.UID
-}
-
-// CreateGuildActivityOwner 通知活动 Actor 联盟归属已创建或加载完成。
-type CreateGuildActivityOwner struct {
+// CreateGuildActvOwner 通知活动 Actor 联盟归属已创建或加载完成。
+type CreateGuildActvOwner struct {
 	GuildID uint64 // 联盟归属 ID。
 }
 
 // GetGuildID 返回需要初始化活动的联盟归属 ID。
-func (message *CreateGuildActivityOwner) GetGuildID() uint64 {
+func (message *CreateGuildActvOwner) GetGuildID() uint64 {
 	if message == nil {
 		return 0
 	}
