@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"log"
 	"net"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/gogu-x/gogs/pb/pfpb/pb_pf"
 	"github.com/gogu-x/gogs/platform/service"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/tlog"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"google.golang.org/grpc"
 )
@@ -27,7 +27,7 @@ func (a *Platform) Name() string { return def.PF }
 
 func (a *Platform) OnInit(ctx tree.Context) {
 	if err := service.EnsureIndexes(a.db); err != nil {
-		log.Printf("GrpcActor: EnsureIndexes: %v", err)
+		tlog.Error("[grpc/Platform.OnInit] 初始化索引失败, err=%v", err)
 	}
 
 	a.router.Register(&pb_pf.RegisterReq{}, a.onRegister)
@@ -40,7 +40,7 @@ func (a *Platform) OnInit(ctx tree.Context) {
 
 	lis, err := net.Listen("tcp", conf.PlatformAddr)
 	if err != nil {
-		log.Fatalf("GrpcActor: listen %s: %v", conf.PlatformAddr, err)
+		tlog.Fatal("[grpc/Platform.OnInit] 监听失败, addr=%s err=%v", conf.PlatformAddr, err)
 	}
 	a.grpcServer = grpc.NewServer()
 	svc := &svcHandler{pid: ctx.Self()}
@@ -48,9 +48,9 @@ func (a *Platform) OnInit(ctx tree.Context) {
 	pb_pf.RegisterOrderServiceServer(a.grpcServer, svc)
 
 	go func() {
-		log.Printf("platform gRPC listening on %s", conf.PlatformAddr)
+		tlog.Info("[grpc/Platform.OnInit] 启动gRPC服务, addr=%s", conf.PlatformAddr)
 		if err := a.grpcServer.Serve(lis); err != nil {
-			log.Printf("GrpcActor: serve error: %v", err)
+			tlog.Error("[grpc/Platform.OnInit] gRPC服务退出, err=%v", err)
 		}
 	}()
 }
@@ -79,7 +79,7 @@ func (s *svcHandler) Register(_ context.Context, req *pb_pf.RegisterReq) (*pb_pf
 	v, err := s.call(req)
 	ack, valid := v.(*pb_pf.AuthAck)
 	if err != nil || !valid || ack == nil {
-		log.Printf("platform Register failed: err=%v response=%T", err, v)
+		tlog.Error("[grpc/svcHandler.Register] 平台请求失败, err=%v response=%T", err, v)
 		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	return ack, nil
@@ -89,7 +89,7 @@ func (s *svcHandler) Login(_ context.Context, req *pb_pf.AuthLoginReq) (*pb_pf.A
 	v, err := s.call(req)
 	ack, valid := v.(*pb_pf.AuthAck)
 	if err != nil || !valid || ack == nil {
-		log.Printf("platform Login failed: err=%v response=%T", err, v)
+		tlog.Error("[grpc/svcHandler.Login] 平台请求失败, err=%v response=%T", err, v)
 		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	return ack, nil
@@ -99,7 +99,7 @@ func (s *svcHandler) VerifyToken(_ context.Context, req *pb_pf.VerifyTokenReq) (
 	v, err := s.call(req)
 	ack, valid := v.(*pb_pf.VerifyAck)
 	if err != nil || !valid || ack == nil {
-		log.Printf("platform VerifyToken failed: err=%v response=%T", err, v)
+		tlog.Error("[grpc/svcHandler.VerifyToken] 平台请求失败, err=%v response=%T", err, v)
 		return &pb_pf.VerifyAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	return ack, nil
@@ -109,7 +109,7 @@ func (s *svcHandler) GetServerList(_ context.Context, req *pb_pf.GetServerListRe
 	v, err := s.call(req)
 	ack, valid := v.(*pb_pf.ServerListAck)
 	if err != nil || !valid || ack == nil {
-		log.Printf("platform GetServerList failed: err=%v response=%T", err, v)
+		tlog.Error("[grpc/svcHandler.GetServerList] 平台请求失败, err=%v response=%T", err, v)
 		return &pb_pf.ServerListAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	return ack, nil
@@ -119,7 +119,7 @@ func (s *svcHandler) CreateOrder(_ context.Context, req *pb_pf.CreateOrderReq) (
 	v, err := s.call(req)
 	ack, valid := v.(*pb_pf.OrderAck)
 	if err != nil || !valid || ack == nil {
-		log.Printf("platform CreateOrder failed: err=%v response=%T", err, v)
+		tlog.Error("[grpc/svcHandler.CreateOrder] 平台请求失败, err=%v response=%T", err, v)
 		return &pb_pf.OrderAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	return ack, nil
@@ -129,7 +129,7 @@ func (s *svcHandler) QueryOrder(_ context.Context, req *pb_pf.QueryOrderReq) (*p
 	v, err := s.call(req)
 	ack, valid := v.(*pb_pf.OrderDetail)
 	if err != nil || !valid || ack == nil {
-		log.Printf("platform QueryOrder failed: err=%v response=%T", err, v)
+		tlog.Error("[grpc/svcHandler.QueryOrder] 平台请求失败, err=%v response=%T", err, v)
 		return &pb_pf.OrderDetail{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
 	return ack, nil

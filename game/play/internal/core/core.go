@@ -36,33 +36,32 @@ type PlayerActor struct {
 	Event  *comm.Event        // 当前玩家的业务事件分发器。
 	Boot   func(*PlayerActor) // Boot 在路由与事件初始化阶段调用。
 
-	initialMessages    []interface{}
-	router             tree.Router
-	messageRouter      tree.Router
-	wheel              *timer.TimeWheel
-	idleTimer          *timer.WheelTimer
-	system             *tree.Tree
-	selfPID            tree.PID
-	store              *mongorpc.Store
-	model              *player.PersistenceModel
-	gatePID            tree.PID
-	ready              bool
-	loadErr            error
-	pending            []interface{}
-	online             bool
-	sessionActive      bool
-	sessionGeneration  uint64
-	saving             bool
-	evictAfterSave     bool
-	stopRequested      bool
-	shutdownStop       bool
-	shutdownRequest    *tree.Envelope
-	idleGeneration     uint64
-	evictReadySent     bool
-	accepting          bool
-	serverOpenEmitted  bool
-	serverCloseEmitted bool
-	saveCallbacks      []func(error)
+	initialMessages    []interface{}            // 创建 Actor 前设置的初始消息，初始化时转入加载等待队列。
+	router             tree.Router              // 玩家业务路由，处理客户端请求及业务模块注册的消息。
+	messageRouter      tree.Router              // Actor 消息入口路由，处理会话、存盘、定时器和生命周期消息。
+	wheel              *timer.TimeWheel         // 当前玩家的定时任务管理器，底层使用共享时间轮分片。
+	system             *tree.Tree               // 当前 Actor 所属的运行系统，用于投递消息和定时回调。
+	selfPID            tree.PID                 // 当前玩家 Actor 的进程标识。
+	store              *mongorpc.Store          // 玩家持久化存储入口，通过 Mongo Actor 异步加载和保存数据。
+	model              *player.PersistenceModel // 玩家持久化模型，负责数据快照及存盘后的脏标记处理。
+	gatePID            tree.PID                 // 游戏网关 Actor 的进程标识，用于推送消息和协调玩家回收。
+	ready              bool                     // 玩家内存数据是否已就绪，可以处理业务请求。
+	loadErr            error                    // 玩家数据初始化或加载失败的原因。
+	pending            []interface{}            // 玩家数据加载期间暂存的消息，就绪后按顺序处理。
+	online             bool                     // 玩家是否处于在线状态，用于控制离线保留和回收。
+	sessionActive      bool                     // 是否绑定有效网关会话，用于校验客户端消息和断线通知。
+	sessionGeneration  uint64                   // 当前网关会话的代次，用于过滤旧连接的请求和断线通知。
+	saving             bool                     // 是否有玩家存盘请求正在等待完成，防止重复发起存盘。
+	evictAfterSave     bool                     // 最终存盘成功后，是否需要向网关申请回收离线玩家。
+	stopRequested      bool                     // 是否已收到普通停止请求，待所需存盘完成后退出。
+	shutdownStop       bool                     // 是否正在执行关服停止流程，存盘结束后回复请求方并退出。
+	shutdownRequest    *tree.Envelope           // 等待关服存盘结果的请求信封，用于延迟回复关服协调方。
+	idleGeneration     uint64                   // 离线回收任务的代次，用于忽略取消或重建任务前的旧超时消息。
+	evictReadySent     bool                     // 是否已通知网关可以回收当前玩家，防止重复发送回收通知。
+	accepting          bool                     // 是否允许接收通过会话校验的客户端请求。
+	serverOpenEmitted  bool                     // 是否已触发玩家开服事件，保证只触发一次。
+	serverCloseEmitted bool                     // 是否已触发玩家关服事件，并据此拒绝后续客户端请求。
+	saveCallbacks      []func(error)            // 等待存盘结果的回调，存盘成功或失败后统一通知。
 }
 
 // Name 返回当前玩家角色的运行期名称。
@@ -644,25 +643,20 @@ func (actor *PlayerActor) onAutoSaveTick(ctx tree.Context, _ *playerAutoSaveTick
 
 // scheduleIdleEviction 为离线的玩家角色启动保留计时器。
 func (actor *PlayerActor) scheduleIdleEviction() {
-	if actor.wheel == nil || actor.online || actor.sessionActive {
+	wheel := actor.wheel
+	if wheel == nil || actor.online || actor.sessionActive {
 		return
 	}
-	if actor.idleTimer != nil {
-		actor.idleTimer.Stop()
-	}
-	actor.idleGeneration++
-	generation := actor.idleGeneration
-	actor.idleTimer = actor.wheel.After(playerIdleTimerType, playerOfflineRetention, generation)
-	if actor.idleTimer == nil {
+	actor.cancelIdleEviction()
+	if wheel.After(playerIdleTimerType, playerOfflineRetention, actor.idleGeneration) == nil {
 		tlog.Log.Error("[play/PlayerActor.scheduleIdleEviction] 安排玩家离线回收失败, pid=%v", actor.UID)
 	}
 }
 
-// cancelIdleEviction 使当前离线保留计时器失效并停止计时。
+// cancelIdleEviction 按类型取消离线回收，并使已经转成业务消息的旧回调失效。
 func (actor *PlayerActor) cancelIdleEviction() {
-	if actor.idleTimer != nil {
-		actor.idleTimer.Stop()
-		actor.idleTimer = nil
+	if wheel := actor.wheel; wheel != nil {
+		wheel.Cancel(playerIdleTimerType)
 	}
 	actor.idleGeneration++
 }
@@ -672,7 +666,6 @@ func (actor *PlayerActor) onIdleTimeout(ctx tree.Context, message *playerIdleTim
 	if message == nil || message.generation != actor.idleGeneration {
 		return
 	}
-	actor.idleTimer = nil
 	if actor.online || actor.sessionActive {
 		return
 	}

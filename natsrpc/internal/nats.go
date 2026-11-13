@@ -3,7 +3,6 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sync/atomic"
 	"time"
 
@@ -20,7 +19,7 @@ const (
 	natsRequestTimeout       = timer.TimerType(1)
 	natsPendingMessageLimit  = 64 * 1024
 	natsPendingByteLimit     = 64 * 1024 * 1024
-	natsActorMailboxCapacity = 8 * 1024
+	natsActorMailboxCapacity = 1000000
 )
 
 // publisher is the minimal NATS transport needed by the send path. Keeping it
@@ -152,13 +151,13 @@ func (ns *Nats) subscribe(ctx tree.Context, sub string) {
 	}
 	s, err := ns.conn.SubscribeSync(sub)
 	if err != nil {
-		log.Printf("natsrpc: subscribe %s: %v", sub, err)
-		panic(fmt.Sprintf("natsrpc: subscribe %s: %v", sub, err))
+		tlog.Error("[natsrpc/Nats.subscribe] 订阅失败, subject=%s err=%v", sub, err)
+		panic(fmt.Sprintf("[natsrpc/Nats.subscribe] 订阅失败, subject=%s err=%v", sub, err))
 	}
 	if err := s.SetPendingLimits(natsPendingMessageLimit, natsPendingByteLimit); err != nil {
 		_ = s.Unsubscribe()
-		log.Printf("natsrpc: set pending limits for %s: %v", sub, err)
-		panic(fmt.Sprintf("natsrpc: set pending limits for %s: %v", sub, err))
+		tlog.Error("[natsrpc/Nats.subscribe] 设置订阅队列限制失败, subject=%s err=%v", sub, err)
+		panic(fmt.Sprintf("[natsrpc/Nats.subscribe] 设置订阅队列限制失败, subject=%s err=%v", sub, err))
 	}
 	ns.nastSub = s
 	go ns.consumeSubscription(ctx, sub, s)

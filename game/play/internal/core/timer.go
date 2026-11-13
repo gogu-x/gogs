@@ -15,7 +15,7 @@ const (
 	// playerAutoSaveInterval 是玩家周期存盘的间隔。
 	playerAutoSaveInterval = time.Minute * 5
 	// playerOfflineRetention 是玩家离线后保留角色的时长。
-	playerOfflineRetention = time.Hour
+	playerOfflineRetention = time.Minute * 5
 )
 
 type playerAutoSaveTick struct{}

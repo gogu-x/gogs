@@ -2,7 +2,6 @@ package webhook
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/gogu-x/gogs/conf"
@@ -10,6 +9,7 @@ import (
 	"github.com/gogu-x/gogs/pb/pfpb/pb_pf"
 	platformgrpc "github.com/gogu-x/gogs/platform/grpc"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/tlog"
 )
 
 type Actor struct{}
@@ -28,9 +28,9 @@ func (a *Actor) OnInit(_ tree.Context) {
 		writePaymentCode(w, platformgrpc.DeliverByOrderID(orderID))
 	})
 	go func() {
-		log.Printf("platform HTTP webhook on %s", conf.PlatformWebhookAddr)
+		tlog.Info("[webhook/Actor.OnInit] 启动HTTP回调服务, addr=%s", conf.PlatformWebhookAddr)
 		if err := http.ListenAndServe(conf.PlatformWebhookAddr, mux); err != nil {
-			log.Printf("webhook: %v", err)
+			tlog.Error("[webhook/Actor.OnInit] HTTP回调服务退出, err=%v", err)
 		}
 	}()
 }
@@ -51,7 +51,7 @@ func writePaymentCode(w http.ResponseWriter, code pb_pf.ErrCode) {
 	if err := json.NewEncoder(w).Encode(struct {
 		Code int32 `json:"code"`
 	}{int32(code)}); err != nil {
-		log.Printf("webhook response write failed: %v", err)
+		tlog.Error("[webhook/writePaymentCode] 回调响应写入失败, err=%v", err)
 	}
 }
 

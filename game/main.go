@@ -17,6 +17,7 @@ import (
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/gogs/natsrpc"
 	_ "github.com/gogu-x/gogs/pb"
+	"github.com/gogu-x/gogs/pprof/diagnostics"
 	"github.com/gogu-x/tree/cluster"
 	"github.com/gogu-x/tree/db/mongorpc"
 	"github.com/gogu-x/tree/tlog"
@@ -26,6 +27,7 @@ import (
 )
 
 func main() {
+	defer tlog.Shutdown(tlog.DefaultFlushTimeout)
 	cmd := &cli.Command{
 		Name:  "game",
 		Usage: "game server",
@@ -35,6 +37,11 @@ func main() {
 				return err
 			}
 			tlog.NewLog(conf.LogPath, 0)
+			stopDiagnostics, err := diagnostics.Start(conf.GamePprofAddr(), c.Int("pprof-block-rate"), c.Int("pprof-mutex-fraction"))
+			if err != nil {
+				return err
+			}
+			defer stopDiagnostics()
 
 			if err := cluster.Init(conf.EtcdEndpoints); err != nil {
 				tlog.Log.Error("cluster init error: %v", err)
@@ -48,7 +55,12 @@ func main() {
 			if err := cluster.Register(serverID, NodeID, addr); err != nil {
 				tlog.Log.Error("cluster register error: %v", err)
 			}
-			fmt.Printf("game server [%s] inst=%s registered at %s\n", serverID, NodeID, addr)
+			tlog.Info(
+				"[game/main] 游戏服务已注册, server=%s node=%s addr=%s",
+				serverID,
+				NodeID,
+				addr,
+			)
 
 			db := mongorpc.Connect(
 				conf.MongoURL,
@@ -58,7 +70,7 @@ func main() {
 			)
 
 			//加载配置表
-			err := glconf.LoadAllConfs(conf.GconfDbUri, conf.GconfDb, true)
+			err = glconf.LoadAllConfs(conf.GconfDbUri, conf.GconfDb, true)
 			if err != nil {
 				tlog.Log.Error("load confs error: %v", err)
 				return err

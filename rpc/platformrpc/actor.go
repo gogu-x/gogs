@@ -28,6 +28,8 @@ func NewActor() *PfRpc { return &PfRpc{routes: make(map[reflect.Type]route)} }
 
 func (a *PfRpc) Name() string { return def.PF }
 
+func (a *PfRpc) MailboxSize() int { return 1000000 }
+
 func (a *PfRpc) register(req any, method string, newResp func() any) {
 	a.routes[reflect.TypeOf(req)] = route{method, newResp}
 }

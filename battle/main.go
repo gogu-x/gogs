@@ -19,6 +19,7 @@ import (
 )
 
 func main() {
+	defer tlog.Shutdown(tlog.DefaultFlushTimeout)
 	cmd := &cli.Command{
 		Name:  "battle",
 		Usage: "deterministic battle service",

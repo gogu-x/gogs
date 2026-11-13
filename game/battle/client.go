@@ -108,7 +108,7 @@ func New(selector NodeSelector, sender Sender, gameServerID, gameNodeID int) *Cl
 func (c *Client) Name() string        { return def.BattleClient }
 func (c *Client) OnInit(tree.Context) {}
 func (c *Client) OnStop(tree.Context) {}
-func (c *Client) MailboxSize() int    { return 8 * 1024 }
+func (c *Client) MailboxSize() int    { return 1000000 }
 
 func (c *Client) HandleMessage(ctx tree.Context, msg interface{}) {
 	switch m := msg.(type) {

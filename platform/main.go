@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 
 	"github.com/gogu-x/gogs/conf"
@@ -18,6 +17,7 @@ import (
 )
 
 func main() {
+	defer tlog.Shutdown(tlog.DefaultFlushTimeout)
 	cmd := &cli.Command{
 		Name:  "platform",
 		Usage: "platform server",
@@ -48,6 +48,6 @@ func main() {
 	}
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
-		log.Fatal(err.Error())
+		tlog.Fatal("[platform/main] 服务退出, err=%v", err)
 	}
 }

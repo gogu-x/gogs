@@ -1,7 +1,6 @@
 package ws
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gogu-x/tree/comm"
+	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/grpc"
 
 	"github.com/gorilla/websocket"
@@ -60,7 +60,7 @@ func (s *Server) OnInit(ctx tree.Context) {
 	}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
-			log.Printf("GateServer: %v", err)
+			tlog.Error("[ws/Server.OnInit] 网关监听退出, err=%v", err)
 		}
 	}()
 }

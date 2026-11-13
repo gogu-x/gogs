@@ -20,7 +20,7 @@ const (
 	// actvOwnerSaveInterval 表示活动记录的定时存盘间隔。
 	actvOwnerSaveInterval = time.Minute
 	// maxPendingActvRequests 表示活动 Actor 加载常驻归属数据期间暂存玩家事件与请求的总数量上限。
-	maxPendingActvRequests = 10240
+	maxPendingActvRequests = 100000
 )
 
 // pendingActvRequest 保存活动 Actor 加载期间暂存的单向消息。
@@ -65,6 +65,8 @@ func NewActv() *Actv {
 
 // Name 返回全局活动 Actor 的名称。
 func (actor *Actv) Name() string { return def.ActorActv }
+
+func (actor *Actv) MailboxSize() int { return 1000000 }
 
 // OnInit 注册消息路由、存盘生命周期、时间轮和活动模板。
 // 启动时先创建索引，再加载服务器/联盟活动元数据，最后加载这些活动的单条组件数据。

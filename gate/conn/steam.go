@@ -3,7 +3,6 @@ package conn
 import (
 	"context"
 	"io"
-	"log"
 
 	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/pb/cspb/pb_auth"
@@ -50,7 +49,7 @@ func (c *Conn) receiveStream(self tree.PID, stream pb_gateway.Gateway_StreamClie
 		frame, err := stream.Recv()
 		if err != nil {
 			if err != io.EOF && status.Code(err) != codes.Canceled {
-				log.Printf("ConnActor[%d]: game stream receive error: %v", c.connID, err)
+				tlog.Error("[conn/Conn.receiveStream] 游戏流接收失败, connID=%d err=%v", c.connID, err)
 			}
 			tree.Send(self, &streamClosed{err: err})
 			return

@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/gate/ws"
 	"github.com/gogu-x/gogs/natsrpc"
+	"github.com/gogu-x/gogs/pprof/diagnostics"
 	"github.com/gogu-x/gogs/rpc/platformrpc"
 
 	_ "github.com/gogu-x/gogs/pb"
@@ -18,6 +18,7 @@ import (
 )
 
 func main() {
+	defer tlog.Shutdown(tlog.DefaultFlushTimeout)
 	cmd := &cli.Command{
 		Name:  "gate",
 		Usage: "gate server",
@@ -28,6 +29,11 @@ func main() {
 			}
 
 			tlog.NewLog(conf.LogPath, 0)
+			stopDiagnostics, err := diagnostics.Start(conf.GatePprofAddr(), c.Int("pprof-block-rate"), c.Int("pprof-mutex-fraction"))
+			if err != nil {
+				return err
+			}
+			defer stopDiagnostics()
 			if err := cluster.Init(conf.EtcdEndpoints); err != nil {
 				tlog.Log.Error("cluster init: %v", err)
 			}
@@ -39,7 +45,7 @@ func main() {
 				natsrpc.NewNats(natsrpc.Gate, conf.GateID, conf.NodeId, conf.NatsURL),
 			)
 
-			fmt.Printf("gate server [%d] starting, listen: %s\n", conf.GateID, conf.GateAddr())
+			tlog.Info("[gate/main] 网关服务启动, gate=%d addr=%s", conf.GateID, conf.GateAddr())
 			tree.Default().Start()
 			return nil
 		},

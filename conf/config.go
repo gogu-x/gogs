@@ -80,6 +80,8 @@ var (
 // explicitly on the command line override values from --config.
 func ConnectionFlags() []cli.Flag {
 	return []cli.Flag{
+		&cli.IntFlag{Name: "pprof-block-rate", Value: 1000000, Usage: "阻塞采样间隔（纳秒），0关闭"},
+		&cli.IntFlag{Name: "pprof-mutex-fraction", Value: 100, Usage: "锁竞争采样比例，0关闭"},
 		&cli.IntFlag{Name: "server-id", Usage: "server-id"},
 		&cli.Int64Flag{Name: "server-open-ts", Usage: "server open time in unix seconds"},
 		&cli.IntFlag{Name: "gate-id", Usage: "gate-id"},
