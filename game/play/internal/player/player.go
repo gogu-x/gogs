@@ -3,8 +3,6 @@
 package player
 
 import (
-	"fmt"
-
 	"github.com/gogu-x/gogs/game/play/internal/player/asset"
 	"github.com/gogu-x/gogs/game/play/internal/player/bag"
 	"github.com/gogu-x/gogs/game/play/internal/player/cardgroup"
@@ -14,9 +12,6 @@ import (
 	"github.com/gogu-x/gogs/game/play/internal/player/souljade"
 	"github.com/gogu-x/gogs/game/play/internal/player/talent"
 	"github.com/gogu-x/gogs/game/play/internal/player/tower"
-	"github.com/gogu-x/gogs/glconf"
-	"github.com/gogu-x/gogs/pb/cspb/pb_common"
-	"github.com/gogu-x/tree/tlog"
 )
 
 // Player 保存玩家持久化数据和运行期各模块数据。
@@ -42,6 +37,7 @@ type Player struct {
 	revision uint64 // 内存版本号，不写入玩家文档。
 }
 
+// NewPlayerData 创建空的玩家数据，不自动发放角色、装备或养成内容。
 func NewPlayerData(uid uint64) *Player {
 	player := &Player{
 		UID:          uid,
@@ -50,13 +46,9 @@ func NewPlayerData(uid uint64) *Player {
 		CardGroupMgr: cardgroup.New(),
 		RoleMgr:      role.New(),
 		EquipmentMgr: equipment.New(),
-		SoulJadeMgr:  souljade.New(uid),
-		TalentMgr:    talent.New(),
 		ShopMgr:      &shop.Mgr{},
 		TowerMgr:     tower.NewTowerMgr(),
 	}
-	player.initDefaultCharacter()
-	player.initStarterEquipment()
 	player.MarkDirty()
 	return player
 }
@@ -141,82 +133,13 @@ func (p *Player) GetTalentMgr() *talent.Mgr {
 	return p.TalentMgr
 }
 
-// EnsureLoadoutModules initializes missing modules once during login loading.
-func (p *Player) EnsureLoadoutModules() bool {
+// GetAssetMgr 返回玩家普通资源模块。
+func (p *Player) GetAssetMgr() *asset.Mgr {
 	if p == nil {
-		return false
+		return nil
 	}
-	changed := false
-	if p.GetSoulJadeMgr() == nil {
-		if module := souljade.New(p.GetUID()); module != nil {
-			p.SoulJadeMgr = module
-			changed = true
-		}
-	}
-	if p.GetTalentMgr() == nil {
-		if module := talent.New(); module != nil {
-			p.TalentMgr = module
-			changed = true
-		}
-	}
-	if souljade.NormalizeSlots(p.GetSoulJadeMgr()) {
-		changed = true
-	}
-	if talent.EnsureRoots(p.GetTalentMgr()) {
-		changed = true
-	}
-	if changed {
-		p.MarkDirty()
-	}
-	return changed
+	return p.AssetMgr
 }
 
-func (p *Player) initDefaultCharacter() {
-	if p == nil {
-		return
-	}
-	roleMgr := p.GetRoleMgr()
-	if roleMgr == nil {
-		return
-	}
-	config := glconf.GetPlayerInitRoleCfg(1)
-	if config == nil {
-		return
-	}
-	roleID := fmt.Sprintf("%d", p.GetUID())
-	roleMgr.SetCharacter(&role.Role{
-		ID:           roleID,
-		ConfigID:     config.GetRoleConfigID(),
-		Level:        config.GetLevel(),
-		Star:         config.GetStar(),
-		Breakthrough: config.GetBreakthrough(),
-	})
-}
-
-// initStarterEquipment initializes inventory and equipped items from the role profile.
-func (p *Player) initStarterEquipment() {
-	if p == nil {
-		return
-	}
-	equipmentMgr := p.GetEquipmentMgr()
-	roleMgr := p.GetRoleMgr()
-	if equipmentMgr == nil || roleMgr == nil {
-		return
-	}
-	character, ok := roleMgr.GetCharacter()
-	if !ok || character == nil {
-		return
-	}
-	if len(equipmentMgr.GetItems()) > 0 {
-		return
-	}
-	items, equippedIDs, code := equipment.InitialLoadout(p.GetUID(), glconf.GetPlayerInitRoleCfg(1))
-	if code != pb_common.ErrCode_OK {
-		tlog.Log.Error("[player/initStarterEquipment] 初始装备配置无效, pid=%v code=%v", p.GetUID(), code)
-		return
-	}
-	for _, item := range items {
-		equipmentMgr.AddItem(item)
-	}
-	character.SetEquipmentIDs(equippedIDs)
-}
+// SetAssetMgr 更新玩家普通资源模块。
+func (p *Player) SetAssetMgr(mgr *asset.Mgr) { p.AssetMgr = mgr }

@@ -2,6 +2,7 @@ package ctl_assets
 
 import (
 	"github.com/gogu-x/gogs/game/play/internal/core"
+	"github.com/gogu-x/gogs/game/play/internal/player/asset"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/tree/tlog"
@@ -15,9 +16,9 @@ func OnActvAssetTrade(ctx *core.Context, tx *ipb.ActvAssetTrade) {
 	code := pb_common.ErrCode_ACTV_UNAVAILABLE
 	uid := ctx.PlayerID()
 	if current := ctx.GetPlayer(); current != nil && tx.GetUID() == uid {
-		code = current.ApplyAssetTrade(tx)
+		code = asset.ApplyAssetTrade(current, tx)
 		if code == pb_common.ErrCode_OK {
-			ctx.CastPlayerMsg(uid, current.AssetMgr.Message())
+			ctx.CastPlayerMsg(uid, current.GetAssetMgr().Message())
 		}
 	}
 	ctx.Response(code, nil)

@@ -8,6 +8,8 @@ import (
 	"github.com/gogu-x/gogs/game/play/internal/player"
 	"github.com/gogu-x/gogs/game/play/internal/player/loadouttest"
 	"github.com/gogu-x/gogs/game/play/internal/player/role"
+	"github.com/gogu-x/gogs/game/play/internal/player/souljade"
+	"github.com/gogu-x/gogs/game/play/internal/player/talent"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/gogs/pb/cspb/pb_souljade"
@@ -56,6 +58,8 @@ func loadoutContext(t *testing.T) (*core.Context, *player.Player, *captureGate) 
 	loadouttest.Load(t)
 	tlog.NewLog("", 0)
 	p := player.NewPlayerData(42)
+	p.SoulJadeMgr = souljade.New(42)
+	p.TalentMgr = talent.New()
 	p.GetRoleMgr().SetCharacter(&role.Role{ID: "role-42", ConfigID: 1, Level: 1})
 	p.SetDirty(false)
 	gate := &captureGate{}
@@ -279,7 +283,7 @@ func TestWriteGuardsReplyOnceWithoutChangingState(t *testing.T) {
 			t.Run(action.name+"/"+condition.name, func(t *testing.T) {
 				ctx, p, gate := loadoutContext(t)
 				condition.prepare(p)
-				beforeJade, beforeTalent := p.BuildSoulJadeData(), p.BuildTalentData()
+				beforeJade, beforeTalent := souljade.BuildData(p), talent.BuildData(p)
 				beforeRevision := p.Revision()
 				action.invoke(ctx, condition.requestID, condition.revision)
 				ack := gate.reply(t)
@@ -304,7 +308,7 @@ func TestWriteGuardsReplyOnceWithoutChangingState(t *testing.T) {
 				if p.IsDirty() || p.Revision() != beforeRevision {
 					t.Fatal("rejected request marked the player dirty")
 				}
-				if !proto.Equal(beforeJade, p.BuildSoulJadeData()) || !proto.Equal(beforeTalent, p.BuildTalentData()) {
+				if !proto.Equal(beforeJade, souljade.BuildData(p)) || !proto.Equal(beforeTalent, talent.BuildData(p)) {
 					t.Fatal("rejected request changed growth state")
 				}
 			})

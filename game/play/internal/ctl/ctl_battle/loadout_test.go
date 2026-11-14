@@ -19,6 +19,8 @@ import (
 func TestBattleIgnoresClientGrowthAndUsesStoredLoadout(t *testing.T) {
 	loadouttest.Load(t)
 	p := player.NewPlayerData(99)
+	p.SoulJadeMgr = souljade.New(99)
+	p.TalentMgr = talent.New()
 	p.GetRoleMgr().SetCharacter(&role.Role{ID: "role-99", ConfigID: 1, Level: 1})
 	if code := talent.Learn(p.GetTalentMgr(), 1, 6); code != pb_common.ErrCode_OK {
 		t.Fatal(code)
@@ -58,6 +60,8 @@ func battleLoadoutPlayer(t *testing.T) *player.Player {
 		t.Fatal(err)
 	}
 	p := player.NewPlayerData(99)
+	p.SoulJadeMgr = souljade.New(99)
+	p.TalentMgr = talent.New()
 	p.GetRoleMgr().SetCharacter(&role.Role{ID: "role-99", ConfigID: 1, Level: 1, EquipmentIDs: []string{"blade-a"}})
 	p.GetEquipmentMgr().AddItem(&equipment.Item{ID: "blade-a", ConfigID: 77})
 	p.GetEquipmentMgr().AddItem(&equipment.Item{ID: "blade-b", ConfigID: 91})

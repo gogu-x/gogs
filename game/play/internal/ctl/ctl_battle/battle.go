@@ -10,6 +10,7 @@ import (
 	"github.com/gogu-x/gogs/game/battle"
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/game/play/internal/player"
+	"github.com/gogu-x/gogs/game/play/internal/player/loadout"
 	"github.com/gogu-x/gogs/game/play/internal/player/role"
 	"github.com/gogu-x/gogs/game/play/internal/player/souljade"
 	"github.com/gogu-x/gogs/ipb"
@@ -160,7 +161,7 @@ func battleRoleMessage(currentPlayer *player.Player, selectedRole *role.Role) (*
 		Skills:                 roleSkills,
 		Equips:                 roleEquips,
 		SoulJadeEffectAffixIds: souljade.EffectAffixIDs(currentPlayer.GetSoulJadeMgr()),
-		GrowthBonus:            currentPlayer.BattleBonuses(),
+		GrowthBonus:            loadout.BattleBonuses(currentPlayer.GetSoulJadeMgr(), currentPlayer.GetTalentMgr()),
 	}
 	return message, pb_common.ErrCode_OK
 }

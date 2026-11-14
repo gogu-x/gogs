@@ -199,9 +199,6 @@ func (actor *PlayerActor) onPlayerLoaded(ctx tree.Context, value interface{}, er
 		tlog.Log.Info("[play/PlayerActor.onPlayerLoaded] 新玩家数据已初始化, pid=%v", uid)
 	}
 	actor.Player = loaded
-	if loaded.EnsureLoadoutModules() {
-		tlog.Log.Info("[play/PlayerActor.onPlayerLoaded] 玩家魂玉天赋存档已初始化, pid=%v", uid)
-	}
 	actor.model.SetPlayer(loaded)
 	actor.ready = true
 	actor.scheduleAutoSave()
