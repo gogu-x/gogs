@@ -34,7 +34,6 @@ type Actv struct {
 	serverID        uint64
 	router          tree.Router
 	wheel           *timer.TimeWheel
-	system          *tree.Tree
 	selfPID         tree.PID
 	store           *mongorpc.Store
 	lifecycle       *mongorpc.Lifecycle

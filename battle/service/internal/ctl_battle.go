@@ -42,7 +42,7 @@ func (s *Server) OnCreateBattle(ctx tree.Context, req *pb_battle.StartBattleReq)
 		RetryDelay:    time.Second,
 		RetryAttempts: 3,
 	})
-	pid := s.system.SpawnOne(actor)
+	pid := tree.SpawnOne(actor)
 	s.active[battleID] = pid
 	if tlog.Log != nil {
 		tlog.Log.Info("[战斗/创建] 创建BattleActor, battleID=%v seed=%v uid=%v", battleID, seed, req.GetUID())

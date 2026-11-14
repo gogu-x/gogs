@@ -99,8 +99,8 @@ func TestCalendarMidnight(t *testing.T) {
 func TestPushAndBusinessRouting(t *testing.T) {
 	b := newTestBehavior()
 	gate := &sevenDayGate{messages: make(chan *ipb.PushToMsg, 8)}
-	tree.SpawnOne(gate)
-	t.Cleanup(tree.Default().Shutdown)
+	pid := tree.SpawnOne(gate)
+	t.Cleanup(func() { tree.Stop(pid) })
 	b.HandleEvent(gameevent.NewPlayer(gameevent.NameUserLogin, 7, 1))
 	select {
 	case push := <-gate.messages:

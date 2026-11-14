@@ -16,9 +16,9 @@ const (
 
 // registerTimers 创建供 Mongo 存盘生命周期使用的时间轮。
 func (actor *Actv) registerTimers(ctx tree.Context) {
-	actor.system = ctx.System()
+
 	actor.selfPID = ctx.Self()
-	actor.wheel = timer.NewTimeWheel(32, actor.selfPID, actor.system)
+	actor.wheel = timer.NewTimeWheel(32, actor.selfPID)
 	actor.wheel.Register(actvLifecycleTimerType, func(interface{}) {
 		actor.onLifecycleTimer()
 	})
@@ -27,10 +27,10 @@ func (actor *Actv) registerTimers(ctx tree.Context) {
 
 // onLifecycleTimer 将定时到期回调一次性投递到所属 Actv Actor，并携带其 Context。
 func (actor *Actv) onLifecycleTimer() {
-	if actor == nil || actor.system == nil {
+	if actor == nil || actor.selfPID.ID == 0 {
 		return
 	}
-	if !actor.system.SendCallback(actor.selfPID, func(ctx tree.Context, _ interface{}, _ error) {
+	if !tree.SendCallback(actor.selfPID, func(ctx tree.Context, _ interface{}, _ error) {
 		actor.onLifecycleTick(ctx)
 	}, nil, nil) {
 		tlog.Log.Error("[actv/Actv.onLifecycleTimer] 活动生命周期回调投递失败")

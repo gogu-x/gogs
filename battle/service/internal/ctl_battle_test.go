@@ -64,11 +64,10 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 		}
 		return nil
 	})
-	treeSystem := tree.NewTree()
-	managerPID := treeSystem.SpawnOne(&observedServer{Server: server})
-	t.Cleanup(treeSystem.Shutdown)
+
+	managerPID := spawnTestServer(t, server, &observedServer{Server: server})
 	request := &pb.StartBattleReq{UID: 7, ServerID: 1, SourceNodeId: 2, BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
-	value, err := treeSystem.Request(managerPID, request).AwaitTimeout(time.Second)
+	value, err := tree.Request(managerPID, request).AwaitTimeout(time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +75,12 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	if ack.GetBattleId() == "" {
 		t.Fatal("missing generated battle id")
 	}
-	value, err = treeSystem.Request(managerPID, &activeBattleQuery{battleID: ack.GetBattleId()}).AwaitTimeout(time.Second)
+	value, err = tree.Request(managerPID, &activeBattleQuery{battleID: ack.GetBattleId()}).AwaitTimeout(time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 	actorPID := value.(tree.PID)
+	t.Cleanup(func() { tree.Stop(actorPID) })
 	if actorPID.ID == 0 {
 		t.Fatal("战斗未登记")
 	}
@@ -92,10 +92,10 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Fatal("battle did not finish")
 	}
-	treeSystem.Send(managerPID, &battle.ActorStopped{BattleID: ack.GetBattleId(), PID: actorPID})
+	tree.Send(managerPID, &battle.ActorStopped{BattleID: ack.GetBattleId(), PID: actorPID})
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		value, err = treeSystem.Request(managerPID, &activeBattleQuery{battleID: ack.GetBattleId()}).AwaitTimeout(time.Second)
+		value, err = tree.Request(managerPID, &activeBattleQuery{battleID: ack.GetBattleId()}).AwaitTimeout(time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -155,11 +155,9 @@ func TestBattleComputesBeforeDelivery(t *testing.T) {
 		return nil
 	})
 
-	treeSystem := tree.NewTree()
-	managerPID := treeSystem.SpawnOne(server)
-	t.Cleanup(treeSystem.Shutdown)
+	managerPID := spawnTestServer(t, server, server)
 	request := &pb.StartBattleReq{UID: 7, ServerID: 1, SourceNodeId: 2, BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
-	if _, err := treeSystem.Request(managerPID, request).AwaitTimeout(time.Second); err != nil {
+	if _, err := tree.Request(managerPID, request).AwaitTimeout(time.Second); err != nil {
 		t.Fatal(err)
 	}
 
@@ -241,11 +239,10 @@ func TestSlowDeliveryDoesNotBlockManager(t *testing.T) {
 		}
 		return nil
 	})
-	system := tree.NewTree()
-	manager := system.SpawnOne(server)
+
+	manager := spawnTestServer(t, server, server)
 	t.Cleanup(func() {
 		close(release)
-		system.Shutdown()
 	})
 	for uid := uint64(1); uid <= 2; uid++ {
 		request := &pb.StartBattleReq{
@@ -253,7 +250,7 @@ func TestSlowDeliveryDoesNotBlockManager(t *testing.T) {
 			BattleType:    pb.BattleType_BATTLE_TYPE_TOWER,
 			AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1,
 		}
-		if _, err := system.Request(manager, request).AwaitTimeout(time.Second); err != nil {
+		if _, err := tree.Request(manager, request).AwaitTimeout(time.Second); err != nil {
 			t.Fatalf("管理器被单场投递阻塞: %v", err)
 		}
 		select {
@@ -262,4 +259,31 @@ func TestSlowDeliveryDoesNotBlockManager(t *testing.T) {
 			t.Fatal("战斗没有独立进入投递阶段")
 		}
 	}
+}
+
+// spawnTestServer 使用全局入口创建管理器，并在测试结束时先回收其战斗 Actor。
+func spawnTestServer(t *testing.T, server *Server, actor tree.Actor) tree.PID {
+	t.Helper()
+	pid := tree.SpawnOne(actor)
+	t.Cleanup(func() {
+		children := make(chan []tree.PID, 1)
+		if tree.SendCallback(pid, func(tree.Context, interface{}, error) {
+			pids := make([]tree.PID, 0, len(server.active))
+			for _, child := range server.active {
+				pids = append(pids, child)
+			}
+			children <- pids
+		}, nil, nil) {
+			select {
+			case pids := <-children:
+				for _, child := range pids {
+					tree.Stop(child)
+				}
+			case <-time.After(time.Second):
+				t.Error("管理器未返回待回收 Actor")
+			}
+		}
+		tree.Stop(pid)
+	})
+	return pid
 }

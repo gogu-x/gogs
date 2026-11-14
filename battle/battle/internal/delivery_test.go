@@ -36,9 +36,8 @@ func TestComputedReportRetriesAndRetires(t *testing.T) {
 			return nil
 		}),
 	})
-	system := tree.NewTree()
-	system.SpawnOne(actor)
-	t.Cleanup(system.Shutdown)
+	pid := tree.SpawnOne(actor)
+	t.Cleanup(func() { tree.Stop(pid) })
 	var checksum string
 	for i := 0; i < 2; i++ {
 		select {
@@ -54,7 +53,7 @@ func TestComputedReportRetriesAndRetires(t *testing.T) {
 	}
 	deadline := time.Now().Add(time.Second)
 	for {
-		if _, exists := system.Lookup(def.BattleActorName(setup.BattleID)); !exists {
+		if _, exists := tree.Lookup(def.BattleActorName(setup.BattleID)); !exists {
 			break
 		}
 		if time.Now().After(deadline) {

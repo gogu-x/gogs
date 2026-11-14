@@ -75,8 +75,7 @@ func main() {
 				tlog.Log.Error("load confs error: %v", err)
 				return err
 			}
-			system := tree.Default()
-			system.Spawn(
+			tree.Spawn(
 				mongorpc.NewActor(def.Mongo, db, mongorpc.WithWorkers(16)),
 				natsrpc.NewNats(natsrpc.Game, conf.ServerID, conf.NodeId, conf.NatsURL),
 				battle.New(nil, nil, conf.ServerID, conf.NodeId),
@@ -84,7 +83,7 @@ func main() {
 				actv.NewActv(),
 				gate.NewGate(),
 			)
-			gameevent.SendToActors(system, gameevent.NewServerOpened(), []string{def.Guild, def.ActorActv, def.BattleClient, def.GameGate})
+			gameevent.SendToActors(gameevent.NewServerOpened(), []string{def.Guild, def.ActorActv, def.BattleClient, def.GameGate})
 
 			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -92,13 +91,12 @@ func main() {
 			signal.Stop(quit)
 
 			if err := gameevent.SendToActors(
-				system,
 				gameevent.NewServerClosing(),
 				[]string{def.GameGate, def.BattleClient, def.Guild, def.ActorActv},
 			); err != nil {
 				tlog.Log.Error("[game/main] 关服事件处理失败, err=%v", err)
 			}
-			system.Shutdown()
+			tree.Shutdown()
 			return nil
 		},
 	}

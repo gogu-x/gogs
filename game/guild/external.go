@@ -58,7 +58,7 @@ func (guild *Guild) OnInit(ctx tree.Context) {
 		guild.onUnhandledMessage,
 	)
 	internal.InitRoutes(&guild.router, guild.store, guild.onCreateGuild)
-	guild.wheel = timer.NewTimeWheel(32, ctx.Self(), ctx.System())
+	guild.wheel = timer.NewTimeWheel(32, ctx.Self())
 	guild.model = internal.NewPersistenceModel(guild.store)
 	mongoStore := mongorpc.NewStore(def.Mongo)
 	guild.lifecycle = mongorpc.NewLifecycle(mongoStore, guild.wheel, ctx)

@@ -41,7 +41,6 @@ type Nats struct {
 	nastSub   *natsgo.Subscription
 	timeWheel *timer.TimeWheel
 	codec     codec.Codec
-	system    *tree.Tree
 	conn      *natsgo.Conn
 	transport publisher
 	natsURl   string
@@ -87,8 +86,8 @@ func (ns *Nats) OnInit(ctx tree.Context) {
 	}
 	ns.conn = nc
 	ns.transport = nc
-	ns.system = ctx.System()
-	ns.timeWheel = timer.NewTimeWheel(1024, ctx.Self(), ns.system)
+
+	ns.timeWheel = timer.NewTimeWheel(1024, ctx.Self())
 	ns.timeWheel.Register(natsRequestTimeout, func(data interface{}) {
 		sessionID, ok := data.(int64)
 		if ok {

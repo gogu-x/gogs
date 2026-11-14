@@ -15,7 +15,7 @@ func PushToPlayer(uid uint64, message proto.Message) bool {
 		return false
 	}
 	gatePID, ok := tree.Lookup(def.GameGate)
-	if !ok || !tree.Default().TrySend(gatePID, &PushToMsg{UID: uid, Msg: message}) {
+	if !ok || !tree.TrySend(gatePID, &PushToMsg{UID: uid, Msg: message}) {
 		tlog.Error("[ipb/PushToPlayer] Gate 不可用或队列已满, pid=%v", uid)
 		return false
 	}

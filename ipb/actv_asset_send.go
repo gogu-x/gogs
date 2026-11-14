@@ -13,20 +13,16 @@ func RequestActvAssets(tx *ActvAssetTrade, callback func(pb_common.ErrCode)) boo
 	if tx == nil || callback == nil {
 		return false
 	}
-	sys := tree.Default()
-	if sys == nil {
-		return false
-	}
-	target, ok := sys.Lookup(fmt.Sprintf("player-%d", tx.GetUID()))
+	target, ok := tree.Lookup(fmt.Sprintf("player-%d", tx.GetUID()))
 	if !ok {
 		return false
 	}
-	sender, ok := sys.Lookup(def.ActorActv)
+	sender, ok := tree.Lookup(def.ActorActv)
 	if !ok {
 		return false
 	}
 	snapshot := tx.DeepCopy()
-	return sys.RequestCallback(
+	return tree.RequestCallback(
 		target,
 		snapshot,
 		sender,

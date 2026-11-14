@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/gogu-x/tree"
 	"time"
 
 	"github.com/gogu-x/tree/timer"
@@ -15,13 +16,13 @@ const (
 
 // initTimer 注册结果投递定时任务。
 func (a *BattleActor) initTimer() {
-	a.timer = timer.NewTimeWheel(timeWheelChanLen, a.self, a.system)
+	a.timer = timer.NewTimeWheel(timeWheelChanLen, a.self)
 	a.timer.Register(resultRetryTimer, a.onRetryTimer)
 }
 
 // onRetryTimer 将重试交给战斗 Actor 串行处理。
 func (a *BattleActor) onRetryTimer(interface{}) {
-	a.system.Send(a.self, &retryTick{})
+	tree.Send(a.self, &retryTick{})
 }
 
 // scheduleRetry 安排确认超时检查，次数耗尽后由 retry 回收 Actor。

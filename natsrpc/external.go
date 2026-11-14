@@ -48,7 +48,7 @@ func CallSync(sendModule, taggerModule string, sendActorName, taggerActorName st
 		SendName:     sendActorName,
 		TaggerName:   taggerActorName,
 	}
-	tree.Default().RequestCallback(pid, callMsg, callerPID, cb)
+	tree.RequestCallback(pid, callMsg, callerPID, cb)
 	return nil
 }
 

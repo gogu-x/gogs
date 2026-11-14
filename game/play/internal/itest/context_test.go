@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/game/play/internal/core"
+	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/comm"
 )
 
@@ -14,7 +15,7 @@ const testEvent = comm.EventName("testEvent")
 // TestPlayerEventRunsOnOwningActor 验证玩家事件在该玩家角色内同步执行。
 func TestPlayerEventRunsOnOwningActor(t *testing.T) {
 	result := make(chan uint64, 1)
-	tr, pid := spawnPlayerActor(t, func(actor *core.PlayerActor) {
+	pid := spawnPlayerActor(t, func(actor *core.PlayerActor) {
 		actor.OnEvent(testEvent, func(current *core.PlayerActor, _ *comm.Arg) {
 			result <- current.GetPlayer().GetUID()
 		})
@@ -24,7 +25,7 @@ func TestPlayerEventRunsOnOwningActor(t *testing.T) {
 		})
 	})
 
-	got, err := tr.Request(pid, &testReq{UID: testUID}).AwaitTimeout(time.Second)
+	got, err := tree.Request(pid, &testReq{UID: testUID}).AwaitTimeout(time.Second)
 	if err != nil || got != true {
 		t.Fatalf("request response = %v, err = %v", got, err)
 	}
@@ -43,7 +44,7 @@ func TestNestedEmitPreservesActorState(t *testing.T) {
 	// innerEvent 是嵌套事件测试使用的事件名称。
 	const innerEvent = comm.EventName("innerEvent")
 	result := make(chan uint64, 1)
-	tr, pid := spawnPlayerActor(t, func(actor *core.PlayerActor) {
+	pid := spawnPlayerActor(t, func(actor *core.PlayerActor) {
 		actor.OnEvent(innerEvent, func(current *core.PlayerActor, _ *comm.Arg) {
 			if current.GetPlayer() != nil {
 				current.GetPlayer().MarkDirty()
@@ -61,7 +62,7 @@ func TestNestedEmitPreservesActorState(t *testing.T) {
 		})
 	})
 
-	got, err := tr.Request(pid, &testReq{UID: testUID}).AwaitTimeout(time.Second)
+	got, err := tree.Request(pid, &testReq{UID: testUID}).AwaitTimeout(time.Second)
 	if err != nil || got != true {
 		t.Fatalf("request response = %v, err = %v", got, err)
 	}

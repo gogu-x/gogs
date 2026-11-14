@@ -68,22 +68,22 @@ func IsServerClosing(message interface{}) bool {
 }
 
 // SendToActors sends an event to each named Actor and waits for every response.
-func SendToActors(system *tree.Tree, message *sspb.Event, actorNames []string) error {
-	if system == nil || message == nil {
-		err := fmt.Errorf("event message or actor system is nil")
+func SendToActors(message *sspb.Event, actorNames []string) error {
+	if message == nil {
+		err := fmt.Errorf("event message is nil")
 		tlog.Log.Error("[event/SendToActors] 事件投递参数无效, actorCount=%v err=%v", len(actorNames), err)
 		return err
 	}
 	var deliveryErr error
 	for _, actorName := range actorNames {
-		pid, _ := system.Lookup(actorName)
+		pid, _ := tree.Lookup(actorName)
 		if IsServerClosing(message) {
-			if _, err := system.Request(pid, Clone(message)).AwaitTimeout(eventDeliveryTimeout); err != nil {
+			if _, err := tree.Request(pid, Clone(message)).AwaitTimeout(eventDeliveryTimeout); err != nil {
 				deliveryErr = fmt.Errorf("shutdown actor %s: %w", actorName, err)
 				break
 			}
 		} else {
-			system.Send(pid, Clone(message))
+			tree.Send(pid, Clone(message))
 		}
 	}
 	return deliveryErr

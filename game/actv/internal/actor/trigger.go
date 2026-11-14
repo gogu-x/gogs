@@ -39,10 +39,10 @@ func (actor *Actv) startTrigger() {
 
 // onTriggerTimer 将定时到期回调投递到 Actv Actor 线程执行。
 func (actor *Actv) onTriggerTimer(_ interface{}) {
-	if actor == nil || actor.system == nil {
+	if actor == nil || actor.selfPID.ID == 0 {
 		return
 	}
-	if !actor.system.SendCallback(actor.selfPID, func(_ tree.Context, _ interface{}, _ error) {
+	if !tree.SendCallback(actor.selfPID, func(_ tree.Context, _ interface{}, _ error) {
 		actor.runTrigger()
 	}, nil, nil) {
 		tlog.Log.Error("[actv/Actv.onTriggerTimer] 活动触发回调投递失败")

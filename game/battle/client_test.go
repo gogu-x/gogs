@@ -61,9 +61,9 @@ func clientRequest(uid uint64) *pb.StartBattleReq {
 	return &pb.StartBattleReq{UID: uid, BattleType: pb.BattleType_BATTLE_TYPE_TEST, AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
 }
 
-func requestState(t *testing.T, tr *tree.Tree, pid tree.PID, uid uint64) State {
+func requestState(t *testing.T, pid tree.PID, uid uint64) State {
 	t.Helper()
-	value, err := tr.Request(pid, &GetState{UID: uid}).AwaitTimeout(time.Second)
+	value, err := tree.Request(pid, &GetState{UID: uid}).AwaitTimeout(time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,14 +72,13 @@ func requestState(t *testing.T, tr *tree.Tree, pid tree.PID, uid uint64) State {
 
 func TestSendFailureReturnsIdle(t *testing.T) {
 	sender := &fakeSender{startErr: errors.New("publish failed")}
-	tr := tree.NewTree()
-	pid := tr.SpawnOne(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4))
-	t.Cleanup(tr.Shutdown)
-	openBattleClient(t, tr, pid)
-	if _, err := tr.Request(pid, &Begin{Request: clientRequest(7)}).AwaitTimeout(time.Second); err == nil {
+	pid := tree.SpawnOne(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4))
+	t.Cleanup(func() { tree.Stop(pid) })
+	openBattleClient(t, pid)
+	if _, err := tree.Request(pid, &Begin{Request: clientRequest(7)}).AwaitTimeout(time.Second); err == nil {
 		t.Fatal("expected publish error")
 	}
-	if got := requestState(t, tr, pid, 7).Status; got != Idle {
+	if got := requestState(t, pid, 7).Status; got != Idle {
 		t.Fatalf("state = %s, want Idle", got)
 	}
 	if starts, _ := sender.counts(); starts != 1 {
@@ -90,29 +89,28 @@ func TestSendFailureReturnsIdle(t *testing.T) {
 func TestCreateUnknownDedupAndIdempotentResult(t *testing.T) {
 	sender := &fakeSender{}
 	gate := &gateCapture{messages: make(chan *ipb.PushToMsg, 8)}
-	tr := tree.NewTree()
-	pids := tr.Spawn(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4), gate)
+	pids := []tree.PID{tree.SpawnOne(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4)), tree.SpawnOne(gate)}
 	clientPID := pids[0]
-	t.Cleanup(tr.Shutdown)
-	openBattleClient(t, tr, clientPID)
+	t.Cleanup(func() { tree.Stop(pids[1]); tree.Stop(pids[0]) })
+	openBattleClient(t, clientPID)
 	request := clientRequest(7)
-	value, err := tr.Request(clientPID, &Begin{Request: request}).AwaitTimeout(time.Second)
+	value, err := tree.Request(clientPID, &Begin{Request: request}).AwaitTimeout(time.Second)
 	if err != nil || value.(State).Status != CreateUnknown {
 		t.Fatalf("begin = %#v, %v", value, err)
 	}
-	if _, err := tr.Request(clientPID, &Begin{Request: request}).AwaitTimeout(time.Second); err == nil {
+	if _, err := tree.Request(clientPID, &Begin{Request: request}).AwaitTimeout(time.Second); err == nil {
 		t.Fatal("CreateUnknown must reject a blind resend")
 	}
 	starts, _ := sender.counts()
 	if starts != 1 {
 		t.Fatalf("starts = %d, want 1", starts)
 	}
-	tr.Send(clientPID, &pb.BattleCreatedNtf{BattleId: "b1", Uid: 7})
-	tr.Send(clientPID, &pb.BattleActionNtf{BattleId: "b1", Uid: 7, Event: &pb.BattleEvent{Sequence: 1}})
-	tr.Send(clientPID, &pb.BattleActionNtf{BattleId: "b1", Uid: 7, Event: &pb.BattleEvent{Sequence: 1}})
+	tree.Send(clientPID, &pb.BattleCreatedNtf{BattleId: "b1", Uid: 7})
+	tree.Send(clientPID, &pb.BattleActionNtf{BattleId: "b1", Uid: 7, Event: &pb.BattleEvent{Sequence: 1}})
+	tree.Send(clientPID, &pb.BattleActionNtf{BattleId: "b1", Uid: 7, Event: &pb.BattleEvent{Sequence: 1}})
 	finished := &pb.BattleFinishedNtf{BattleId: "b1", Uid: 7, Checksum: "sum"}
-	tr.Send(clientPID, finished)
-	tr.Send(clientPID, finished)
+	tree.Send(clientPID, finished)
+	tree.Send(clientPID, finished)
 	deadline := time.After(2 * time.Second)
 	pushes := 0
 	for pushes < 3 {
@@ -129,7 +127,7 @@ func TestCreateUnknownDedupAndIdempotentResult(t *testing.T) {
 		t.Fatalf("unexpected duplicate push: %T", extra.Msg)
 	default:
 	}
-	state := requestState(t, tr, clientPID, 7)
+	state := requestState(t, clientPID, 7)
 	if state.Status != Finished || state.BattleID != "b1" || state.LastSequence != 1 {
 		t.Fatalf("state = %+v", state)
 	}
@@ -140,12 +138,12 @@ func TestCreateUnknownDedupAndIdempotentResult(t *testing.T) {
 }
 
 // openBattleClient 完成开服前置条件，确保测试进入真实创建逻辑。
-func openBattleClient(t *testing.T, tr *tree.Tree, pid tree.PID) {
+func openBattleClient(t *testing.T, pid tree.PID) {
 	t.Helper()
 	if tlog.Log == nil {
 		tlog.NewLog(t.TempDir(), 0)
 	}
-	if _, err := tr.Request(pid, gameevent.NewServerOpened()).AwaitTimeout(time.Second); err != nil {
+	if _, err := tree.Request(pid, gameevent.NewServerOpened()).AwaitTimeout(time.Second); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -154,24 +152,23 @@ func openBattleClient(t *testing.T, tr *tree.Tree, pid tree.PID) {
 func TestPrecomputedResultKeepsPlaybackAdmission(t *testing.T) {
 	sender := &fakeSender{}
 	gate := &gateCapture{messages: make(chan *ipb.PushToMsg, 8)}
-	tr := tree.NewTree()
-	pids := tr.Spawn(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4), gate)
+	pids := []tree.PID{tree.SpawnOne(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4)), tree.SpawnOne(gate)}
 	pid := pids[0]
-	t.Cleanup(tr.Shutdown)
-	openBattleClient(t, tr, pid)
-	if _, err := tr.Request(pid, &Begin{Request: clientRequest(7)}).AwaitTimeout(time.Second); err != nil {
+	t.Cleanup(func() { tree.Stop(pids[1]); tree.Stop(pids[0]) })
+	openBattleClient(t, pid)
+	if _, err := tree.Request(pid, &Begin{Request: clientRequest(7)}).AwaitTimeout(time.Second); err != nil {
 		t.Fatal(err)
 	}
-	tr.Send(pid, &pb.BattleCreatedNtf{BattleId: "fast", Uid: 7, TickDurationMs: 60000})
-	tr.Send(pid, &pb.BattleActionNtf{BattleId: "fast", Uid: 7, Event: &pb.BattleEvent{Sequence: 1, Tick: 10, EndTick: 20}})
-	tr.Send(pid, &pb.BattleFinishedNtf{BattleId: "fast", Uid: 7})
-	if state := requestState(t, tr, pid, 7); state.Status != Finished {
+	tree.Send(pid, &pb.BattleCreatedNtf{BattleId: "fast", Uid: 7, TickDurationMs: 60000})
+	tree.Send(pid, &pb.BattleActionNtf{BattleId: "fast", Uid: 7, Event: &pb.BattleEvent{Sequence: 1, Tick: 10, EndTick: 20}})
+	tree.Send(pid, &pb.BattleFinishedNtf{BattleId: "fast", Uid: 7})
+	if state := requestState(t, pid, 7); state.Status != Finished {
 		t.Fatalf("计算结果未立即处理: %+v", state)
 	}
-	if _, err := tr.Request(pid, &Begin{Request: clientRequest(7)}).AwaitTimeout(time.Second); !errors.Is(err, ErrInProgress) {
+	if _, err := tree.Request(pid, &Begin{Request: clientRequest(7)}).AwaitTimeout(time.Second); !errors.Is(err, ErrInProgress) {
 		t.Fatalf("提前开启下一场: %v", err)
 	}
-	if _, err := tr.Request(pid, &Reset{UID: 7}).AwaitTimeout(time.Second); !errors.Is(err, ErrInProgress) {
+	if _, err := tree.Request(pid, &Reset{UID: 7}).AwaitTimeout(time.Second); !errors.Is(err, ErrInProgress) {
 		t.Fatalf("通过重置绕过演出窗口: %v", err)
 	}
 	if starts, _ := sender.counts(); starts != 1 {

@@ -37,8 +37,8 @@ func TestRequestPoliciesBelongToBusiness(t *testing.T) {
 		t.Fatal("活动初始化失败")
 	}
 	gate := &captureGate{messages: make(chan *ipb.PushToMsg, 8)}
-	tree.SpawnOne(gate)
-	t.Cleanup(tree.Default().Shutdown)
+	pid := tree.SpawnOne(gate)
+	t.Cleanup(func() { tree.Stop(pid) })
 	svc.HandleRequest(7, 12, &pb_actv.GetProgressReq{})
 	response := receivePush(t, gate, 7).Msg
 	if !behavior.called || response == nil {

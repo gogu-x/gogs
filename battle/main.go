@@ -48,13 +48,13 @@ func main() {
 				return err
 			}
 
-			tree.Default().Spawn(
+			tree.Spawn(
 				mongorpc.NewActor(def.Mongo, db, mongorpc.WithWorkers(16)),
 				service.New(),
 				natsrpc.NewNats(natsrpc.Battle, conf.ServerID, conf.NodeId, conf.NatsURL),
 			)
 			tlog.Log.Info("battle service [%d/%d] registered at %s\n", conf.ServerID, conf.NodeId, conf.BattleAddr())
-			tree.Default().Start()
+			tree.Start()
 			return nil
 		},
 	}

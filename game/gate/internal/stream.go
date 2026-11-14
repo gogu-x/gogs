@@ -16,7 +16,6 @@ import (
 type gatewayService struct {
 	pb_gateway.UnimplementedGatewayServer
 	actorPID tree.PID
-	system   *tree.Tree
 	codec    codec.Codec
 }
 
@@ -38,7 +37,7 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 	}
 	tlog.Log.Debug("[gate/gatewayService.Stream] 收到初始网关消息, type=%T", msg)
 
-	result, err := s.system.Request(
+	result, err := tree.Request(
 		s.actorPID,
 		&openSession{stream: stream, msg: msg},
 	).AwaitTimeout(5 * time.Second)
@@ -53,7 +52,7 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 		return status.Error(codes.Internal, "")
 	}
 
-	defer s.system.Send(s.actorPID, &closeSession{
+	defer tree.Send(s.actorPID, &closeSession{
 		pid:        opened.pid,
 		uid:        opened.uid,
 		generation: opened.generation,
@@ -79,7 +78,7 @@ func (s *gatewayService) Stream(stream pb_gateway.Gateway_StreamServer) error {
 			return status.Error(codes.InvalidArgument, "")
 		}
 		tlog.Log.Debug("[gate/gatewayService.Stream] 收到网关消息, type=%T", msg)
-		if !s.system.TrySend(opened.pid, &inboundFrame{msg: msg}) {
+		if !tree.TrySend(opened.pid, &inboundFrame{msg: msg}) {
 			tlog.Log.Error("[gate/gatewayService.Stream] 网关会话队列已满, pid=%v", opened.uid)
 			return status.Error(codes.ResourceExhausted, "")
 		}

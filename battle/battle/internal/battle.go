@@ -31,7 +31,6 @@ type BattleActor struct {
 	attempts int
 	timer    *timer.TimeWheel
 	released bool
-	system   *tree.Tree
 	self     tree.PID
 }
 
@@ -43,11 +42,10 @@ func (a *BattleActor) Name() string     { return def.BattleActorName(a.p.BattleI
 func (a *BattleActor) MailboxSize() int { return battleMailboxSize }
 
 func (a *BattleActor) OnInit(ctx tree.Context) {
-	a.system = ctx.System()
 	a.self = ctx.Self()
 	a.initTimer()
 	// SpawnOne 等待初始化结束；计算放入邮箱，避免阻塞管理器创建其他战斗。
-	a.system.Send(a.self, &beginBattle{})
+	tree.Send(a.self, &beginBattle{})
 }
 
 func (a *BattleActor) OnStop(_ tree.Context) { a.stopTimer() }
@@ -242,8 +240,8 @@ func (a *BattleActor) finish(ctx tree.Context) {
 	}
 	a.released = true
 	a.stopTimer()
-	if a.system != nil && a.managerPID().ID != 0 {
-		a.system.Send(a.managerPID(), &ActorStopped{BattleID: a.p.BattleID, PID: a.self})
+	if a.managerPID().ID != 0 {
+		tree.Send(a.managerPID(), &ActorStopped{BattleID: a.p.BattleID, PID: a.self})
 	}
 	ctx.Stop()
 }

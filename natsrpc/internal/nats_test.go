@@ -99,8 +99,6 @@ func (c *routeContext) Lookup(name string) (tree.PID, bool) {
 	c.lookupName = name
 	return c.target, true
 }
-func (c *routeContext) Register(string)              {}
-func (c *routeContext) System() *tree.Tree           { return nil }
 func (c *routeContext) SetValue(string, interface{}) {}
 func (c *routeContext) GetValue(string) interface{}  { return nil }
 

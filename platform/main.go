@@ -42,7 +42,7 @@ func main() {
 				natsrpc.NewNats(natsrpc.PF, conf.ServerID, conf.NodeId, conf.NatsURL),
 			)
 
-			tree.Default().Start()
+			tree.Start()
 			return nil
 		},
 	}

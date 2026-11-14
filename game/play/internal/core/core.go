@@ -40,7 +40,6 @@ type PlayerActor struct {
 	router             tree.Router              // 玩家业务路由，处理客户端请求及业务模块注册的消息。
 	messageRouter      tree.Router              // Actor 消息入口路由，处理会话、存盘、定时器和生命周期消息。
 	wheel              *timer.TimeWheel         // 当前玩家的定时任务管理器，底层使用共享时间轮分片。
-	system             *tree.Tree               // 当前 Actor 所属的运行系统，用于投递消息和定时回调。
 	selfPID            tree.PID                 // 当前玩家 Actor 的进程标识。
 	store              *mongorpc.Store          // 玩家持久化存储入口，通过 Mongo Actor 异步加载和保存数据。
 	model              *player.PersistenceModel // 玩家持久化模型，负责数据快照及存盘后的脏标记处理。
@@ -76,7 +75,7 @@ func (actor *PlayerActor) OnInit(ctx tree.Context) {
 	actor.Event = comm.NewEvent()
 	actor.accepting = true
 	actor.gatePID, _ = ctx.Lookup(def.GameGate)
-	actor.system = ctx.System()
+
 	actor.selfPID = ctx.Self()
 	actor.registerTimers()
 	actor.scheduleIdleEviction()
@@ -615,7 +614,7 @@ func (actor *PlayerActor) stopIfSaved(ctx tree.Context, message *ipb.StopPlayerA
 
 // sendTimerMessage 将定时器结果发送回当前角色的消息队列。
 func (actor *PlayerActor) sendTimerMessage(message interface{}) {
-	if actor.system == nil || actor.selfPID.ID == 0 || !actor.system.TrySend(actor.selfPID, message) {
+	if actor.selfPID.ID == 0 || !tree.TrySend(actor.selfPID, message) {
 		tlog.Log.Error("[play/PlayerActor.sendTimerMessage] 投递玩家定时消息失败, pid=%v type=%T", actor.UID, message)
 	}
 }

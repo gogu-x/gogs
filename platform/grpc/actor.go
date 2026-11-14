@@ -72,7 +72,7 @@ type svcHandler struct {
 }
 
 func (s *svcHandler) call(msg interface{}) (interface{}, error) {
-	return tree.Default().Request(s.pid, msg).AwaitTimeout(5 * time.Second)
+	return tree.Request(s.pid, msg).AwaitTimeout(5 * time.Second)
 }
 
 func (s *svcHandler) Register(_ context.Context, req *pb_pf.RegisterReq) (*pb_pf.AuthAck, error) {

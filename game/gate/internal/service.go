@@ -65,7 +65,6 @@ type GateActor struct {
 	pendingOpen       map[uint64]*openSession
 	bannedUIDs        map[uint64]struct{}
 	nextGen           uint64
-	system            *tree.Tree
 	messageRetryWheel *timer.TimeWheel
 	messageRetryTimer *timer.WheelTimer
 	serverOpened      bool
@@ -94,7 +93,6 @@ func (g *GateActor) MailboxSize() int { return 8 * 1024 }
 
 // OnInit 注册网关消息处理方法并初始化会话目录。
 func (g *GateActor) OnInit(ctx tree.Context) {
-	g.system = ctx.System()
 	g.router.Register(&openSession{}, g.onOpenSession)
 	g.router.Register(&closeSession{}, g.onCloseSession)
 	g.router.Register(&ipb.PushToMsg{}, g.onPushToMsg)
@@ -106,7 +104,7 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 	g.router.Register(&ipb.BanUID{}, g.onBanUID)
 	g.router.Register(&ipb.UnbanUID{}, g.onUnbanUID)
 
-	g.messageRetryWheel = timer.NewTimeWheel(32, ctx.Self(), ctx.System())
+	g.messageRetryWheel = timer.NewTimeWheel(32, ctx.Self())
 	g.messageRetryWheel.Register(playerMessageRetryTimerType, func(_ interface{}) {
 		g.onPlayerMessageRetryTimer()
 	})
@@ -120,7 +118,6 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 	g.grpcServer = grpc.NewServer()
 	pb_gateway.RegisterGatewayServer(g.grpcServer, &gatewayService{
 		actorPID: ctx.Self(),
-		system:   ctx.System(),
 		codec:    codec.ProtoCodec,
 	})
 
@@ -231,7 +228,7 @@ func (g *GateActor) spawnPlayerActor(ctx tree.Context, uid uint64, messages []in
 	} else {
 		actor = play.NewPlayerActor(uid)
 	}
-	return ctx.System().SpawnOne(actor)
+	return tree.SpawnOne(actor)
 }
 
 // prependServerOpened 将开服事件放到玩家 Actor 的初始消息队列前部。
@@ -341,7 +338,7 @@ func (g *GateActor) createSession(ctx tree.Context, open *openSession) (*openedS
 		ctx.Send(previous.pid, &stopAgent{})
 	}
 	agent := newGsAgent(uid, generation, open.stream, ctx.Self(), state.pid)
-	agentPID := ctx.System().SpawnOne(agent)
+	agentPID := tree.SpawnOne(agent)
 	g.sessions[uid] = session{
 		pid:        agentPID,
 		playerPID:  state.pid,
@@ -675,8 +672,8 @@ func (g *GateActor) onPlayerMessageRetryTimer() {
 		if state == nil {
 			continue
 		}
-		if state.evicting && state.pid.ID != 0 && g.system != nil {
-			if !g.system.TrySend(state.pid, &ipb.StopPlayerActor{UID: uid}) {
+		if state.evicting && state.pid.ID != 0 {
+			if !tree.TrySend(state.pid, &ipb.StopPlayerActor{UID: uid}) {
 				tlog.Log.Error("[gate/GateActor.onPlayerMessageRetryTimer] 重试停止离线玩家 Actor 失败, pid=%v playerPID=%v", uid, state.pid)
 			}
 			continue
@@ -690,12 +687,12 @@ func (g *GateActor) onPlayerMessageRetryTimer() {
 
 // flushPending 按顺序向玩家 Actor 重发排队消息。
 func (g *GateActor) flushPending(state *playerActorState) {
-	if state == nil || state.evicting || state.pid.ID == 0 || g.system == nil {
+	if state == nil || state.evicting || state.pid.ID == 0 {
 		return
 	}
 	pending := state.TakePending()
 	for index, message := range pending {
-		if !g.system.TrySend(state.pid, message) {
+		if !tree.TrySend(state.pid, message) {
 			for _, remaining := range pending[index:] {
 				if !state.AddPending(remaining) {
 					tlog.Log.Error("[gate/GateActor.flushPending] 玩家系统消息缓存已满, playerPID=%v", state.pid)

@@ -39,11 +39,11 @@ func DeliverByOrderID(orderID string) pb_pf.ErrCode {
 	if orderID == "" {
 		return pb_pf.ErrCode_PARAM
 	}
-	pid, ok := tree.Default().Lookup(def.PF)
+	pid, ok := tree.Lookup(def.PF)
 	if !ok {
 		return pb_pf.ErrCode_INTERNAL
 	}
-	value, err := tree.Default().Request(pid, &deliverReq{orderID}).AwaitTimeout(5 * time.Second)
+	value, err := tree.Request(pid, &deliverReq{orderID}).AwaitTimeout(5 * time.Second)
 	code, valid := value.(pb_pf.ErrCode)
 	if err != nil || !valid {
 		tlog.Log.Error("DeliverByOrderID failed: order=%s err=%v response=%T", orderID, err, value)

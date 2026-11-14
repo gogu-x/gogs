@@ -26,7 +26,7 @@ type playerIdleTimeout struct {
 
 // registerTimers 创建玩家定时器，并集中注册各定时器的回调。
 func (actor *PlayerActor) registerTimers() {
-	actor.wheel = timer.NewTimeWheel(32, actor.selfPID, actor.system)
+	actor.wheel = timer.NewTimeWheel(32, actor.selfPID)
 	actor.wheel.Register(playerAutoSaveTimerType, actor.onAutoSaveTimer)
 	actor.wheel.Register(playerIdleTimerType, actor.onIdleTimer)
 }

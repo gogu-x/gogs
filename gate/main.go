@@ -46,7 +46,7 @@ func main() {
 			)
 
 			tlog.Info("[gate/main] 网关服务启动, gate=%d addr=%s", conf.GateID, conf.GateAddr())
-			tree.Default().Start()
+			tree.Start()
 			return nil
 		},
 	}

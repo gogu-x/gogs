@@ -12,7 +12,6 @@ import (
 type Server struct {
 	router   tree.Router
 	self     tree.PID
-	system   *tree.Tree
 	active   map[string]tree.PID
 	compiler *battle.ConfigCompiler
 	reports  battle.Repository
@@ -34,7 +33,7 @@ func (s *Server) Name() string     { return def.BattleService }
 func (s *Server) MailboxSize() int { return 1024 }
 
 func (s *Server) OnInit(ctx tree.Context) {
-	s.self, s.system = ctx.Self(), ctx.System()
+	s.self = ctx.Self()
 	s.initRouter()
 }
 
