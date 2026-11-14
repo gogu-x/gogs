@@ -9,7 +9,7 @@ import (
 
 var (
 	// EtcdEndpoints etcd 地址（逗号分隔的命令行参数或 JSON 数组配置）
-	EtcdEndpoints = []string{"43.160.212.55:2379"}
+	EtcdEndpoints = []string{"127.0.0.1:2379"}
 
 	// GateBasePort gate WebSocket 基础端口，实际端口 = GateBasePort + GateID
 	GateBasePort = 8000
@@ -45,7 +45,7 @@ var (
 	GrpcPortOverride = ""
 
 	// MongoURL MongoDB 连接地址
-	MongoURL = "mongodb://43.160.212.55:27017"
+	MongoURL = "mongodb://127.0.0.1:27017"
 
 	// MongoUsername MongoDB 认证用户名
 	MongoUsername = ""
@@ -54,7 +54,7 @@ var (
 	MongoPassword = ""
 
 	// NatsURL NATS 连接地址
-	NatsURL = "nats://43.160.212.55:4222"
+	NatsURL = "nats://127.0.0.1:4222"
 
 	// PlatformAddr 平台服 gRPC 监听地址
 	PlatformAddr = ":7000"
