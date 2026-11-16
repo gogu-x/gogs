@@ -44,6 +44,18 @@ func TestCompiledBattleIgnoresLaterRequestAndConfigurationMutations(t *testing.T
 		GrowthBonus: &pb_common.GrowthBonuses{MaxHpPermille: 100, AttackPermille: 250, DefensePermille: 200, SpeedPermille: 100}}
 	request := &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{role}, MonsterGroupConfigId: 1}
 	compiler := NewDefault()
+	emptyLoadout := &pb.StartBattleReq{BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{{RoleId: "new-player", RoleConfigId: 1, Level: 1, Star: 1}}, MonsterGroupConfigId: 1}
+	emptySetup, err := compiler.Compile("new-player", 1, emptyLoadout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyBattle, err := engine.NewBattle(emptySetup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := emptyBattle.Run(); err != nil {
+		t.Fatal(err)
+	}
 	setup, err := compiler.Compile("snapshot-isolation", 7, request)
 	if err != nil {
 		t.Fatal(err)

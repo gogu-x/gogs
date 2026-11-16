@@ -52,9 +52,6 @@ type Actv struct {
 // NewActv 创建可选服务器编号对应的全局活动 Actor。
 func NewActv() *Actv {
 	serverID := uint64(conf.ServerID)
-	if serverID == 0 {
-		serverID = defaultActvServerID
-	}
 	return &Actv{
 		serverID:    serverID,
 		actvService: service.NewActvService(serverID),

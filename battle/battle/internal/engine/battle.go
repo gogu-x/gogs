@@ -197,7 +197,7 @@ func (b *Battle) expireStatuses(actor *unit) {
 func (b *Battle) chooseSkill(actor *unit) SkillConfig {
 	if !b.hasStatus(actor, pb.StatusType_STATUS_TYPE_SILENCE) {
 		for _, skill := range actor.Config.ActiveSkills {
-			if actor.Cooldowns[skill.ID] == 0 {
+			if actor.Cooldowns[skill.ID] == 0 && !isSupportSkill(skill) {
 				return skill
 			}
 		}
@@ -249,15 +249,10 @@ func (b *Battle) startAction(actor *unit) {
 		targets = b.targets(actor, skill.TargetRule)
 	}
 	ids := targetIDs(targets)
-	b.emit(
-		pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED,
-		actor.Config.InstanceID, firstTarget(ids), skill.ID, "",
-		0, actor.HP, actor.HP,
-		eventInfo{}, ids,
-	)
+	action := &scheduledAction{ID: b.action, Actor: actor, Skill: skill, Targets: targets, TargetIDs: ids, StartTick: b.tick, Basic: skill.ID == actor.Config.BasicSkill.ID}
+	b.emitActionEvent(action, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED)
 	b.tickPeriodic(actor)
 
-	action := &scheduledAction{ID: b.action, Actor: actor, Skill: skill, Targets: targets, TargetIDs: ids, StartTick: b.tick, Basic: skill.ID == actor.Config.BasicSkill.ID}
 	if !actor.alive() {
 		b.emit(
 			pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED,
@@ -275,20 +270,14 @@ func (b *Battle) startAction(actor *unit) {
 		)
 		action.ImpactTick, action.EndTick = b.tick, b.tick+skill.RecoveryTicks
 	} else {
+		// 治疗与友方增益在同一次出手内独立生效，不替换攻击或推进额外回合。
+		b.triggerSupportSkills(actor)
 		// 先算出动作窗口，再随 SKILL_USED 一起下发：客户端收到这一条事件就能确定
 		// windup/impact/recovery 并立即起播，不必等待动作结束时的 ACTION_ENDED。
 		windup, recovery := actionWindow(skill.WindupTicks, skill.RecoveryTicks, b.attackInterval(actor))
 		action.ImpactTick = b.tick + windup
 		action.EndTick = action.ImpactTick + recovery
-		skillEvent := b.emit(
-			pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED,
-			actor.Config.InstanceID, firstTarget(ids), skill.ID, "",
-			0, actor.HP, actor.HP,
-			eventInfo{BasicAttack: action.Basic}, ids,
-		)
-		skillEvent.StartTick = action.StartTick
-		skillEvent.ImpactTick = action.ImpactTick
-		skillEvent.EndTick = action.EndTick
+		b.emitSkillUsed(action)
 		b.schedule(&timelineItem{Tick: action.ImpactTick, Phase: phaseImpact, Actor: actor, Action: action})
 		if skill.Cooldown > 0 && !action.Basic {
 			actor.Cooldowns[skill.ID] = skill.Cooldown
@@ -489,12 +478,7 @@ func (t effectTarget) SetStatuses(value []StatusInstance) { t.unit.Statuses = va
 
 func (b *Battle) endAction(action *scheduledAction) {
 	b.expireStatuses(action.Actor)
-	b.emit(
-		pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED,
-		action.Actor.Config.InstanceID, firstTarget(action.TargetIDs), action.Skill.ID, "",
-		0, action.Actor.HP, action.Actor.HP,
-		eventInfo{}, action.TargetIDs,
-	)
+	b.emitActionEvent(action, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED)
 	b.activeActions--
 }
 

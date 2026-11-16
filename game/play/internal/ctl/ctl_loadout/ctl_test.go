@@ -83,64 +83,107 @@ func requireStatus(t *testing.T, message proto.Message, expected pb_common.ErrCo
 	if actual != expected {
 		t.Fatalf("status = %v, want %v", actual, expected)
 	}
-	if reflected.Descriptor().Fields().ByName("error") != nil {
-		t.Fatal("response still contains a free-form error field")
-	}
 }
 
-func TestQueriesReturnExplicitSuccessAndCurrentSnapshots(t *testing.T) {
+func TestQueriesReturnCurrentSnapshots(t *testing.T) {
 	ctx, p, gate := loadoutContext(t)
 	GetSoulJade(ctx, &pb_souljade.GetRoleSoulJadeReq{RequestId: 10})
 	jade := gate.reply(t).(*pb_souljade.GetRoleSoulJadeAck)
 	requireStatus(t, jade, pb_common.ErrCode_OK)
-	if jade.GetRequestId() != 10 || jade.GetData() == nil {
+	if jade.GetRequestId() != 10 || jade.GetData() == nil || jade.GetData().GetRoleId() != "role-42" {
 		t.Fatal("missing soul jade request ID or snapshot")
 	}
 	GetTalent(ctx, &pb_talent.GetRoleTalentReq{RequestId: 11})
 	talents := gate.reply(t).(*pb_talent.GetRoleTalentAck)
 	requireStatus(t, talents, pb_common.ErrCode_OK)
 	if talents.GetRequestId() != 11 || talents.GetData() == nil || p.IsDirty() {
-		t.Fatal("query changed state or omitted metadata")
+		t.Fatal("query changed state or omitted the snapshot")
 	}
-	p.GetRoleMgr().SetCharacter(nil)
-	GetSoulJade(ctx, &pb_souljade.GetRoleSoulJadeReq{RequestId: 12})
-	requireStatus(t, gate.reply(t), pb_common.ErrCode_LOADOUT_UNAVAILABLE)
-	GetTalent(ctx, &pb_talent.GetRoleTalentReq{RequestId: 13})
-	requireStatus(t, gate.reply(t), pb_common.ErrCode_LOADOUT_UNAVAILABLE)
 }
 
-func TestUpgradeReplayReturnsStaleRevisionWithoutDoubleCharge(t *testing.T) {
+func TestNewPlayerEmptyLoadoutSnapshotsAndTalentOperation(t *testing.T) {
+	ctx, p, gate := loadoutContext(t)
+	newPlayer := player.NewPlayerData(43)
+	if newPlayer.GetSoulJadeMgr() == nil || newPlayer.GetTalentMgr() == nil || len(newPlayer.GetSoulJadeMgr().GetItems()) != 0 || len(newPlayer.GetEquipmentMgr().GetItems()) != 0 {
+		t.Fatal("new player did not receive empty loadout modules")
+	}
+	p.SoulJadeMgr = newPlayer.GetSoulJadeMgr()
+	p.TalentMgr = newPlayer.GetTalentMgr()
+	GetSoulJade(ctx, &pb_souljade.GetRoleSoulJadeReq{RequestId: 20})
+	jade := gate.reply(t).(*pb_souljade.GetRoleSoulJadeAck)
+	if jade.GetCode() != pb_common.ErrCode_OK || jade.GetData() == nil || jade.GetData().GetRoleId() != "role-42" || len(jade.GetData().GetItems()) != 0 || len(jade.GetData().GetSlots()) == 0 {
+		t.Fatalf("invalid empty soul jade snapshot: %v", jade)
+	}
+	if len(p.GetEquipmentMgr().GetItems()) != 0 {
+		t.Fatal("initialization granted equipment")
+	}
+	ChangeSoulJade(ctx, &pb_souljade.ChangeRoleSoulJadeReq{RequestId: 23, Slot: 1, InstanceId: "unowned"})
+	change := gate.reply(t).(*pb_souljade.ChangeRoleSoulJadeAck)
+	requireStatus(t, change, pb_common.ErrCode_ITEM_NOT_OWNED)
+	if change.GetData() == nil || len(change.GetData().GetItems()) != 0 {
+		t.Fatal("invalid equip did not preserve the empty snapshot")
+	}
+	GetTalent(ctx, &pb_talent.GetRoleTalentReq{RequestId: 21})
+	talents := gate.reply(t).(*pb_talent.GetRoleTalentAck)
+	if talents.GetCode() != pb_common.ErrCode_OK || talents.GetData() == nil || talents.GetData().GetRoleId() != "role-42" || len(talents.GetData().GetNodes()) == 0 {
+		t.Fatalf("invalid initial talent snapshot: %v", talents)
+	}
+	LearnTalent(ctx, &pb_talent.LearnRoleTalentReq{RequestId: 22, NodeId: 1})
+	learn := gate.reply(t).(*pb_talent.LearnRoleTalentAck)
+	requireStatus(t, learn, pb_common.ErrCode_OK)
+	if learn.GetData() == nil || learn.GetData().GetSpentPoints() == 0 {
+		t.Fatal("talent learning did not update the snapshot")
+	}
+}
+
+func TestQueriesWithoutRoleStillReturnModuleData(t *testing.T) {
+	ctx, _, gate := loadoutContext(t)
+	ctx.GetPlayer().GetRoleMgr().SetCharacter(nil)
+	GetSoulJade(ctx, &pb_souljade.GetRoleSoulJadeReq{RequestId: 12})
+	jade := gate.reply(t).(*pb_souljade.GetRoleSoulJadeAck)
+	requireStatus(t, jade, pb_common.ErrCode_OK)
+	if jade.GetData() == nil || jade.GetData().GetRoleId() != "" {
+		t.Fatal("soul jade query depends on the role")
+	}
+	GetTalent(ctx, &pb_talent.GetRoleTalentReq{RequestId: 13})
+	talents := gate.reply(t).(*pb_talent.GetRoleTalentAck)
+	requireStatus(t, talents, pb_common.ErrCode_OK)
+	if talents.GetData() == nil {
+		t.Fatal("talent query depends on the role")
+	}
+}
+
+func TestQueriesWithMissingModulesReturnEmpty(t *testing.T) {
+	ctx, p, gate := loadoutContext(t)
+	p.SoulJadeMgr = nil
+	p.TalentMgr = nil
+	GetSoulJade(ctx, &pb_souljade.GetRoleSoulJadeReq{RequestId: 310})
+	jade := gate.reply(t).(*pb_souljade.GetRoleSoulJadeAck)
+	requireStatus(t, jade, pb_common.ErrCode_OK)
+	if jade.GetRequestId() != 310 || jade.GetData() != nil {
+		t.Fatal("missing soul jade data should return an empty snapshot")
+	}
+	GetTalent(ctx, &pb_talent.GetRoleTalentReq{RequestId: 311})
+	talents := gate.reply(t).(*pb_talent.GetRoleTalentAck)
+	requireStatus(t, talents, pb_common.ErrCode_OK)
+	if talents.GetRequestId() != 311 || talents.GetData() != nil {
+		t.Fatal("missing talent data should return an empty snapshot")
+	}
+	if gate.sends != 2 || p.IsDirty() {
+		t.Fatal("queries omitted a response or changed state")
+	}
+}
+
+func TestUpgradeIgnoresRevisionAndSpendsEssence(t *testing.T) {
 	ctx, p, gate := loadoutContext(t)
 	mgr := p.GetSoulJadeMgr()
 	id := mgr.GetSlots()[1]
-	req := &pb_souljade.UpgradeRoleSoulJadeReq{RequestId: 100, ExpectedRevision: mgr.GetRevision(), InstanceId: id}
-	UpgradeSoulJade(ctx, req)
-	first := gate.reply(t).(*pb_souljade.UpgradeRoleSoulJadeAck)
-	requireStatus(t, first, pb_common.ErrCode_OK)
-	if first.GetRequestId() != 100 || !p.IsDirty() {
-		t.Fatal("successful upgrade did not echo the request or mark dirty")
-	}
-	remaining, revision := mgr.GetEssence(), mgr.GetRevision()
-	p.SetDirty(false)
-	UpgradeSoulJade(ctx, req)
-	second := gate.reply(t).(*pb_souljade.UpgradeRoleSoulJadeAck)
-	requireStatus(t, second, pb_common.ErrCode_STALE_REVISION)
-	if second.GetData() == nil || second.GetData().GetEssence() != remaining || mgr.GetRevision() != revision || p.IsDirty() {
-		t.Fatal("replayed request charged again or lost the current snapshot")
-	}
-	req.RequestId = 101
-	UpgradeSoulJade(ctx, req)
-	third := gate.reply(t).(*pb_souljade.UpgradeRoleSoulJadeAck)
-	requireStatus(t, third, pb_common.ErrCode_STALE_REVISION)
-	if third.GetData().GetRevision() != revision || mgr.GetEssence() != remaining || p.IsDirty() {
-		t.Fatal("concurrent stale request changed state")
-	}
-	req.ExpectedRevision = revision
-	req.RequestId = 0
-	UpgradeSoulJade(ctx, req)
-	requireStatus(t, gate.reply(t), pb_common.ErrCode_STALE_REVISION)
-	if mgr.GetEssence() != remaining || p.IsDirty() {
-		t.Fatal("missing request ID changed state")
+	essence := mgr.GetEssence()
+	UpgradeSoulJade(ctx, &pb_souljade.UpgradeRoleSoulJadeReq{RequestId: 100, ExpectedRevision: 999, InstanceId: id})
+	ack := gate.reply(t).(*pb_souljade.UpgradeRoleSoulJadeAck)
+	requireStatus(t, ack, pb_common.ErrCode_OK)
+	if ack.GetRequestId() != 100 || ack.GetData() == nil || !p.IsDirty() || mgr.GetEssence() >= essence {
+		t.Fatal("upgrade did not apply, echo the request or mark dirty")
 	}
 }
 
@@ -148,183 +191,109 @@ func TestUpgradeBusinessFailurePreservesStateAndReturnsPreciseCode(t *testing.T)
 	ctx, p, gate := loadoutContext(t)
 	mgr := p.GetSoulJadeMgr()
 	mgr.SetEssence(0)
-	revision := mgr.GetRevision()
 	id := mgr.GetSlots()[1]
 	level := mgr.GetItems()[id].GetLevel()
-	UpgradeSoulJade(ctx, &pb_souljade.UpgradeRoleSoulJadeReq{RequestId: 102, ExpectedRevision: revision, InstanceId: id})
+	UpgradeSoulJade(ctx, &pb_souljade.UpgradeRoleSoulJadeReq{RequestId: 102, InstanceId: id})
 	ack := gate.reply(t).(*pb_souljade.UpgradeRoleSoulJadeAck)
 	requireStatus(t, ack, pb_common.ErrCode_INSUFFICIENT_ESSENCE)
-	if ack.GetData() == nil || ack.GetData().GetRevision() != revision || mgr.GetItems()[id].GetLevel() != level || p.IsDirty() {
+	if ack.GetData() == nil || mgr.GetItems()[id].GetLevel() != level || p.IsDirty() {
 		t.Fatal("failed upgrade partially changed state or omitted the snapshot")
 	}
 }
 
-func TestRefineReplayDoesNotChargeTwice(t *testing.T) {
+func TestRefineAppliesWithoutRevision(t *testing.T) {
 	ctx, p, gate := loadoutContext(t)
 	mgr := p.GetSoulJadeMgr()
-	req := &pb_souljade.RefineRoleSoulJadeReq{RequestId: 110, ExpectedRevision: mgr.GetRevision(), InstanceId: mgr.GetSlots()[1]}
-	RefineSoulJade(ctx, req)
+	RefineSoulJade(ctx, &pb_souljade.RefineRoleSoulJadeReq{RequestId: 110, InstanceId: mgr.GetSlots()[1]})
 	requireStatus(t, gate.reply(t), pb_common.ErrCode_OK)
 	if !p.IsDirty() {
 		t.Fatal("successful reroll did not mark dirty")
-	}
-	remaining, revision := mgr.GetEssence(), mgr.GetRevision()
-	p.SetDirty(false)
-	RefineSoulJade(ctx, req)
-	ack := gate.reply(t).(*pb_souljade.RefineRoleSoulJadeAck)
-	requireStatus(t, ack, pb_common.ErrCode_STALE_REVISION)
-	if ack.GetData().GetRevision() != revision || mgr.GetEssence() != remaining || p.IsDirty() {
-		t.Fatal("replayed reroll changed state")
 	}
 }
 
 func TestEquipReturnsSpecificErrorsAndFreshSnapshot(t *testing.T) {
 	ctx, p, gate := loadoutContext(t)
 	mgr := p.GetSoulJadeMgr()
-	revision := mgr.GetRevision()
-	req := &pb_souljade.ChangeRoleSoulJadeReq{RequestId: 120, ExpectedRevision: revision, Slot: 2, InstanceId: mgr.GetSlots()[1]}
+	req := &pb_souljade.ChangeRoleSoulJadeReq{RequestId: 120, Slot: 2, InstanceId: mgr.GetSlots()[1]}
 	ChangeSoulJade(ctx, req)
 	ack := gate.reply(t).(*pb_souljade.ChangeRoleSoulJadeAck)
 	requireStatus(t, ack, pb_common.ErrCode_DUPLICATE_JADE)
-	if ack.GetData() == nil || mgr.GetRevision() != revision || p.IsDirty() {
+	if ack.GetData() == nil || p.IsDirty() {
 		t.Fatal("duplicate equipment request changed state")
 	}
 	req.InstanceId = ""
 	ChangeSoulJade(ctx, req)
-	requireStatus(t, gate.reply(t), pb_common.ErrCode_OK)
-	if !p.IsDirty() || mgr.GetSlots()[2] != "" {
-		t.Fatal("successful slot change was not persisted")
-	}
-	p.SetDirty(false)
-	ChangeSoulJade(ctx, req)
-	requireStatus(t, gate.reply(t), pb_common.ErrCode_STALE_REVISION)
-	if p.IsDirty() {
-		t.Fatal("stale slot change marked dirty")
+	ack = gate.reply(t).(*pb_souljade.ChangeRoleSoulJadeAck)
+	requireStatus(t, ack, pb_common.ErrCode_OK)
+	if !p.IsDirty() || mgr.GetSlots()[2] != "" || ack.GetData() == nil {
+		t.Fatal("successful slot change was not applied")
 	}
 }
 
-func TestTalentLearnAndResetRejectStaleRequests(t *testing.T) {
+func TestTalentLearnAndReset(t *testing.T) {
 	ctx, p, gate := loadoutContext(t)
-	mgr := p.GetTalentMgr()
-	req := &pb_talent.LearnRoleTalentReq{RequestId: 200, ExpectedRevision: mgr.GetRevision(), NodeId: 1}
-	LearnTalent(ctx, req)
+	LearnTalent(ctx, &pb_talent.LearnRoleTalentReq{RequestId: 200, NodeId: 1})
 	first := gate.reply(t).(*pb_talent.LearnRoleTalentAck)
 	requireStatus(t, first, pb_common.ErrCode_OK)
 	if first.GetData().GetAvailablePoints() != 5 || !p.IsDirty() {
 		t.Fatal("successful learning did not spend points or mark dirty")
 	}
 	p.SetDirty(false)
-	req.NodeId, req.RequestId = 2, 201
-	LearnTalent(ctx, req)
-	second := gate.reply(t).(*pb_talent.LearnRoleTalentAck)
-	requireStatus(t, second, pb_common.ErrCode_STALE_REVISION)
-	if second.GetData().GetSpentPoints() != 1 || mgr.GetLearned()[2] || p.IsDirty() {
-		t.Fatal("stale talent request changed state")
+	LearnTalent(ctx, &pb_talent.LearnRoleTalentReq{RequestId: 201, NodeId: 1})
+	requireStatus(t, gate.reply(t), pb_common.ErrCode_TALENT_ALREADY_LEARNED)
+	if p.IsDirty() {
+		t.Fatal("rejected learning marked dirty")
 	}
-	reset := &pb_talent.ResetRoleTalentReq{RequestId: 202, ExpectedRevision: mgr.GetRevision(), Branch: 0}
-	ResetTalent(ctx, reset)
+	ResetTalent(ctx, &pb_talent.ResetRoleTalentReq{RequestId: 202, Branch: 0})
 	third := gate.reply(t).(*pb_talent.ResetRoleTalentAck)
 	requireStatus(t, third, pb_common.ErrCode_OK)
 	if third.GetData().GetAvailablePoints() != 6 || third.GetData().GetBonuses().GetAttackPermille() != 0 || !p.IsDirty() {
 		t.Fatal("reset failed to refund points or persist state")
 	}
-	p.SetDirty(false)
-	ResetTalent(ctx, reset)
-	requireStatus(t, gate.reply(t), pb_common.ErrCode_STALE_REVISION)
-	if p.IsDirty() {
-		t.Fatal("replayed reset marked dirty")
-	}
 }
 
-func TestWriteGuardsReplyOnceWithoutChangingState(t *testing.T) {
+func TestWritesWithMissingModulesReturnUnavailable(t *testing.T) {
 	actions := []struct {
 		name   string
-		invoke func(*core.Context, uint64, uint64)
+		invoke func(*core.Context)
 	}{
-		{"change", func(ctx *core.Context, requestID, revision uint64) {
-			ChangeSoulJade(ctx, &pb_souljade.ChangeRoleSoulJadeReq{RequestId: requestID, ExpectedRevision: revision, Slot: 2})
+		{"change", func(ctx *core.Context) {
+			ChangeSoulJade(ctx, &pb_souljade.ChangeRoleSoulJadeReq{RequestId: 300, Slot: 2})
 		}},
-		{"upgrade", func(ctx *core.Context, requestID, revision uint64) {
-			UpgradeSoulJade(ctx, &pb_souljade.UpgradeRoleSoulJadeReq{RequestId: requestID, ExpectedRevision: revision})
+		{"upgrade", func(ctx *core.Context) {
+			UpgradeSoulJade(ctx, &pb_souljade.UpgradeRoleSoulJadeReq{RequestId: 300})
 		}},
-		{"refine", func(ctx *core.Context, requestID, revision uint64) {
-			RefineSoulJade(ctx, &pb_souljade.RefineRoleSoulJadeReq{RequestId: requestID, ExpectedRevision: revision})
+		{"refine", func(ctx *core.Context) {
+			RefineSoulJade(ctx, &pb_souljade.RefineRoleSoulJadeReq{RequestId: 300})
 		}},
-		{"learn", func(ctx *core.Context, requestID, revision uint64) {
-			LearnTalent(ctx, &pb_talent.LearnRoleTalentReq{RequestId: requestID, ExpectedRevision: revision, NodeId: 1})
+		{"learn", func(ctx *core.Context) {
+			LearnTalent(ctx, &pb_talent.LearnRoleTalentReq{RequestId: 300, NodeId: 1})
 		}},
-		{"reset", func(ctx *core.Context, requestID, revision uint64) {
-			ResetTalent(ctx, &pb_talent.ResetRoleTalentReq{RequestId: requestID, ExpectedRevision: revision, Branch: 0})
+		{"reset", func(ctx *core.Context) {
+			ResetTalent(ctx, &pb_talent.ResetRoleTalentReq{RequestId: 300, Branch: 0})
 		}},
-	}
-	conditions := []struct {
-		name      string
-		prepare   func(*player.Player)
-		requestID uint64
-		revision  uint64
-		code      pb_common.ErrCode
-	}{
-		{"missing role module", func(p *player.Player) { p.RoleMgr = nil }, 300, 1, pb_common.ErrCode_LOADOUT_UNAVAILABLE},
-		{"missing character", func(p *player.Player) { p.GetRoleMgr().SetCharacter(nil) }, 300, 1, pb_common.ErrCode_LOADOUT_UNAVAILABLE},
-		{"empty character ID", func(p *player.Player) { p.GetRoleMgr().SetCharacter(&role.Role{}) }, 300, 1, pb_common.ErrCode_LOADOUT_UNAVAILABLE},
-		{"missing growth module", func(p *player.Player) {
-			p.SoulJadeMgr = nil
-			p.TalentMgr = nil
-		}, 300, 1, pb_common.ErrCode_LOADOUT_UNAVAILABLE},
-		{"uninitialized revision", func(p *player.Player) {
-			p.GetSoulJadeMgr().SetRevision(0)
-			p.GetTalentMgr().SetRevision(0)
-		}, 300, 0, pb_common.ErrCode_LOADOUT_UNAVAILABLE},
-		{"missing request ID", func(*player.Player) {}, 0, 1, pb_common.ErrCode_STALE_REVISION},
-		{"stale revision", func(*player.Player) {}, 300, 0, pb_common.ErrCode_STALE_REVISION},
 	}
 	for _, action := range actions {
-		for _, condition := range conditions {
-			t.Run(action.name+"/"+condition.name, func(t *testing.T) {
-				ctx, p, gate := loadoutContext(t)
-				condition.prepare(p)
-				beforeJade, beforeTalent := souljade.BuildData(p), talent.BuildData(p)
-				beforeRevision := p.Revision()
-				action.invoke(ctx, condition.requestID, condition.revision)
-				ack := gate.reply(t)
-				requireStatus(t, ack, condition.code)
-				if gate.sends != 1 {
-					t.Fatalf("handler sent %d replies, want one", gate.sends)
-				}
-				reflected := ack.ProtoReflect()
-				requestField := reflected.Descriptor().Fields().ByName("request_id")
-				if reflected.Get(requestField).Uint() != condition.requestID {
-					t.Fatal("guard response did not echo the request ID")
-				}
-				dataField := reflected.Descriptor().Fields().ByName("data")
-				snapshot := reflected.Get(dataField).Message().Interface()
-				if action.name == "learn" || action.name == "reset" {
-					if !proto.Equal(snapshot, beforeTalent) {
-						t.Fatal("guard response lost the initial talent snapshot")
-					}
-				} else if !proto.Equal(snapshot, beforeJade) {
-					t.Fatal("guard response lost the initial soul jade snapshot")
-				}
-				if p.IsDirty() || p.Revision() != beforeRevision {
-					t.Fatal("rejected request marked the player dirty")
-				}
-				if !proto.Equal(beforeJade, souljade.BuildData(p)) || !proto.Equal(beforeTalent, talent.BuildData(p)) {
-					t.Fatal("rejected request changed growth state")
-				}
-			})
-		}
-	}
-}
-
-func TestQueriesWithMissingModulesReturnUnavailable(t *testing.T) {
-	ctx, p, gate := loadoutContext(t)
-	p.SoulJadeMgr = nil
-	p.TalentMgr = nil
-	GetSoulJade(ctx, &pb_souljade.GetRoleSoulJadeReq{RequestId: 310})
-	requireStatus(t, gate.reply(t), pb_common.ErrCode_LOADOUT_UNAVAILABLE)
-	GetTalent(ctx, &pb_talent.GetRoleTalentReq{RequestId: 311})
-	requireStatus(t, gate.reply(t), pb_common.ErrCode_LOADOUT_UNAVAILABLE)
-	if gate.sends != 2 || p.IsDirty() {
-		t.Fatal("queries omitted a response or changed state")
+		t.Run(action.name, func(t *testing.T) {
+			ctx, p, gate := loadoutContext(t)
+			p.SoulJadeMgr = nil
+			p.TalentMgr = nil
+			action.invoke(ctx)
+			ack := gate.reply(t)
+			requireStatus(t, ack, pb_common.ErrCode_LOADOUT_UNAVAILABLE)
+			if gate.sends != 1 {
+				t.Fatalf("handler sent %d replies, want one", gate.sends)
+			}
+			reflected := ack.ProtoReflect()
+			if reflected.Get(reflected.Descriptor().Fields().ByName("request_id")).Uint() != 300 {
+				t.Fatal("response did not echo the request ID")
+			}
+			if reflected.Has(reflected.Descriptor().Fields().ByName("data")) {
+				t.Fatal("missing module should return an empty snapshot")
+			}
+			if p.IsDirty() {
+				t.Fatal("rejected request marked the player dirty")
+			}
+		})
 	}
 }

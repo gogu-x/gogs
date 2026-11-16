@@ -1,9 +1,9 @@
 package asset
 
 import (
-	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"math"
-	"sort"
+
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 )
 
 // CheckCosts 检查全部消耗是否有效且余额充足，不修改资产。
@@ -56,6 +56,5 @@ func (m *Mgr) Message() *pb_common.AssetsNtf {
 	for id, count := range m.Assets {
 		message.Assets = append(message.Assets, &pb_common.AssetBalance{Id: id, Count: count})
 	}
-	sort.Slice(message.Assets, func(i, j int) bool { return message.Assets[i].GetId() < message.Assets[j].GetId() })
 	return message
 }

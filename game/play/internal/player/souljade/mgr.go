@@ -39,6 +39,11 @@ type Mgr struct {
 	Slots    map[int32]string `bson:"slots"`    // Slot-to-instance references.
 }
 
+// NewEmpty 创建不包含魂玉和材料的初始模块。
+func NewEmpty() *Mgr {
+	return &Mgr{Revision: 1, Items: make(map[string]*Item), Slots: make(map[int32]string)}
+}
+
 // New initializes inventory exclusively from loaded configuration.
 func New(uid uint64) *Mgr {
 	config := initConfig()

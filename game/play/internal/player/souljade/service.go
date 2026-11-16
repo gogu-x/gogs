@@ -15,77 +15,39 @@ type Player interface {
 	MarkDirty()
 }
 
-// BuildData 根据已加载的角色和模块状态组装快照。
+// BuildData 根据玩家当前魂玉数据组装快照；玩家没有魂玉数据时返回 nil。
 func BuildData(p Player) *pb_souljade.RoleSoulJadeData {
-	if p == nil {
-		return nil
-	}
-	roleMgr := p.GetRoleMgr()
-	roleID, _, _ := roleMgr.State()
+	roleID, _, _ := p.GetRoleMgr().State()
 	return View(p.GetSoulJadeMgr(), roleID)
 }
 
-// apply 校验角色与版本并执行模块变更，失败返回操作前快照。
-func apply(
-	p Player, requestID, expected uint64, operation func(*Mgr) pb_common.ErrCode,
-) (data *pb_souljade.RoleSoulJadeData, code pb_common.ErrCode) {
-	if p == nil {
-		return nil, pb_common.ErrCode_LOADOUT_UNAVAILABLE
+// apply 执行魂玉变更并返回最新快照；业务校验全部通过后才修改数据，失败时数据保持不变。
+func apply(p Player, operation func(*Mgr) pb_common.ErrCode) (*pb_souljade.RoleSoulJadeData, pb_common.ErrCode) {
+	code := operation(p.GetSoulJadeMgr())
+	if code == pb_common.ErrCode_OK {
+		p.MarkDirty()
 	}
-	mgr := p.GetSoulJadeMgr()
-	before := mgr.GetRevision()
-	defer func() {
-		tlog.Log.Info("[souljade/apply] 养成操作处理完成, request=%v, expected=%v, before=%v, after=%v, code=%v, pid=%v",
-			requestID, expected, before, mgr.GetRevision(), code, p.GetUID())
-	}()
-	data = BuildData(p)
-	roleMgr := p.GetRoleMgr()
-	roleID, _, _ := roleMgr.State()
-	if roleID == "" || mgr == nil || before == 0 {
-		return data, pb_common.ErrCode_LOADOUT_UNAVAILABLE
-	}
-	if requestID == 0 || expected != before {
-		return data, pb_common.ErrCode_STALE_REVISION
-	}
-	if code = operation(mgr); code != pb_common.ErrCode_OK {
-		return data, code
-	}
-	p.MarkDirty()
-	return BuildData(p), pb_common.ErrCode_OK
+	tlog.Log.Info("[souljade/apply] 魂玉操作处理完成, code=%v, pid=%v", code, p.GetUID())
+	return BuildData(p), code
 }
 
-// ChangeSoulJade 校验请求并执行对应的模块业务。
+// ChangeSoulJade 更换或卸下指定槽位的魂玉。
 func ChangeSoulJade(p Player, req *pb_souljade.ChangeRoleSoulJadeReq) (*pb_souljade.RoleSoulJadeData, pb_common.ErrCode) {
-	if req == nil {
-		return nil, pb_common.ErrCode_PARAM
-	}
-	return apply(
-		p, req.GetRequestId(), req.GetExpectedRevision(), func(mgr *Mgr) pb_common.ErrCode {
-			return Change(mgr, req.GetSlot(), req.GetInstanceId())
-		},
-	)
+	return apply(p, func(mgr *Mgr) pb_common.ErrCode {
+		return Change(mgr, req.GetSlot(), req.GetInstanceId())
+	})
 }
 
-// UpgradeSoulJade 校验请求并执行对应的模块业务。
+// UpgradeSoulJade 升级指定魂玉。
 func UpgradeSoulJade(p Player, req *pb_souljade.UpgradeRoleSoulJadeReq) (*pb_souljade.RoleSoulJadeData, pb_common.ErrCode) {
-	if req == nil {
-		return nil, pb_common.ErrCode_PARAM
-	}
-	return apply(
-		p, req.GetRequestId(), req.GetExpectedRevision(), func(mgr *Mgr) pb_common.ErrCode {
-			return Upgrade(mgr, req.GetInstanceId())
-		},
-	)
+	return apply(p, func(mgr *Mgr) pb_common.ErrCode {
+		return Upgrade(mgr, req.GetInstanceId())
+	})
 }
 
-// RefineSoulJade 校验请求并执行对应的模块业务。
+// RefineSoulJade 洗练指定魂玉的词条。
 func RefineSoulJade(p Player, req *pb_souljade.RefineRoleSoulJadeReq) (*pb_souljade.RoleSoulJadeData, pb_common.ErrCode) {
-	if req == nil {
-		return nil, pb_common.ErrCode_PARAM
-	}
-	return apply(
-		p, req.GetRequestId(), req.GetExpectedRevision(), func(mgr *Mgr) pb_common.ErrCode {
-			return Refine(mgr, req.GetInstanceId())
-		},
-	)
+	return apply(p, func(mgr *Mgr) pb_common.ErrCode {
+		return Refine(mgr, req.GetInstanceId())
+	})
 }

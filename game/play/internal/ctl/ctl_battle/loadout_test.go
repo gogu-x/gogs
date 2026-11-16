@@ -39,6 +39,31 @@ func TestBattleIgnoresClientGrowthAndUsesStoredLoadout(t *testing.T) {
 	}
 }
 
+func TestNewPlayerWithoutEquipmentOrSoulJadeCompilesBattle(t *testing.T) {
+	_ = battleLoadoutPlayer(t)
+	if err := glconf.SetPlayerInitRoleCfgForTest([]*glconf.PlayerInitRoleCfg{{
+		CfgID: 1, RoleConfigID: 1, Level: 1, Star: 1,
+		EquipmentConfigIDs: []int32{77}, EquippedConfigIDs: []int32{77},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	p := player.NewPlayerData(101)
+	if len(p.GetEquipmentMgr().GetItems()) != 0 || len(p.GetSoulJadeMgr().GetItems()) != 0 {
+		t.Fatal("new player received equipment or soul jade")
+	}
+	request, code := buildBattleRequest(p, &pb.StartBattleReq{})
+	if code != pb_common.ErrCode_OK {
+		t.Fatal(code)
+	}
+	roles := request.GetAttackerRoles()
+	if len(roles) != 1 || roles[0].GetRoleConfigId() != 1 || len(roles[0].GetEquips()) != 0 || len(roles[0].GetSoulJadeEffectAffixIds()) != 0 {
+		t.Fatalf("unexpected starting role: %v", roles)
+	}
+	if _, err := battleengine.NewDefaultConfigCompiler().Compile("new-player", 1, request); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func battleLoadoutPlayer(t *testing.T) *player.Player {
 	t.Helper()
 	loadouttest.Load(t)

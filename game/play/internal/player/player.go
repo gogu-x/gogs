@@ -3,6 +3,8 @@
 package player
 
 import (
+	"fmt"
+
 	"github.com/gogu-x/gogs/game/play/internal/player/asset"
 	"github.com/gogu-x/gogs/game/play/internal/player/bag"
 	"github.com/gogu-x/gogs/game/play/internal/player/cardgroup"
@@ -12,6 +14,8 @@ import (
 	"github.com/gogu-x/gogs/game/play/internal/player/souljade"
 	"github.com/gogu-x/gogs/game/play/internal/player/talent"
 	"github.com/gogu-x/gogs/game/play/internal/player/tower"
+	"github.com/gogu-x/gogs/glconf"
+	"github.com/gogu-x/tree/tlog"
 )
 
 // Player 保存玩家持久化数据和运行期各模块数据。
@@ -37,7 +41,7 @@ type Player struct {
 	revision uint64 // 内存版本号，不写入玩家文档。
 }
 
-// NewPlayerData 创建空的玩家数据，不自动发放角色、装备或养成内容。
+// NewPlayerData 创建玩家数据，不自动发放装备或养成内容。
 func NewPlayerData(uid uint64) *Player {
 	player := &Player{
 		UID:          uid,
@@ -46,8 +50,19 @@ func NewPlayerData(uid uint64) *Player {
 		CardGroupMgr: cardgroup.New(),
 		RoleMgr:      role.New(),
 		EquipmentMgr: equipment.New(),
+		SoulJadeMgr:  souljade.NewEmpty(),
+		TalentMgr:    talent.New(),
 		ShopMgr:      &shop.Mgr{},
 		TowerMgr:     tower.NewTowerMgr(),
+	}
+	if config := glconf.GetPlayerInitRoleCfgNoErr(1); config != nil && config.GetRoleConfigID() > 0 && config.GetLevel() > 0 && glconf.GetBattleRoleCfgNoErr(config.GetRoleConfigID()) != nil {
+		player.GetRoleMgr().SetCharacter(&role.Role{
+			ID: fmt.Sprintf("%d-role", uid), ConfigID: config.GetRoleConfigID(),
+			Level: config.GetLevel(), Star: config.GetStar(), Breakthrough: config.GetBreakthrough(),
+		})
+		tlog.Log.Info("[player/NewPlayerData] 创建初始角色, roleConfig=%v pid=%v", config.GetRoleConfigID(), uid)
+	} else {
+		tlog.Log.Error("[player/NewPlayerData] 初始角色配置不可用, pid=%v", uid)
 	}
 	player.MarkDirty()
 	return player
