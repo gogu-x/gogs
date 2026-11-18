@@ -83,10 +83,11 @@ func (as *ActvService) CreateDueServerActs(plans []*trigger.Plan, now int64) []*
 func (as *ActvService) EndDueActvs(now int64) {
 	for _, actv := range as.orderedActvs {
 		meta := actv.GetMeta()
-		if actv.IsEnded() || meta.GetEndTs() <= 0 || now < meta.GetEndTs() {
+		if !actv.IsDataReady() || actv.IsEnded() || meta.GetEndTs() <= 0 || now < meta.GetEndTs() {
 			continue
 		}
 		if meta.IsExpired(now) {
+			actv.closeTasks()
 			meta.State = StateEnded
 			meta.MarkDirty()
 			tlog.Log.Info("[actv/ActvService.EndDueActvs] 活动已过结算期，关闭并等待存盘清理, actv=%v", meta.GetActvID())

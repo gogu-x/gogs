@@ -1,4 +1,4 @@
-package actor
+package actv
 
 import (
 	"time"
@@ -8,20 +8,11 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/trigger"
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/tree"
-	"github.com/gogu-x/tree/timer"
 	"github.com/gogu-x/tree/tlog"
 )
 
-const (
-	// actvTriggerInterval 表示按配置触发创建活动实例的检查间隔。
-	actvTriggerInterval  = time.Minute
-	actvTriggerTimerType = timer.TimerType(1000014)
-)
-
-// registerTriggerTimer 注册触发创建定时器的回调。
-func (actor *Actv) registerTriggerTimer() {
-	actor.wheel.Register(actvTriggerTimerType, actor.onTriggerTimer)
-}
+// actvTriggerInterval 表示按配置触发创建活动实例的检查间隔。
+const actvTriggerInterval = time.Minute
 
 // startTrigger 在活动数据加载完成且收到开服事件后启动：解析配置时间规则，立即检查一次，之后每分钟检查。
 // 只启动一次；加载失败时不启动，避免在缺少已有实例的情况下重复创建。

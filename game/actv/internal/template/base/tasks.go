@@ -18,7 +18,7 @@ type TaskComp struct {
 	meta              *service.ActvMeta // 活动归属。
 	registry          *task.Registry    // 公共计数规则。
 	component         *task.Component   // 随数据生命周期持有的任务组件。
-	hub               *task.Hub         // 所属玩家的任务分发入口。
+	hub               *task.Hub         // 所属对象的任务分发入口。
 }
 
 // NewTaskComp 创建独立任务组件，类型由每个任务的Goal声明。
@@ -50,7 +50,7 @@ func (m *TaskComp) OpenTasks() {
 // Tasks 返回生命周期持有的任务组件，业务调用方不得关闭。
 func (m *TaskComp) Tasks() *task.Component { return m.component }
 
-// AttachTasks 在活动开放时挂到所属玩家Hub，重复挂载无副作用。
+// AttachTasks 在活动开放时挂到对应归属Hub，重复挂载无副作用。
 func (m *TaskComp) AttachTasks(hub *task.Hub) {
 	if hub == nil || m.component == nil || m.hub == hub {
 		return
@@ -109,10 +109,10 @@ func accumulateTask(current task.Instance, event task.Event) (int64, bool) {
 // taskPushHooks 在任务变化后统一发送当前状态，模板不参与事件转发。
 type taskPushHooks struct{ task.BaseHooks }
 
-// Changed 仅在组件已挂载时推送任务变化。
+// Changed 仅为已挂载的个人活动推送任务变化，共享活动由模板决定通知对象。
 func (taskPushHooks) Changed(owner task.Owner, _ task.Change) {
 	m, ok := owner.(*TaskComp)
-	if !ok || m.hub == nil {
+	if !ok || m.hub == nil || m.meta.GetOwnerScope() != service.ScopePlayer {
 		return
 	}
 	message := &pb_actv.ActvTasksNtf{ActvId: uint64(m.meta.GetActvID())}

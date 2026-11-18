@@ -24,7 +24,7 @@ type ActvService struct {
 	actvs         map[int64]*Actv               // 全部活动实例，键为实例编号。
 	ownerActvs    map[ownerKey][]*Actv          // 每个归属者的活动实例，保持注册顺序。
 	orderedActvs  []*Actv                       // 全部活动实例，保持全局注册顺序，供 tick、事件和存盘遍历。
-	taskHubs      map[uint64]*task.Hub          // 每个玩家独立的任务事件入口。
+	taskHubs      map[ownerKey]*task.Hub        // 按玩家、联盟、服务器归属隔离的任务事件入口。
 	loadedPlayers map[uint64]bool               // 活动数据已加载的玩家，“玩家是否已加载”的唯一数据来源。
 }
 
@@ -43,7 +43,7 @@ func NewActvService(serverID uint64) *ActvService {
 		actvs:         make(map[int64]*Actv),
 		ownerActvs:    make(map[ownerKey][]*Actv),
 		loadedPlayers: make(map[uint64]bool),
-		taskHubs:      make(map[uint64]*task.Hub),
+		taskHubs:      make(map[ownerKey]*task.Hub),
 	}
 }
 
@@ -233,6 +233,7 @@ func (as *ActvService) RemoveActvs(actvIDs []int64) {
 			ownerActvs[owner] = remaining
 		} else {
 			delete(ownerActvs, owner)
+			delete(as.taskHubs, owner)
 		}
 	}
 	as.orderedActvs = as.retainedActvs(as.orderedActvs, removed)
@@ -336,6 +337,21 @@ func (as *ActvService) ListServerActvs() []*Actv {
 	return as.ListActvs(ScopeServer, as.serverID)
 }
 
+// ListPlayerVisibleActvs 合并玩家本人、本服及所属联盟的活动，返回独立列表。
+// 联盟编号须由服务端成员关系提供，未加入或成员关系未知时传零。
+func (as *ActvService) ListPlayerVisibleActvs(uid uint64, guildID OwnerID) []*Actv {
+	if as == nil || uid == 0 || uid > uint64(1<<63-1) {
+		return nil
+	}
+	personal := as.ListActvs(ScopePlayer, OwnerID(uid))
+	server := as.ListServerActvs()
+	guild := as.ListActvs(ScopeGuild, guildID)
+	result := make([]*Actv, 0, len(personal)+len(server)+len(guild))
+	result = append(result, personal...)
+	result = append(result, server...)
+	return append(result, guild...)
+}
+
 // ListAllActvs 按全局注册顺序返回全部活动实例。返回内部只读视图，调用方不得修改。
 func (as *ActvService) ListAllActvs() []*Actv {
 	if as == nil {
@@ -370,33 +386,33 @@ func (as *ActvService) HandleEvent(event *sspb.Event) {
 	if as == nil || event == nil {
 		return
 	}
-	var actvs []*Actv
+	var owner ownerKey
 	switch event.GetEventTyp() {
 	case gameevent.TypeServerLifecycle:
-		actvs = as.ListServerActvs()
+		owner = ownerKey{scope: ScopeServer, id: as.serverID}
 	case gameevent.TypePlayerLifecycle:
 		uid := gameevent.PlayerUID(event)
 		if uid == 0 || uid > uint64(1<<63-1) || !as.IsPlayerLoaded(uid) {
 			return
 		}
-		actvs = as.ListActvs(ScopePlayer, OwnerID(uid))
+		owner = ownerKey{scope: ScopePlayer, id: OwnerID(uid)}
 	case gameevent.TypeGuild:
 		guildID := gameevent.Uint64Param(event, gameevent.ParamGuildID)
 		if guildID == 0 || guildID > uint64(1<<63-1) {
 			return
 		}
-		actvs = as.ListActvs(ScopeGuild, OwnerID(guildID))
+		owner = ownerKey{scope: ScopeGuild, id: OwnerID(guildID)}
 	default:
 		return
 	}
 	if event.GetName() == gameevent.NameTaskProgress {
 		if progress, ok := gameevent.ReadTask(event); ok {
-			as.publishTasks(gameevent.PlayerUID(event), progress, time.Now().Unix())
+			as.publishTasks(owner, progress, time.Now().Unix())
 		}
 		return
 	}
 	now := time.Now().Unix()
-	for _, actv := range actvs {
+	for _, actv := range as.ownerActvs[owner] {
 		behavior := actv.GetExt()
 		if behavior == nil || actv.IsEnded() || actv.GetMeta().IsExpired(now) {
 			continue
@@ -415,7 +431,7 @@ func (as *ActvService) StartDueActvs(now int64) {
 			continue
 		}
 		meta := actv.GetMeta()
-		if meta.IsExpired(now) || meta.Started || (meta.GetStartTs() > 0 && now < meta.GetStartTs()) {
+		if !actv.IsDataReady() || meta.IsExpired(now) || meta.Started || (meta.GetStartTs() > 0 && now < meta.GetStartTs()) || (meta.GetEndTs() > 0 && now >= meta.GetEndTs()) {
 			continue
 		}
 		actv.GetExt().OnStart()
@@ -432,7 +448,7 @@ func (as *ActvService) HandleTicker() {
 	now := time.Now().Unix()
 	for _, actv := range as.ListAllActvs() {
 		meta := actv.GetMeta()
-		if meta == nil || !meta.Started || actv.GetExt() == nil || actv.IsEnded() || meta.IsExpired(now) {
+		if meta == nil || !actv.IsDataReady() || !meta.Started || actv.GetExt() == nil || actv.IsEnded() || meta.IsExpired(now) || meta.GetStartTs() > now || (meta.GetEndTs() > 0 && now >= meta.GetEndTs()) {
 			continue
 		}
 		actv.GetExt().OnTicker()
@@ -466,3 +482,6 @@ func (actv *Actv) GetService() *ActvService { return actv.ownerService }
 
 // GetParentActvID 返回同一期父实例。
 func (meta *ActvMeta) GetParentActvID() int64 { return meta.ParentActvID }
+
+// IsDataReady 返回活动组件是否已完成数据加载。
+func (actv *Actv) IsDataReady() bool { return actv != nil && actv.dataReady }

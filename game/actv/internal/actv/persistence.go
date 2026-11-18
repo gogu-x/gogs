@@ -1,4 +1,4 @@
-package actor
+package actv
 
 import (
 	"time"
@@ -7,8 +7,6 @@ import (
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/timer"
 )
-
-const actvSaveTickerType = timer.TimerType(1000012)
 
 // actvPersistenceModel adapts actv metadata to Mongo lifecycle storage.
 type actvPersistenceModel struct {
@@ -20,7 +18,7 @@ func newActvPersistenceModel(actvService *service.ActvService) *actvPersistenceM
 }
 
 // GetCollection 保留历史集合名，代码重命名不迁移已有存档。
-func (*actvPersistenceModel) GetCollection() string { return "activity" }
+func (*actvPersistenceModel) GetCollection() string { return "actv_meta" }
 
 func (*actvPersistenceModel) GetPrototype() interface{} { return (*service.ActvMeta)(nil) }
 
@@ -79,8 +77,6 @@ func (*actvPersistenceModel) MackDirty(value interface{}) bool {
 
 func (*actvPersistenceModel) GetTickerType() timer.TimerType { return actvSaveTickerType }
 
-const actvDataSaveTickerType = timer.TimerType(1000013)
-
 // actvDataPersistenceModel 将活动组件数据适配到历史组件集合，与元数据集合分开存放。
 type actvDataPersistenceModel struct {
 	service *service.ActvService
@@ -91,7 +87,7 @@ func newActvDataPersistenceModel(actvService *service.ActvService) *actvDataPers
 }
 
 // GetCollection 保留历史组件集合名，继续读取已有玩家进度。
-func (*actvDataPersistenceModel) GetCollection() string { return "activity_data" }
+func (*actvDataPersistenceModel) GetCollection() string { return "actv_data" }
 
 func (*actvDataPersistenceModel) GetPrototype() interface{} { return (*service.ActvDataDoc)(nil) }
 

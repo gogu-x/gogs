@@ -1,4 +1,4 @@
-package actor
+package actv
 
 import (
 	"github.com/gogu-x/gogs/def"
@@ -8,8 +8,14 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// actvReplySession 提供回复目标和会话版本，供独立列表消息与业务消息共用。
+type actvReplySession interface {
+	GetUID() uint64
+	GetGeneration() uint64
+}
+
 // pushActv 仅在具体处理函数主动调用时推送，保留请求的会话版本。
-func pushActv(ctx tree.Context, message *ipb.PlayerActvMessage, response proto.Message) bool {
+func pushActv(ctx tree.Context, message actvReplySession, response proto.Message) bool {
 	uid := message.GetUID()
 	if ctx == nil || uid == 0 || response == nil || !response.ProtoReflect().IsValid() {
 		return false
@@ -20,9 +26,4 @@ func pushActv(ctx tree.Context, message *ipb.PlayerActvMessage, response proto.M
 		return false
 	}
 	return true
-}
-
-// logActvFailure 记录加载或投递失败，不替业务构造客户端消息。
-func logActvFailure(message *ipb.PlayerActvMessage, err error) {
-	tlog.Log.Error("[actv/logActvFailure] 活动请求不可用, pid=%v err=%v", message.GetUID(), err)
 }

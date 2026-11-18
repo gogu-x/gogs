@@ -4,16 +4,12 @@
 package sevenday
 
 import (
-	"time"
-
 	"github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/game/actv/internal/template/base"
-	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
-	"github.com/gogu-x/gogs/pb/cspb/pb_common"
-	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree/tlog"
+	"time"
 )
 
 const (
@@ -129,25 +125,6 @@ func (b *Behavior) pushState() {
 	b.PushToPlayer(uint64(b.Meta().GetOwnerID()), &pb_actv.SevenDayLoginNtf{Data: b.packState()})
 }
 
-// handleGetSevenDayLogin 提供可选补拉接口，所有业务校验及响应由模板决定。
-// @actv.request
-func (b *Behavior) handleGetSevenDayLogin(uid uint64, request *pb_actv.GetSevenDayLoginReq) {
-	meta := b.Meta()
-	ack := &pb_actv.GetSevenDayLoginAck{Code: pb_common.ErrCode_OK}
-	switch {
-	case uid == 0 || uint64(meta.GetOwnerID()) != uid || request.GetActvId() != uint64(meta.GetActvID()):
-		ack.Code = pb_common.ErrCode_ACTV_NOT_FOUND
-	case b.login.Blocked():
-		ack.Code = pb_common.ErrCode_ACTV_UNAVAILABLE
-	case meta.GetStartTs() > time.Now().Unix():
-		ack.Code = pb_common.ErrCode_ACTV_NOT_OPEN
-	default:
-		b.advance(time.Now(), b.online)
-		ack.Data = b.packState()
-	}
-	b.PushToPlayer(uid, ack)
-}
-
 // OnPack 返回列表信息；完成状态保留，但不结束或删除实例。
 func (b *Behavior) OnPack() *pb_actv.ActvInfo {
 	info := b.BaseBehavior.OnPack()
@@ -160,33 +137,3 @@ func (b *Behavior) OnPack() *pb_actv.ActvInfo {
 	}
 	return info
 }
-
-// handleLogin 消费玩家登录事件，直接使用事件发生时间计数。
-// @actv.event 2 "userLogin"
-func (b *Behavior) handleLogin(event *sspb.Event) {
-	if gameevent.PlayerUID(event) != uint64(b.Meta().GetOwnerID()) {
-		return
-	}
-	generation := gameevent.PlayerGeneration(event)
-	if generation == 0 || generation <= b.generation {
-		return
-	}
-	b.generation = generation
-	b.updateOnline(true, gameevent.PlayerEventTime(event))
-}
-
-// handleLogout 消费玩家离线事件，跨零点时先结算再离线。
-// @actv.event 2 "userLogout"
-func (b *Behavior) handleLogout(event *sspb.Event) {
-	if gameevent.PlayerUID(event) != uint64(b.Meta().GetOwnerID()) {
-		return
-	}
-	if generation := gameevent.PlayerGeneration(event); generation != b.generation {
-		return
-	}
-	b.updateOnline(false, gameevent.PlayerEventTime(event))
-}
-
-// handleRelease 在玩家释放前结束在线状态，不另建会话回调接口。
-// @actv.event 2 "playerReleased"
-func (b *Behavior) handleRelease(event *sspb.Event) { b.handleLogout(event) }

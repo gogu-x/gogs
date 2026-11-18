@@ -1,4 +1,4 @@
-package actor
+package actv
 
 import (
 	"errors"
@@ -31,8 +31,8 @@ func (c *directContext) Send(_ tree.PID, value interface{}) bool {
 	return true
 }
 
-func directRequest() *ipb.PlayerActvMessage {
-	return &ipb.PlayerActvMessage{UID: 7, Generation: 3, Online: true, Message: &pb_actv.GetActvListReq{}}
+func directRequest() *ipb.ActvList {
+	return &ipb.ActvList{ActvMessage: &ipb.ActvMessage{UID: 7, Generation: 3, Online: true, Message: &pb_actv.GetActvListReq{}}}
 }
 func assertDirect(t *testing.T, c *directContext, code pb_common.ErrCode) {
 	t.Helper()
@@ -50,7 +50,8 @@ func TestDirectActvLoaded(t *testing.T) {
 	a := &Actv{ready: true, actvService: service.NewActvService(1), players: make(map[uint64]*playerLoadState)}
 	a.actvService.SetPlayerLoaded(7)
 	c := &directContext{}
-	a.onPlayerActvMessage(c, directRequest())
+	a.registerHandlers()
+	a.HandleMessage(c, directRequest())
 	assertDirect(t, c, pb_common.ErrCode_OK)
 }
 
@@ -58,7 +59,7 @@ func TestDirectActvLoaded(t *testing.T) {
 func TestDirectActvPending(t *testing.T) {
 	a := &Actv{actvService: service.NewActvService(1), players: make(map[uint64]*playerLoadState)}
 	c := &directContext{}
-	a.onPlayerActvMessage(c, directRequest())
+	a.handleGetActvList(c, directRequest())
 	if len(a.pending) != 1 || c.sent != 0 {
 		t.Fatal("全局加载期间未暂存")
 	}
@@ -70,7 +71,7 @@ func TestDirectActvPending(t *testing.T) {
 	a.actvService = service.NewActvService(1)
 	state := &playerLoadState{loading: true}
 	a.players[7] = state
-	a.onPlayerActvMessage(c, directRequest())
+	a.handleGetActvList(c, directRequest())
 	if len(state.pending) != 1 || c.sent != 0 {
 		t.Fatal("玩家加载期间未暂存")
 	}
@@ -84,7 +85,7 @@ func TestDirectPendingFailure(t *testing.T) {
 	state := &playerLoadState{loading: true}
 	a.players[7] = state
 	c := &directContext{}
-	a.onPlayerActvMessage(c, directRequest())
+	a.handleGetActvList(c, directRequest())
 	a.onPlayerLoadFinished(c, 7, state, errors.New("load failed"))
 	if c.sent != 0 {
 		t.Fatal("基础设施失败不应自动发送业务消息")
@@ -92,13 +93,13 @@ func TestDirectPendingFailure(t *testing.T) {
 	state = &playerLoadState{loading: true, pending: make([]pendingActvRequest, maxPendingPlayerRequests)}
 	a.players[7] = state
 	c = &directContext{}
-	a.onPlayerActvMessage(c, directRequest())
+	a.handleGetActvList(c, directRequest())
 	if c.sent != 0 {
 		t.Fatal("基础设施失败不应自动发送业务消息")
 	}
 	a = &Actv{pending: make([]pendingActvRequest, maxPendingActvRequests)}
 	c = &directContext{}
-	a.onPlayerActvMessage(c, directRequest())
+	a.handleGetActvList(c, directRequest())
 	if c.sent != 0 {
 		t.Fatal("基础设施失败不应自动发送业务消息")
 	}
@@ -125,7 +126,7 @@ func TestBusinessControlsPush(t *testing.T) {
 	}
 	actor := &Actv{actvService: svc}
 	ctx := &directContext{}
-	message := &ipb.PlayerActvMessage{UID: 7, ActvID: 12, Generation: 3, Message: &pb_actv.GetProgressReq{ActvId: 12}}
+	message := &ipb.ActvMessage{UID: 7, ActvID: 12, Generation: 3, Message: &pb_actv.GetProgressReq{ActvId: 12}}
 	actor.handlePlayerActvMessage(ctx, message)
 	if ctx.sent != 0 {
 		t.Fatal("业务未推送却出现自动响应")

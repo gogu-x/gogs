@@ -1,4 +1,4 @@
-package actor
+package actv
 
 import (
 	"github.com/gogu-x/gogs/game/actv/internal/service"

@@ -7,7 +7,7 @@ func (b *Behavior) OnTicker() {
 	now := time.Now()
 	day, _ := dayBounds(now)
 	uid := uint64(b.Meta().GetOwnerID())
-	if d := b.players.Get(uid); d != nil && d.GetDayStart() < day {
+	if d := b.playerData(); d != nil && d.GetDayStart() < day {
 		b.refresh(uid, now, false)
 		b.push(uid)
 	}

@@ -128,8 +128,13 @@ type SaveAllGuilds struct{}
 // SaveAllActvs 请求活动 Actor 存盘所有已变更的活动数据。
 type SaveAllActvs struct{}
 
-// PlayerActvMessage 将玩家活动请求从玩家 Actor 转发到全局活动 Actor。
-type PlayerActvMessage struct {
+// ActvList 将列表查询独立路由到活动 Actor，并保留玩家会话信息。
+type ActvList struct {
+	*ActvMessage // 玩家身份、会话版本及原始请求。
+}
+
+// ActvMessage 将玩家活动请求从玩家 Actor 转发到全局活动 Actor。
+type ActvMessage struct {
 	UID        uint64      // 玩家唯一 ID。
 	ActvID     uint64      // 活动实例 ID；活动列表请求为 0。
 	Generation uint64      // 当前网关会话版本。
@@ -138,7 +143,7 @@ type PlayerActvMessage struct {
 }
 
 // GetUID 返回活动请求所属玩家的编号。
-func (message *PlayerActvMessage) GetUID() uint64 {
+func (message *ActvMessage) GetUID() uint64 {
 	if message == nil {
 		return 0
 	}
@@ -146,7 +151,7 @@ func (message *PlayerActvMessage) GetUID() uint64 {
 }
 
 // GetActvID 返回活动请求目标实例的编号。
-func (message *PlayerActvMessage) GetActvID() uint64 {
+func (message *ActvMessage) GetActvID() uint64 {
 	if message == nil {
 		return 0
 	}
@@ -154,7 +159,7 @@ func (message *PlayerActvMessage) GetActvID() uint64 {
 }
 
 // GetGeneration 返回转发活动请求时使用的网关会话版本。
-func (message *PlayerActvMessage) GetGeneration() uint64 {
+func (message *ActvMessage) GetGeneration() uint64 {
 	if message == nil {
 		return 0
 	}
@@ -162,12 +167,12 @@ func (message *PlayerActvMessage) GetGeneration() uint64 {
 }
 
 // GetOnline 返回转发活动请求时玩家是否在线。
-func (message *PlayerActvMessage) GetOnline() bool {
+func (message *ActvMessage) GetOnline() bool {
 	return message != nil && message.Online
 }
 
 // GetMessage 返回需要处理的活动业务请求。
-func (message *PlayerActvMessage) GetMessage() interface{} {
+func (message *ActvMessage) GetMessage() interface{} {
 	if message == nil {
 		return nil
 	}

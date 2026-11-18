@@ -17,15 +17,21 @@ type requestContext struct {
 	full bool
 	tree.Context
 	missing   bool
-	forwarded *ipb.PlayerActvMessage
-	reply     *ipb.PushToMsg
+	forwarded interface {
+		GetUID() uint64
+		GetActvID() uint64
+	}
+	reply *ipb.PushToMsg
 }
 
 func (c *requestContext) Lookup(name string) (tree.PID, bool) {
 	return tree.PID{ID: 1}, name == def.GameGate || (name == def.ActorActv && !c.missing)
 }
 func (c *requestContext) TrySend(_ tree.PID, message interface{}) bool {
-	c.forwarded = message.(*ipb.PlayerActvMessage)
+	c.forwarded = message.(interface {
+		GetUID() uint64
+		GetActvID() uint64
+	})
 	return !c.full
 }
 func (c *requestContext) Send(_ tree.PID, message interface{}) bool {
@@ -52,6 +58,11 @@ func TestActvResponses(t *testing.T) {
 			tc.call(ctx)
 			if fake.forwarded.GetUID() != 42 || fake.forwarded.GetActvID() != tc.actvID {
 				t.Fatal("转发身份或活动编号不符")
+			}
+			if tc.name == "list" {
+				if _, ok := fake.forwarded.(*ipb.ActvList); !ok {
+					t.Fatal("列表未使用独立消息")
+				}
 			}
 			if fake.reply != nil {
 				t.Fatal("成功投递后不应由 Player 回复")

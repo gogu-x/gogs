@@ -1,10 +1,9 @@
-package actor
+package actv
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/gogu-x/gogs/game/actv/internal/service"
 	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
@@ -20,52 +19,67 @@ const maxActvInstanceID = uint64(1<<63 - 1)
 // registerHandlers 注册全局活动 Actor 的内部消息处理器。
 func (actor *Actv) registerHandlers() {
 	tree.RegisterFunc(&actor.router, &sspb.Event{}, actor.onEvent)
-	tree.RegisterFunc(&actor.router, &ipb.PlayerActvMessage{}, actor.onPlayerActvMessage)
+	tree.RegisterFunc(&actor.router, &ipb.ActvMessage{}, actor.onPlayerActvMessage)
 	tree.RegisterFunc(&actor.router, &ipb.SaveAllActvs{}, actor.onSaveAllActvs)
+	tree.RegisterFunc(&actor.router, &ipb.ActvList{}, actor.handleGetActvList)
 }
 
 // onPlayerActvMessage 将玩家活动请求分发到实例绑定的模板行为；玩家数据未就绪时按玩家暂存。
-func (actor *Actv) onPlayerActvMessage(ctx tree.Context, message *ipb.PlayerActvMessage) {
-	if ctx == nil {
-		return
-	}
-	if !actor.ready {
-		if len(actor.pending) >= maxPendingActvRequests {
-			logActvFailure(message, fmt.Errorf("actv data is still loading"))
-			return
-		}
-		actor.pending = append(actor.pending, pendingActvRequest{message: message})
-		return
-	}
-	if actor.loadErr != nil {
-		logActvFailure(message, actor.loadErr)
+func (actor *Actv) onPlayerActvMessage(ctx tree.Context, message *ipb.ActvMessage) {
+	if ctx == nil || !actor.acceptActvRequest(message) {
 		return
 	}
 	actor.dispatchPlayerRequest(ctx, message)
 }
 
+// actvPlayerRequest 提供请求排队所需的玩家身份。
+type actvPlayerRequest interface{ GetUID() uint64 }
+
+// acceptActvRequest 在全局活动数据加载期间保留原始消息类型。
+func (actor *Actv) acceptActvRequest(message actvPlayerRequest) bool {
+	if !actor.ready {
+		if len(actor.pending) >= maxPendingActvRequests {
+			tlog.Log.Error("[actv/Actv.acceptActvRequest] 活动等待队列已满, pid=%v", message.GetUID())
+			return false
+		}
+		actor.pending = append(actor.pending, pendingActvRequest{message: message})
+		return false
+	}
+	if actor.loadErr != nil {
+		tlog.Log.Error("[actv/Actv.acceptActvRequest] 活动数据加载失败, pid=%v err=%v", message.GetUID(), actor.loadErr)
+		return false
+	}
+	return true
+}
+
 // handlePlayerActvMessage 只分发消息；列表和具体业务各自选择推送。
-func (actor *Actv) handlePlayerActvMessage(ctx tree.Context, message *ipb.PlayerActvMessage) {
+func (actor *Actv) handlePlayerActvMessage(ctx tree.Context, message *ipb.ActvMessage) {
 	uid := message.GetUID()
 	request, ok := message.GetMessage().(proto.Message)
 	if uid == 0 || !ok || request == nil || !request.ProtoReflect().IsValid() {
-		logActvFailure(message, fmt.Errorf("invalid actv request"))
+		tlog.Log.Error("[actv/Actv.handlePlayerActvMessage] 活动请求无效, pid=%v", uid)
 		return
 	}
 	if actor.actvService == nil {
-		logActvFailure(message, fmt.Errorf("actv service unavailable"))
-		return
-	}
-	if _, ok := request.(*pb_actv.GetActvListReq); ok {
-		pushActv(ctx, message, actor.actvList(uid))
+		tlog.Log.Error("[actv/Actv.handlePlayerActvMessage] 活动服务不可用, pid=%v", uid)
 		return
 	}
 	actvID := message.GetActvID()
 	if actvID > maxActvInstanceID {
-		logActvFailure(message, fmt.Errorf("invalid actv id"))
+		tlog.Log.Error("[actv/Actv.handlePlayerActvMessage] 活动编号无效, pid=%v actv=%v", uid, actvID)
 		return
 	}
 	actor.actvService.HandleRequest(uid, int64(actvID), request)
+}
+
+// handleGetActvList 处理活动列表请求并推送当前已加载的活动信息。
+func (actor *Actv) handleGetActvList(ctx tree.Context, message *ipb.ActvList) {
+	if ctx == nil || message == nil || message.GetUID() == 0 || !actor.acceptActvRequest(message) || !actor.playerRequestReady(message) {
+		return
+	}
+	uid := message.GetUID()
+	tlog.Log.Info("[actv/Actv.handleGetActvList] 获取活动列表, pid=%v", uid)
+	pushActv(ctx, message, actor.actvList(uid))
 }
 
 // onSaveAllActvs 保存所有活动实例的脏元数据。
@@ -87,10 +101,10 @@ func (actor *Actv) saveAll(ctx tree.Context) {
 	})
 }
 
-// actvList 将玩家当前已加载活动实例打包为客户端活动列表。
+// actvList 将玩家本人、本服及所属联盟的已加载活动打包为客户端列表。
 func (actor *Actv) actvList(uid uint64) *pb_actv.GetActvListAck {
 	ack := &pb_actv.GetActvListAck{Code: pb_common.ErrCode_OK}
-	actvs := actor.actvService.ListActvs(service.ScopePlayer, service.OwnerID(uid))
+	actvs := actor.actvService.ListPlayerVisibleActvs(uid, actor.playerGuildID(uid))
 	actvInfos := make([]*pb_actv.ActvInfo, 0, len(actvs))
 	for _, actv := range actvs {
 		if actv == nil {

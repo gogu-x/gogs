@@ -4,6 +4,7 @@ import (
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/ipb"
+	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/protobuf/proto"
 )
@@ -20,12 +21,16 @@ func forwardActvRequest(
 		return
 	}
 	generation := ctx.SessionGeneration()
-	message := &ipb.PlayerActvMessage{
+	message := &ipb.ActvMessage{
 		UID: uid, ActvID: actvID, Generation: generation,
 		Online: ctx.SessionActive(), Message: request,
 	}
+	var outgoing interface{} = message
+	if _, ok := request.(*pb_actv.GetActvListReq); ok {
+		outgoing = &ipb.ActvList{ActvMessage: message}
+	}
 	actvPID, ok := ctx.TreeCtx.Lookup(def.ActorActv)
-	if !ok || !ctx.TreeCtx.TrySend(actvPID, message) {
+	if !ok || !ctx.TreeCtx.TrySend(actvPID, outgoing) {
 		tlog.Log.Error("[ctl_actv/forwardActvRequest] 活动服务不可用或队列已满, pid=%v request=%T", uid, request)
 	}
 }

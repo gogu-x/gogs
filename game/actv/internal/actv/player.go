@@ -1,4 +1,4 @@
-package actor
+package actv
 
 import (
 	"fmt"
@@ -210,17 +210,28 @@ func (actor *Actv) initializePlayer(ctx tree.Context, event *sspb.Event) {
 }
 
 // dispatchPlayerRequest 只处理请求：初始化期间暂存，未初始化则拒绝，不隐式加载数据。
-func (actor *Actv) dispatchPlayerRequest(ctx tree.Context, message *ipb.PlayerActvMessage) {
-	uid := message.GetUID()
-	if actor.actvService.IsPlayerLoaded(uid) {
+func (actor *Actv) dispatchPlayerRequest(ctx tree.Context, message *ipb.ActvMessage) {
+	if actor.playerRequestReady(message) {
 		actor.handlePlayerActvMessage(ctx, message)
-		return
+	}
+}
+
+// playerRequestReady 共用玩家加载检查，排队时保留列表和业务请求各自的类型。
+func (actor *Actv) playerRequestReady(message actvPlayerRequest) bool {
+	uid := message.GetUID()
+	if actor.actvService == nil {
+		tlog.Log.Error("[actv/Actv.playerRequestReady] 活动服务不可用, pid=%v", uid)
+		return false
+	}
+	if actor.actvService.IsPlayerLoaded(uid) {
+		return true
 	}
 	if state := actor.players[uid]; state != nil && (state.loading || state.reload) {
 		state.queuePending(message)
-		return
+		return false
 	}
-	logActvFailure(message, fmt.Errorf("player actv is not initialized"))
+	tlog.Log.Error("[actv/Actv.playerRequestReady] 玩家活动尚未初始化, pid=%v", uid)
+	return false
 }
 
 // queuePending 初始化只暂存原始消息，沿用收件顺序，事件与请求各自由独立入口回放。
@@ -237,8 +248,10 @@ func (actor *Actv) replayPending(ctx tree.Context, item pendingActvRequest) {
 	switch message := item.message.(type) {
 	case *sspb.Event:
 		actor.onEvent(ctx, message)
-	case *ipb.PlayerActvMessage:
+	case *ipb.ActvMessage:
 		actor.onPlayerActvMessage(ctx, message)
+	case *ipb.ActvList:
+		actor.handleGetActvList(ctx, message)
 	}
 }
 
@@ -251,8 +264,11 @@ func logPlayerInputFailure(message interface{}, err error) {
 		)
 		return
 	}
-	request, _ := message.(*ipb.PlayerActvMessage)
-	logActvFailure(request, err)
+	request, ok := message.(actvPlayerRequest)
+	if !ok {
+		return
+	}
+	tlog.Log.Error("[actv/logPlayerInputFailure] 活动请求不可用, pid=%v err=%v", request.GetUID(), err)
 }
 
 // onPlayerOwnerReleased 存盘玩家相关的脏数据并从内存卸载。

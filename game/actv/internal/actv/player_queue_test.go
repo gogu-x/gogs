@@ -1,4 +1,4 @@
-package actor
+package actv
 
 import (
 	"github.com/gogu-x/gogs/game/actv/internal/service"
@@ -54,7 +54,7 @@ func TestUnifiedPlayerQueue(t *testing.T) {
 	login := gameevent.NewPlayer(gameevent.NameUserLogin, 7, 2)
 	login.ExtArgs[gameevent.ParamOccurredAt] = strconv.FormatInt(time.Now().Add(-time.Hour).UnixNano(), 10)
 	actor.onEvent(nil, login)
-	actor.dispatchPlayerRequest(nil, &ipb.PlayerActvMessage{UID: 7, ActvID: 100, Message: &pb_actv.GetProgressReq{}})
+	actor.dispatchPlayerRequest(nil, &ipb.ActvMessage{UID: 7, ActvID: 100, Message: &pb_actv.GetProgressReq{}})
 	actor.onEvent(nil, gameevent.NewPlayer(gameevent.NameUserLogout, 7, 2))
 	if len(state.pending) != 3 || len(observer.received) != 0 {
 		t.Fatal("加载期间没有统一暂存")
@@ -94,7 +94,7 @@ func TestStartupPlayerQueue(t *testing.T) {
 	actor := queueActor()
 	actor.ready = false
 	actor.onEvent(nil, gameevent.NewPlayer(gameevent.NameUserLogin, 7, 1))
-	actor.onPlayerActvMessage(&directContext{}, &ipb.PlayerActvMessage{UID: 7, Message: &pb_actv.GetActvListReq{}})
+	actor.onPlayerActvMessage(&directContext{}, &ipb.ActvMessage{UID: 7, Message: &pb_actv.GetActvListReq{}})
 	actor.onEvent(nil, gameevent.NewPlayer(gameevent.NameUserLogout, 7, 1))
 	state := &playerLoadState{loading: true}
 	actor.players[7] = state
@@ -103,7 +103,7 @@ func TestStartupPlayerQueue(t *testing.T) {
 	if len(state.pending) != 3 {
 		t.Fatal("启动暂存消息未进入玩家队列")
 	}
-	if _, ok := state.pending[1].message.(*ipb.PlayerActvMessage); !ok {
+	if _, ok := state.pending[1].message.(*ipb.ActvMessage); !ok {
 		t.Fatal("请求与事件顺序被打乱")
 	}
 }
@@ -112,7 +112,7 @@ func TestStartupPlayerQueue(t *testing.T) {
 func TestBusinessPathsNeverLoad(t *testing.T) {
 	actor := queueActor()
 	actor.onEvent(&directContext{}, gameevent.NewPlayer(gameevent.NameUserLogin, 7, 1))
-	actor.onPlayerActvMessage(&directContext{}, &ipb.PlayerActvMessage{UID: 7, Message: &pb_actv.GetActvListReq{}})
+	actor.onPlayerActvMessage(&directContext{}, &ipb.ActvMessage{UID: 7, Message: &pb_actv.GetActvListReq{}})
 	if len(actor.players) != 0 || actor.actvService.IsPlayerLoaded(7) {
 		t.Fatal("业务消息隐式加载了玩家")
 	}
@@ -124,7 +124,7 @@ func TestBusinessPathsNeverLoad(t *testing.T) {
 		t.Fatal("初始化事件没有安排重载")
 	}
 	actor.onEvent(&directContext{}, gameevent.NewPlayer(gameevent.NameUserLogin, 7, 2))
-	actor.onPlayerActvMessage(&directContext{}, &ipb.PlayerActvMessage{UID: 7, Message: &pb_actv.GetActvListReq{}})
+	actor.onPlayerActvMessage(&directContext{}, &ipb.ActvMessage{UID: 7, Message: &pb_actv.GetActvListReq{}})
 	if len(state.pending) != 2 {
 		t.Fatal("明确初始化后的事件与请求未暂存")
 	}

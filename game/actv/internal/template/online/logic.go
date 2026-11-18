@@ -8,8 +8,6 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/conf"
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/game/actv/internal/template/base"
-	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
-	"github.com/gogu-x/gogs/pb/sspb"
 )
 
 // Behavior 实现在线活动行为，并组合该活动实例自己的数据组件。
@@ -58,21 +56,4 @@ func (b *Behavior) Settle(uid uint64) {
 	}
 	p.Settled = true
 	b.member.MarkDirty(uid)
-}
-
-// handleGetProgress 处理在线活动进度查询请求。
-// @actv.request
-func (b *Behavior) handleGetProgress(uid uint64, request *pb_actv.GetProgressReq) {
-	// 业务实现后自行构造响应并调用 PushToPlayer。
-}
-
-// handleClaimReward 处理在线活动领奖请求。
-// @actv.request
-func (b *Behavior) handleClaimReward(uid uint64, request *pb_actv.ClaimRewardReq) {
-	// 业务实现后自行构造响应并调用 PushToPlayer。
-}
-
-// handleUserLogin 处理玩家上线事件。
-// @actv.event 1 "onUserLogin"
-func (b *Behavior) handleUserLogin(event *sspb.Event) {
 }

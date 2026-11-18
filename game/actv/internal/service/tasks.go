@@ -25,19 +25,19 @@ func (as *ActvService) Loaded(actv *Actv) {
 	as.attachTasks(actv, time.Now().Unix())
 }
 
-// attachTasks 只为已加载且当前开放的个人活动挂载任务组件。
+// attachTasks 为已加载且当前开放的活动按归属挂载任务组件。
 func (as *ActvService) attachTasks(actv *Actv, now int64) {
 	meta := actv.GetMeta()
-	uid := uint64(meta.GetOwnerID())
-	if !actv.dataReady || meta.GetOwnerScope() != ScopePlayer || !as.IsPlayerLoaded(uid) || actv.IsEnded() || meta.GetStartTs() > now || (meta.GetEndTs() > 0 && meta.GetEndTs() <= now) {
+	owner := actv.ownerKey()
+	if !actv.dataReady || !as.taskOwnerReady(owner) || actv.IsEnded() || meta.GetStartTs() > now || (meta.GetEndTs() > 0 && meta.GetEndTs() <= now) {
 		return
 	}
 	for _, comp := range actv.comps {
 		if tasks, ok := comp.(taskLifecycle); ok {
-			hub := as.taskHubs[uid]
+			hub := as.taskHubs[owner]
 			if hub == nil {
 				hub = &task.Hub{}
-				as.taskHubs[uid] = hub
+				as.taskHubs[owner] = hub
 			}
 			tasks.AttachTasks(hub)
 		}
@@ -53,32 +53,29 @@ func (actv *Actv) closeTasks() {
 	}
 }
 
-// publishTasks 先推进该玩家活动的时间边界，然后由Hub统一分发一次事件。
-func (as *ActvService) publishTasks(uid uint64, progress task.Event, now int64) {
-	if !as.IsPlayerLoaded(uid) {
+// publishTasks 只通过对应归属Hub分发事件，活动时间边界由生命周期定时器推进。
+func (as *ActvService) publishTasks(owner ownerKey, progress task.Event, now int64) {
+	if !as.taskOwnerReady(owner) {
 		return
 	}
-	for _, actv := range as.ListActvs(ScopePlayer, OwnerID(uid)) {
-		meta := actv.GetMeta()
-		if !actv.dataReady || actv.IsEnded() {
-			continue
-		}
-		if meta.GetEndTs() > 0 && meta.GetEndTs() <= now {
-			as.EndActv(meta.GetActvID())
-			continue
-		}
-		if meta.GetStartTs() > now {
-			continue
-		}
-		if !meta.Started {
-			actv.GetExt().OnStart()
-			meta.Started = true
-			meta.MarkDirty()
-			as.attachTasks(actv, now)
-		}
-		actv.GetExt().OnTicker()
-	}
-	if hub := as.taskHubs[uid]; hub != nil {
+	if hub := as.taskHubs[owner]; hub != nil {
 		hub.Publish(progress, now)
+	}
+}
+
+// taskOwnerReady 校验归属，只有玩家归属需要等待玩家加载。
+func (as *ActvService) taskOwnerReady(owner ownerKey) bool {
+	if owner.id <= 0 {
+		return false
+	}
+	switch owner.scope {
+	case ScopePlayer:
+		return as.IsPlayerLoaded(uint64(owner.id))
+	case ScopeGuild:
+		return true
+	case ScopeServer:
+		return owner.id == as.serverID
+	default:
+		return false
 	}
 }
