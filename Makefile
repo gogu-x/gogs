@@ -1,6 +1,6 @@
 include config.mk
 
-SHELL := cmd.exe
+#SHELL := cmd.exe
 
 proto:
 	$(PYTHON) $(GEN_PROTO) $(PROTO_PATH) $(GO_OUT) $(MODULE)
