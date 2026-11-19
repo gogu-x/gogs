@@ -1,8 +1,6 @@
 package service
 
 import (
-	"time"
-
 	"github.com/gogu-x/tree/comm"
 
 	actvconf "github.com/gogu-x/gogs/game/actv/internal/conf"
@@ -407,11 +405,11 @@ func (as *ActvService) HandleEvent(event *sspb.Event) {
 	}
 	if event.GetName() == gameevent.NameTaskProgress {
 		if progress, ok := gameevent.ReadTask(event); ok {
-			as.publishTasks(owner, progress, time.Now().Unix())
+			as.publishTasks(owner, progress, comm.NowUnix())
 		}
 		return
 	}
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	for _, actv := range as.ownerActvs[owner] {
 		behavior := actv.GetExt()
 		if behavior == nil || actv.IsEnded() || actv.GetMeta().IsExpired(now) {
@@ -445,7 +443,7 @@ func (as *ActvService) StartDueActvs(now int64) {
 
 // HandleTicker 将生命周期定时回调分发给已启动的活动模板。
 func (as *ActvService) HandleTicker() {
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	for _, actv := range as.ListAllActvs() {
 		meta := actv.GetMeta()
 		if meta == nil || !actv.IsDataReady() || !meta.Started || actv.GetExt() == nil || actv.IsEnded() || meta.IsExpired(now) || meta.GetStartTs() > now || (meta.GetEndTs() > 0 && now >= meta.GetEndTs()) {

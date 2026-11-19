@@ -9,6 +9,7 @@ import (
 	templates "github.com/gogu-x/gogs/game/actv/internal/template"
 	"github.com/gogu-x/gogs/game/actv/internal/trigger"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/db/mongorpc"
 	"github.com/gogu-x/tree/timer"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -83,7 +84,7 @@ func (actor *Actv) OnInit(ctx tree.Context) {
 	actor.ensureIndexes(ctx)
 	if !actor.lifecycle.LoadAll(ctx, (*service.ActvMeta)(nil), retainedActvFilter(bson.M{
 		"owner_scope": bson.M{"$in": bson.A{int32(service.ScopeServer), int32(service.ScopeGuild)}},
-	}, time.Now().Unix()), actor.onActvsLoaded) {
+	}, comm.NowUnix()), actor.onActvsLoaded) {
 		actor.failLoad(ctx, nil)
 		return
 	}

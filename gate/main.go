@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strconv"
 
 	"github.com/gogu-x/gogs/conf"
 	"github.com/gogu-x/gogs/gate/ws"
@@ -34,10 +35,14 @@ func main() {
 				return err
 			}
 			defer stopDiagnostics()
-			if err := cluster.Init(conf.EtcdEndpoints); err != nil {
-				tlog.Log.Error("cluster init: %v", err)
+
+			if err := cluster.Init(ctx, conf.EtcdEndpoints); err != nil {
+				return err
 			}
 			defer cluster.Close()
+			if err := cluster.StartWithTimeOffset(strconv.Itoa(conf.ServerID)); err != nil {
+				return err
+			}
 
 			tree.Spawn(
 				ws.New(conf.GateAddr(), int64(conf.GateID)),

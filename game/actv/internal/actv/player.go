@@ -2,13 +2,13 @@ package actv
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -83,7 +83,7 @@ func (actor *Actv) startPlayerLoad(ctx tree.Context, uid uint64, state *playerLo
 
 // loadPlayerComponents 只读取有效个人活动及相关共享活动中的玩家条目，避免加载过期历史数据。
 func (actor *Actv) loadPlayerComponents(ctx tree.Context, uid uint64, state *playerLoadState) {
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	actvIDs := actor.actvService.SharedActvIDs(actor.playerGuildID(uid), now)
 	for index := range *state.metas {
 		meta := &(*state.metas)[index]

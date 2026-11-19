@@ -1,14 +1,15 @@
 package shop
 
-import "time"
+import "github.com/gogu-x/tree/comm"
 
 // OnTicker 每日重置购买次数。
 func (b *Shop) OnTicker() {
 	uid := uint64(b.Meta().GetOwnerID())
 	d := b.playerData()
-	day, _ := period(time.Now())
+	now := comm.Now()
+	day, _ := comm.DayBounds(now)
 	if d != nil && day > d.GetDayStart() {
-		b.refresh(uid, time.Now())
+		b.refresh(uid, now)
 		b.push(uid)
 	}
 }

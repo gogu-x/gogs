@@ -8,6 +8,7 @@ import (
 	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/codec"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 )
 
@@ -72,7 +73,7 @@ func newGsAgent(
 		stream:      stream,
 		manager:     manager,
 		playerPID:   playerPID,
-		windowStart: time.Now(),
+		windowStart: comm.RealNow(),
 	}
 }
 
@@ -169,7 +170,7 @@ func (g *GsAgent) onOutbound(ctx tree.Context, msg interface{}) {
 
 // allowFrame 检查当前会话是否超过每秒入站帧数限制。
 func (g *GsAgent) allowFrame() bool {
-	now := time.Now()
+	now := comm.RealNow()
 	if now.Sub(g.windowStart) >= time.Second {
 		g.windowStart = now
 		g.frameCount = 0

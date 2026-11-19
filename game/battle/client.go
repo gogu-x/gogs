@@ -3,7 +3,6 @@ package battle
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/gogu-x/gogs/def"
 	gameevent "github.com/gogu-x/gogs/game/event"
@@ -13,6 +12,7 @@ import (
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/cluster"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/protobuf/proto"
 )
@@ -168,7 +168,7 @@ func (c *Client) begin(ctx tree.Context, msg *Begin) {
 	request := proto.Clone(msg.Request).(*pb.StartBattleReq)
 	uid := request.GetUID()
 	r := c.state(uid)
-	if r.playback.pending(time.Now()) {
+	if r.playback.pending(comm.RealNow()) {
 		ctx.Response(r.State, ErrInProgress)
 		return
 	}
@@ -232,7 +232,7 @@ func (c *Client) action(ctx tree.Context, msg *pb.BattleActionNtf) {
 		return
 	}
 	r.seen[sequence] = struct{}{}
-	r.playback.observe(msg.GetEvent(), time.Now())
+	r.playback.observe(msg.GetEvent(), comm.RealNow())
 	if sequence > r.LastSequence {
 		r.LastSequence = sequence
 	}
@@ -299,7 +299,7 @@ func (c *Client) reset(ctx tree.Context, msg *Reset) {
 		return
 	}
 	r := c.state(msg.UID)
-	if r.playback.pending(time.Now()) {
+	if r.playback.pending(comm.RealNow()) {
 		ctx.Response(r.State, ErrInProgress)
 		return
 	}

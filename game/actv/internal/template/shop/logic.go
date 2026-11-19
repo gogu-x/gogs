@@ -7,6 +7,7 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/template/base"
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 	"sort"
 	"time"
@@ -39,12 +40,6 @@ func (b *Shop) OnInit() {
 	}
 }
 
-// period 返回当地零点和下一日零点。
-func period(now time.Time) (int64, int64) {
-	d := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return d.Unix(), d.AddDate(0, 0, 1).Unix()
-}
-
 // refresh 仅重置每日限购，不影响当期累计限购。
 func (b *Shop) refresh(uid uint64, now time.Time) {
 	d := b.playerData()
@@ -52,7 +47,7 @@ func (b *Shop) refresh(uid uint64, now time.Time) {
 		return
 	}
 	d.Init()
-	day, _ := period(now)
+	day, _ := comm.DayBounds(now)
 	if day <= d.GetDayStart() {
 		return
 	}
@@ -71,7 +66,7 @@ func (b *Shop) state(uid uint64) *pb_actv.ActvShopState {
 	if d == nil {
 		return nil
 	}
-	_, next := period(time.Now())
+	_, next := comm.DayBounds(comm.Now())
 	s := &pb_actv.ActvShopState{ActvId: uint64(b.Meta().GetActvID()), NextSequence: d.GetSequence() + 1, NextResetTime: next, Pending: b.buying}
 	for id := range b.goods {
 		s.Goods = append(s.Goods, &pb_actv.ActvGoodsState{GoodsId: id, Bought: d.GetBought()[id]})

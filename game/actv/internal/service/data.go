@@ -2,8 +2,8 @@ package service
 
 import (
 	"fmt"
-	"time"
 
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 )
 
@@ -181,7 +181,7 @@ func (as *ActvService) SetPlayerLoaded(uid uint64) {
 // canCreatePlayerEntry 返回活动的玩家列表组件能否为玩家新建条目：玩家已加载且活动未结束。
 func (as *ActvService) canCreatePlayerEntry(actv *Actv) func(uid uint64) bool {
 	return func(uid uint64) bool {
-		return as.loadedPlayers[uid] && !actv.IsEnded() && !actv.GetMeta().IsExpired(time.Now().Unix())
+		return as.loadedPlayers[uid] && !actv.IsEnded() && !actv.GetMeta().IsExpired(comm.NowUnix())
 	}
 }
 
@@ -191,7 +191,7 @@ func (as *ActvService) IsPlayerLoaded(uid uint64) bool { return as.loadedPlayers
 // NotifyPlayerLoaded 通知玩家相关的进行中共享活动（本服活动 + 所属联盟活动）：该玩家的组件数据已恢复。
 // 玩家独有活动通过 OnLoaded 获知数据恢复，不重复通知。
 func (as *ActvService) NotifyPlayerLoaded(uid uint64, guildID OwnerID) {
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	as.rangePlayerShared(guildID, func(actv *Actv) {
 		if !actv.IsEnded() && !actv.GetMeta().IsExpired(now) {
 			actv.GetExt().OnPlayerLoaded(uid)
@@ -202,7 +202,7 @@ func (as *ActvService) NotifyPlayerLoaded(uid uint64, guildID OwnerID) {
 // NotifyPlayerUnload 通知玩家相关的进行中共享活动：该玩家即将卸载。
 // 调用发生在取存盘快照之前，模板在钩子中的修改会随释放一起存盘。
 func (as *ActvService) NotifyPlayerUnload(uid uint64, guildID OwnerID) {
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	as.rangePlayerShared(guildID, func(actv *Actv) {
 		if !actv.IsEnded() && !actv.GetMeta().IsExpired(now) {
 			actv.GetExt().OnPlayerUnload(uid)
@@ -256,7 +256,7 @@ func (as *ActvService) UnloadPlayer(uid uint64, guildID OwnerID) {
 // guildID 为玩家所属联盟：玩家列表条目只挂入与该玩家相关的共享活动，其他联盟活动的条目跳过，
 // 保证释放时按同一索引能完整卸载。启动加载不含玩家条目，传 0 即可。
 func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc, guildID OwnerID) {
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	for index := range docs {
 		doc := &docs[index]
 		actv := as.GetActvByID(doc.ActvID)
@@ -286,7 +286,7 @@ func (as *ActvService) ApplyDataDocs(docs []ActvDataDoc, guildID OwnerID) {
 func (as *ActvService) SettleEndedPlayer(uid uint64, guildID OwnerID) ([]*ActvDataDoc, []int64) {
 	var docs []*ActvDataDoc
 	var settled []int64
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	as.rangePlayerShared(guildID, func(actv *Actv) {
 		if !actv.IsEnded() || actv.GetMeta().IsExpired(now) || len(actv.playerComps) == 0 {
 			return

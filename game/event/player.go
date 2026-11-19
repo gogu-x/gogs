@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/pb/sspb"
+	"github.com/gogu-x/tree/comm"
 )
 
 const (
@@ -23,7 +24,7 @@ func NewPlayer(name string, uid uint64, generation uint64) *sspb.Event {
 	return &sspb.Event{Name: name, EventTyp: TypePlayerLifecycle, ExtArgs: map[string]string{
 		ParamUID:        strconv.FormatUint(uid, 10),
 		ParamGeneration: strconv.FormatUint(generation, 10),
-		ParamOccurredAt: strconv.FormatInt(time.Now().UnixNano(), 10),
+		ParamOccurredAt: strconv.FormatInt(comm.NowUnixNano(), 10),
 	}}
 }
 
@@ -47,7 +48,7 @@ func PlayerEventTime(message *sspb.Event) time.Time {
 	if at, err := strconv.ParseInt(message.GetExtArgs()[ParamOccurredAt], 10, 64); err == nil && at > 0 {
 		return time.Unix(0, at).In(time.Local)
 	}
-	return time.Now()
+	return comm.Now()
 }
 
 // IsPlayerInitialized 判断是否为明确的玩家活动初始化事件。

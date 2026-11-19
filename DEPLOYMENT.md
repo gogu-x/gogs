@@ -45,6 +45,18 @@ go build -trimpath -ldflags='-s -w' -o ..\deploy\bin\platform ./platform
    docker compose --env-file .env logs --tail=100 gate game-1 battle-1 platform
    ```
 
+## 区服游戏时间
+
+Game、Battle 和 Gate 按各自的 `--server-id` 读取 etcd 中的 `/time/{serverID}`，区服 ID 默认为 `1`。偏移量是相对系统时间的有符号十进制秒数。以区服 `101` 为例，`86400` 快进一天，`-3600` 回拨一小时。删除键或写入 `0` 时恢复系统时间。
+
+三个服务启动时先加载偏移，运行中监听变更，无需重启。初始读取失败或偏移无效时退出启动流程，运行时遇到无效值会保留上次有效偏移。活动、每日刷新和玩家事件使用游戏时间。限流、存盘间隔和战斗演出等待使用实际经过时间。
+
+本地联调使用同级 `tree` 仓库。单仓构建和镜像发布须使用包含该功能的 `tree` 版本。
+
+## 服务注册
+
+Game 和 Battle 分别注册到 `/services/Game/{serverID}/{nodeID}` 和 `/services/Battle/{serverID}/{nodeID}`。Gate 通过 Game 的注册记录查找节点地址。
+
 ## 镜像交付到另一台服务器
 
 没有镜像仓库时，在构建机执行：

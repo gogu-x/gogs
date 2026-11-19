@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/glconf"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 )
 
@@ -126,7 +127,8 @@ func NewPlan(cfg *glconf.ActvOnlineCfg, openTs int64, loc *time.Location) (*Plan
 		if err != nil {
 			return nil, fmt.Errorf("config %d trigger_val offset: %w", cfg.GetID(), err)
 		}
-		plan.FirstStartTs = dayStart(openTs, loc) + offset
+		start, _ := comm.DayBounds(time.Unix(openTs, 0).In(loc))
+		plan.FirstStartTs = start + offset
 	default:
 		return nil, fmt.Errorf("config %d trigger type %d: %w", cfg.GetID(), plan.TriggerType, ErrUnsupported)
 	}
@@ -281,10 +283,4 @@ func ParseDuration(value string) (int64, error) {
 		return 0, fmt.Errorf("invalid duration %q", value)
 	}
 	return number * seconds, nil
-}
-
-// dayStart 返回 ts 所在自然日 0 点。
-func dayStart(ts int64, loc *time.Location) int64 {
-	t := time.Unix(ts, 0).In(loc)
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc).Unix()
 }

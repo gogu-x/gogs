@@ -3,7 +3,6 @@ package internal
 import (
 	"fmt"
 	"net"
-	"os"
 	"time"
 
 	"github.com/gogu-x/gogs/conf"
@@ -15,7 +14,6 @@ import (
 	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
-	"github.com/gogu-x/tree/cluster"
 	"github.com/gogu-x/tree/codec"
 	"github.com/gogu-x/tree/timer"
 	"github.com/gogu-x/tree/tlog"
@@ -127,16 +125,6 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 			tlog.Log.Error("[gate/GateActor.OnInit] gRPC 网关已停止, err=%v", err)
 		}
 	}()
-
-	if err := cluster.Register(
-		fmt.Sprintf("%d", conf.ServerID),
-		fmt.Sprintf("%d", os.Getpid()),
-		conf.GameAddr(),
-	); err != nil {
-		tlog.Log.Error("[gate/GateActor.OnInit] 网关集群注册失败, server=%v err=%v", conf.ServerID, err)
-	} else {
-		tlog.Log.Info("[gate/GateActor.OnInit] 网关已注册到集群, server=%v addr=%v", conf.ServerID, conf.GameAddr())
-	}
 }
 
 // HandleMessage 将网关消息分发给已注册的处理方法。

@@ -6,10 +6,10 @@ import (
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/task"
 	"github.com/gogu-x/tree/tlog"
 	"math/big"
-	"time"
 )
 
 // handleGet 查询也使用已加载组件，未加载时返回不可用。
@@ -57,7 +57,7 @@ func (b *Behavior) handleClaim(uid uint64, request *pb_actv.ClaimActvTaskReq) {
 	}
 	day, taskID := d.GetDayStart(), request.GetTaskId()
 	rs := cfg.rewards[group]
-	result := c.Claim(uint64(request.GetTaskId()), time.Now().Unix(), func(_ task.Owner, _ task.Instance) bool { return b.grant(tx, rs) })
+	result := c.Claim(uint64(request.GetTaskId()), comm.NowUnix(), func(_ task.Owner, _ task.Instance) bool { return b.grant(tx, rs) })
 	switch result {
 	case task.ClaimOK:
 		// 任务快照已完成校验，实际领取状态由资产成功回调提交。
@@ -73,10 +73,11 @@ func (b *Behavior) handleClaim(uid uint64, request *pb_actv.ClaimActvTaskReq) {
 		b.processing = 0
 		ack.Code = code
 		d.Sequence = tx.GetSequence()
-		b.refresh(uid, time.Now(), false)
+		now := comm.Now()
+		b.refresh(uid, now, false)
 		if code == pb_common.ErrCode_OK {
 			if tasks := b.tasks.Tasks(); tasks != nil && (resetType == 0 || day == d.GetDayStart()) {
-				tasks.Claim(uint64(taskID), time.Now().Unix(), func(task.Owner, task.Instance) bool { return true })
+				tasks.Claim(uint64(taskID), now.Unix(), func(task.Owner, task.Instance) bool { return true })
 			}
 
 			for _, reward := range tx.GetRewards() {
@@ -158,7 +159,7 @@ func (b *Behavior) handleDraw(uid uint64, request *pb_actv.DrawActvReq) {
 		b.processing = 0
 		ack.Code = code
 		d.Sequence = tx.GetSequence()
-		b.refresh(uid, time.Now(), false)
+		b.refresh(uid, comm.Now(), false)
 		if code == pb_common.ErrCode_OK {
 			b.Actv.GetService().HandleEvent(gameevent.NewTask(uid, task.Event{Goal: 2, Count: drawCount, Param: poolID}))
 

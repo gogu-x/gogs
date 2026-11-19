@@ -2,7 +2,6 @@ package actv
 
 import (
 	"fmt"
-	"time"
 
 	gameevent "github.com/gogu-x/gogs/game/event"
 	"github.com/gogu-x/gogs/ipb"
@@ -10,6 +9,7 @@ import (
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 	"google.golang.org/protobuf/proto"
 )
@@ -166,7 +166,7 @@ func (actor *Actv) dispatchEvent(ctx tree.Context, message *sspb.Event) {
 		actor.serverOpened = true
 		actor.startTrigger() // 先按配置创建实例，再启动已到开始时间的活动。
 		if actor.actvService != nil {
-			actor.actvService.StartDueActvs(time.Now().Unix())
+			actor.actvService.StartDueActvs(comm.NowUnix())
 		}
 	}
 	if actor.actvService != nil {

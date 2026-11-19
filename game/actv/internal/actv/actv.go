@@ -2,11 +2,11 @@ package actv
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -87,7 +87,7 @@ func (actor *Actv) restoreActv(meta *service.ActvMeta) bool {
 	if actor == nil || actor.actvService == nil || meta == nil || meta.GetActvID() <= 0 || meta.GetCfgID() <= 0 || meta.GetOwnerID() <= 0 {
 		return false
 	}
-	if meta.IsExpired(time.Now().Unix()) {
+	if meta.IsExpired(comm.NowUnix()) {
 		tlog.Log.Info("[actv/Actv.restoreActv] 活动超过十四天结算期，跳过恢复, actv=%v end=%v", meta.GetActvID(), meta.GetEndTs())
 		return false
 	}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/timer"
 	"github.com/gogu-x/tree/tlog"
 )
@@ -52,7 +53,7 @@ func (actor *Actv) onLifecycleTick(ctx tree.Context) {
 		return
 	}
 	if actor.actvService != nil && actor.ready && actor.loadErr == nil && actor.serverOpened {
-		now := time.Now().Unix()
+		now := comm.NowUnix()
 		actor.actvService.StartDueActvs(now)
 		actor.actvService.EndDueActvs(now)
 		actor.actvService.RemoveExpiredActvs(now)

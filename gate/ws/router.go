@@ -1,6 +1,9 @@
 package ws
 
 import (
+	"strconv"
+
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/gate/constant"
 	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
@@ -47,7 +50,7 @@ func (s *Server) handleGrpcClient(ctx tree.Context, msg interface{}) {
 		evle.Respond(ack, nil)
 		return
 	}
-	addr, err := cluster.GetAddr(req.ServerId)
+	addr, err := cluster.GetServiceAddr(def.ServiceGame, strconv.FormatUint(uint64(req.ServerId), 10))
 	if err != nil {
 		evle.Respond(ack, err)
 		return

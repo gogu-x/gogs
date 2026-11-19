@@ -8,6 +8,7 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/trigger"
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 )
 
@@ -46,7 +47,7 @@ func (actor *Actv) runTrigger() {
 		return
 	}
 	actor.ensureCreationTrigger()
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	selected := actor.creationTrigger.Check(trigger.OnServerTick, now, nil)
 	created := actor.actvService.CreateDueServerActs(selected.ServerPlans(), now)
 	if len(created) > 0 {
@@ -86,7 +87,7 @@ func (actor *Actv) initializePlayerActvs(uid uint64, state *playerLoadState) {
 	for _, actv := range actor.actvService.ListActvs(service.ScopePlayer, service.OwnerID(uid)) {
 		history[actv.GetMeta().GetCfgID()] = true
 	}
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	selected := actor.creationTrigger.Check(trigger.OnPlayerInit, now, history)
 	actor.actvService.CreatePlayerActvs(
 		uid, selected.PlayerConfigs(), history, now,

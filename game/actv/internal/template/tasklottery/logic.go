@@ -8,6 +8,7 @@ import (
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/task"
 	"github.com/gogu-x/tree/tlog"
 	"math"
@@ -43,7 +44,7 @@ func (b *Behavior) OnInit() {
 // OnPlayerLoaded 加载后刷新任务状态。
 func (b *Behavior) OnPlayerLoaded(uid uint64) {
 	if d := b.playerData(); d != nil {
-		b.refresh(uid, time.Now(), false)
+		b.refresh(uid, comm.Now(), false)
 	}
 }
 
@@ -51,12 +52,6 @@ func (b *Behavior) OnPlayerLoaded(uid uint64) {
 func (b *Behavior) isOpen(now int64) bool {
 	m := b.Meta()
 	return !b.Actv.IsEnded() && now >= m.GetStartTs() && (m.GetEndTs() == 0 || now < m.GetEndTs())
-}
-
-// dayBounds 返回服务器本地自然日及下一次零点。
-func dayBounds(now time.Time) (int64, int64) {
-	d := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return d.Unix(), d.AddDate(0, 0, 1).Unix()
 }
 
 // refresh 在任务刷新、登录计数和每日限购变化时标脏。
@@ -70,7 +65,7 @@ func (b *Behavior) refresh(uid uint64, now time.Time, login bool) {
 		return
 	}
 	d.Init()
-	day, _ := dayBounds(now)
+	day, _ := comm.DayBounds(now)
 	if day < d.GetDayStart() {
 		return
 	}
@@ -120,7 +115,7 @@ func (b *Behavior) state(uid uint64) *pb_actv.TaskLotteryState {
 	if d == nil {
 		return nil
 	}
-	_, next := dayBounds(time.Now())
+	_, next := comm.DayBounds(comm.Now())
 	s := &pb_actv.TaskLotteryState{ActvId: uint64(b.Meta().GetActvID()), NextSequence: d.GetSequence() + 1, NextResetTime: next}
 	for _, t := range b.tasks.GetData().GetTasks() {
 		s.Tasks = append(s.Tasks, &pb_actv.ActvTaskState{TaskId: int32(t.GetConfigID()), Progress: t.GetProgress(), Target: t.GetTarget(), Status: int32(t.GetStatus())})
@@ -140,9 +135,10 @@ func (b *Behavior) push(uid uint64) {
 
 // query 向玩家返回当前任务抽奖活动的数据。
 func (b *Behavior) query(uid uint64) {
-	b.refresh(uid, time.Now(), false)
+	now := comm.Now()
+	b.refresh(uid, now, false)
 	ack := &pb_actv.GetTaskLotteryAck{Code: pb_common.ErrCode_ACTV_UNAVAILABLE}
-	if b.loadSettings() != nil && b.Actv.GetService().IsPlayerLoaded(uid) && !b.Meta().IsExpired(time.Now().Unix()) {
+	if b.loadSettings() != nil && b.Actv.GetService().IsPlayerLoaded(uid) && !b.Meta().IsExpired(now.Unix()) {
 		ack.Data = b.state(uid)
 		if ack.GetData() != nil {
 			ack.Code = pb_common.ErrCode_OK
@@ -178,10 +174,11 @@ func (b *Behavior) grant(tx *ipb.ActvAssetTrade, rs []*Reward) bool {
 // checkOperation 校验活动状态、处理中请求和操作序号。
 func (b *Behavior) checkOperation(uid uint64, ack *pb_actv.ActvOperationAck) bool {
 	seq := ack.GetSequence()
-	if b.Actv.GetService() == nil || !b.Actv.GetService().IsPlayerLoaded(uid) || b.Meta().IsExpired(time.Now().Unix()) {
+	now := comm.Now()
+	if b.Actv.GetService() == nil || !b.Actv.GetService().IsPlayerLoaded(uid) || b.Meta().IsExpired(now.Unix()) {
 		return false
 	}
-	b.refresh(uid, time.Now(), false)
+	b.refresh(uid, now, false)
 	d := b.playerData()
 	if d == nil {
 		return false
@@ -197,7 +194,7 @@ func (b *Behavior) checkOperation(uid uint64, ack *pb_actv.ActvOperationAck) boo
 		ack.Code = pb_common.ErrCode_PARAM
 		return false
 	}
-	if !b.isOpen(time.Now().Unix()) {
+	if !b.isOpen(now.Unix()) {
 		ack.Code = pb_common.ErrCode_ACTV_NOT_OPEN
 		return false
 	}

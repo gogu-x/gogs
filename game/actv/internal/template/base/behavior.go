@@ -7,8 +7,8 @@ import (
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/sspb"
+	"github.com/gogu-x/tree/comm"
 	"google.golang.org/protobuf/proto"
-	"time"
 )
 
 // BaseBehavior 为绑定单个活动实例的模块提供默认生命周期、组件注册和通用信息行为。
@@ -81,7 +81,7 @@ func (b *BaseBehavior) OnPack() *pb_actv.ActvInfo {
 	if meta == nil {
 		return nil
 	}
-	now := time.Now().Unix()
+	now := comm.NowUnix()
 	start, end := meta.GetStartTs(), meta.GetEndTs()
 	status := pb_actv.ActvStatus_ONGOING
 	switch {

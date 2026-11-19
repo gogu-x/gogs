@@ -27,6 +27,9 @@ const (
 	// BattleClient 是 Game 进程内接收 Battle 生命周期事件的 Actor。
 	BattleClient = "BATTLE_CLIENT"
 
+	// ServiceGame 是 etcd 通用服务发现中的 Game 服务类型。
+	ServiceGame = "Game"
+
 	// ServiceBattle 是 etcd 通用服务发现中的 Battle 服务类型。
 	ServiceBattle = "Battle"
 

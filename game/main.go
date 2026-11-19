@@ -43,24 +43,20 @@ func main() {
 			}
 			defer stopDiagnostics()
 
-			if err := cluster.Init(conf.EtcdEndpoints); err != nil {
-				tlog.Log.Error("cluster init error: %v", err)
+			if err := cluster.Init(ctx, conf.EtcdEndpoints); err != nil {
+				return err
 			}
 			defer cluster.Close()
 
 			serverID := fmt.Sprintf("%d", conf.ServerID)
-			NodeID := fmt.Sprintf("%d", conf.NodeId)
-			addr := conf.GameAddr()
-
-			if err := cluster.Register(serverID, NodeID, addr); err != nil {
-				tlog.Log.Error("cluster register error: %v", err)
-			}
-			tlog.Info(
-				"[game/main] 游戏服务已注册, server=%s node=%s addr=%s",
+			if err := cluster.StartService(
+				def.ServiceGame,
 				serverID,
-				NodeID,
-				addr,
-			)
+				fmt.Sprintf("%d", conf.NodeId),
+				conf.GameAddr(),
+			); err != nil {
+				return err
+			}
 
 			db := mongorpc.Connect(
 				conf.MongoURL,

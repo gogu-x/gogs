@@ -1,7 +1,7 @@
 package service
 
 import "github.com/gogu-x/tree/task"
-import "time"
+import "github.com/gogu-x/tree/comm"
 
 // taskLifecycle 由任务组件实现，挂载和卸载均由活动生命周期管理。
 type taskLifecycle interface {
@@ -22,7 +22,7 @@ func (as *ActvService) Loaded(actv *Actv) {
 	}
 	actv.dataReady = true
 	actv.GetExt().OnLoaded()
-	as.attachTasks(actv, time.Now().Unix())
+	as.attachTasks(actv, comm.NowUnix())
 }
 
 // attachTasks 为已加载且当前开放的活动按归属挂载任务组件。

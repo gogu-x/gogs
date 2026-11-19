@@ -5,16 +5,16 @@ import (
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/task"
 	"github.com/gogu-x/tree/tlog"
 	"math"
-	"time"
 )
 
 // handleGet 查询商店，不读取主活动的内部状态。
 // @actv.request
 func (b *Shop) handleGet(uid uint64, request *pb_actv.GetActvShopReq) {
-	b.refresh(uid, time.Now())
+	b.refresh(uid, comm.Now())
 	ack := &pb_actv.GetActvShopAck{Code: pb_common.ErrCode_ACTV_UNAVAILABLE}
 	if b.valid {
 		ack.Data = b.state(uid)
@@ -40,14 +40,15 @@ func (b *Shop) handleBuy(uid uint64, request *pb_actv.BuyActvShopReq) {
 	if !b.valid || d == nil {
 		return
 	}
-	b.refresh(uid, time.Now())
+	now := comm.Now()
+	b.refresh(uid, now)
 	if b.buying {
 		ack.Pending = true
 		return
 	}
 	m := b.Meta()
-	now := time.Now().Unix()
-	if b.Actv.IsEnded() || now < m.GetStartTs() || (m.GetEndTs() > 0 && now >= m.GetEndTs()) {
+	ts := now.Unix()
+	if b.Actv.IsEnded() || ts < m.GetStartTs() || (m.GetEndTs() > 0 && ts >= m.GetEndTs()) {
 		ack.Code = pb_common.ErrCode_ACTV_NOT_OPEN
 		return
 	}
@@ -77,7 +78,7 @@ func (b *Shop) handleBuy(uid uint64, request *pb_actv.BuyActvShopReq) {
 	submitted := ipb.RequestActvAssets(tx, func(code pb_common.ErrCode) {
 		b.buying = false
 		ack.Code = code
-		b.refresh(uid, time.Now())
+		b.refresh(uid, comm.Now())
 		d.Sequence = seq
 		if ack.GetCode() == pb_common.ErrCode_OK {
 			if g.GetLimitResetType() == 0 || day == d.GetDayStart() {
@@ -106,7 +107,7 @@ func (b *Shop) handleBuy(uid uint64, request *pb_actv.BuyActvShopReq) {
 func (b *Shop) handleRefresh(uid uint64, request *pb_actv.RefreshActvShopReq) {
 	ack := &pb_actv.RefreshActvShopAck{Code: pb_common.ErrCode_ACTV_UNAVAILABLE}
 	if b.valid {
-		b.refresh(uid, time.Now())
+		b.refresh(uid, comm.Now())
 		ack.Data = b.state(uid)
 		if ack.GetData() != nil {
 			ack.Code = pb_common.ErrCode_OK

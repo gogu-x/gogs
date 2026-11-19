@@ -24,26 +24,29 @@ func main() {
 		Name:  "battle",
 		Usage: "deterministic battle service",
 		Flags: conf.ConnectionFlags(),
-		Action: func(_ context.Context, c *cli.Command) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			if err := conf.LoadAndApply(c); err != nil {
 				return err
 			}
 			tlog.NewLog(conf.LogPath, 0)
 
-			if err := cluster.Init(conf.EtcdEndpoints); err != nil {
-				tlog.Log.Error("battle cluster init: %v", err)
-			} else {
-				defer cluster.Close()
-				if err := cluster.RegisterService(def.ServiceBattle, fmt.Sprint(conf.ServerID), fmt.Sprint(conf.NodeId), conf.BattleAddr()); err != nil {
-					tlog.Log.Error("battle service register: %v", err)
-				}
+			if err := cluster.Init(ctx, conf.EtcdEndpoints); err != nil {
+				return err
+			}
+			defer cluster.Close()
+			if err := cluster.StartService(
+				def.ServiceBattle,
+				fmt.Sprint(conf.ServerID),
+				fmt.Sprint(conf.NodeId),
+				conf.BattleAddr(),
+			); err != nil {
+				return err
 			}
 
 			db := mongorpc.Connect(conf.MongoURL, conf.MongoUsername, conf.MongoPassword, "battle")
 
 			//加载配置表
-			err := glconf.LoadAllConfs(conf.GconfDbUri, conf.GconfDb, true)
-			if err != nil {
+			if err := glconf.LoadAllConfs(conf.GconfDbUri, conf.GconfDb, true); err != nil {
 				tlog.Log.Error("load confs error: %v", err)
 				return err
 			}
@@ -53,7 +56,7 @@ func main() {
 				service.New(),
 				natsrpc.NewNats(natsrpc.Battle, conf.ServerID, conf.NodeId, conf.NatsURL),
 			)
-			tlog.Log.Info("battle service [%d/%d] registered at %s\n", conf.ServerID, conf.NodeId, conf.BattleAddr())
+			tlog.Log.Info("[battle/main] 战斗服务启动, server=%v node=%v addr=%v", conf.ServerID, conf.NodeId, conf.BattleAddr())
 			tree.Start()
 			return nil
 		},

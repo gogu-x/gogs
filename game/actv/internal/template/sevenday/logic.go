@@ -8,6 +8,7 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	"github.com/gogu-x/gogs/game/actv/internal/template/base"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
+	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 	"time"
 )
@@ -41,7 +42,7 @@ func (b *Behavior) OnInit() {
 
 // OnTicker 复用活动 Actor 的秒级心跳，在服务器本地零点切日并推送在线玩家。
 func (b *Behavior) OnTicker() {
-	now := time.Now()
+	now := comm.Now()
 	if now.Unix() < b.nextReset {
 		return
 	}
@@ -69,11 +70,8 @@ func (b *Behavior) advance(now time.Time, online bool) bool {
 		return false
 	}
 	data := b.GetLoginData()
-	day := time.Date(
-		now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location(),
-	)
-	start := day.Unix()
-	b.nextReset = day.AddDate(0, 0, 1).Unix()
+	start, next := comm.DayBounds(now)
+	b.nextReset = next
 	// 时钟回拨不得回到旧日期重复累计。
 	if start < data.GetDayStart() {
 		return false

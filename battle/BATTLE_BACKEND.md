@@ -64,9 +64,9 @@ flowchart LR
 
 ## 3. 启动、寻址与并发模型
 
-`battle/main.go` 的启动顺序是加载连接参数、初始化日志、初始化并注册 etcd 服务、连接 MongoDB、加载配置表，再创建 Mongo Actor、Battle 服务管理器和 NATS Actor，最后启动 Actor 系统。
+`battle/main.go` 的启动顺序是加载连接参数、初始化日志、通过 `cluster.Init` 初始化 etcd 客户端，再通过 `cluster.StartService` 启动区服时间偏移监听并注册 Battle 节点。随后连接 MongoDB、加载配置表、创建 Mongo Actor、Battle 服务管理器和 NATS Actor，最后启动 Actor 系统。
 
-- etcd 服务类型为 `Battle`，以服务器编号和节点编号标识实例。初始化或注册失败只记录日志；配置表加载失败则返回错误。
+- 时间偏移来自 `--server-id` 对应的 `/time/{serverID}`，服务退出时关闭监听。etcd 初始化、初始时间偏移读取或配置表加载失败会返回错误。Battle 节点使用 `/services/Battle/{serverID}/{nodeID}`，与 Game 共用租约续租和重试逻辑。首次注册失败时记录日志并在后台重试。
 - `BattleAddr()` 是注册到服务发现的地址。当前战斗消息通过 NATS 传输，入口没有另行启动该地址的战斗 HTTP 或 TCP 监听。
 - Game 的 `ClusterSelector.Pick` 从发现结果中轮询节点，没有按活跃战斗数进行负载分配。
 - 管理器注册名为 `BATTLE_SERVICE`；单场 Actor 名为 `BATTLE_ACTOR_<战斗编号>`；Game 接收端为 `BATTLE_CLIENT`。
