@@ -132,23 +132,17 @@ func (c *Compiler) Compile(battleID string, seed uint64, request *pb.StartBattle
 
 	opponentPositions := make(map[int32]struct{})
 	if scenario.MonsterGroupConfigID != 0 {
-		group := glconf.GetBattleMonsterGroupCfg(scenario.MonsterGroupConfigID)
-		if group == nil {
-			return engine.Setup{}, fmt.Errorf("battle monster group config not found: group_config_id=%d", scenario.MonsterGroupConfigID)
+		members, err := glconf.GetBattleMonsterMembers(scenario.MonsterGroupConfigID)
+		if err != nil {
+			return engine.Setup{}, err
 		}
-		if len(group.Members) == 0 {
-			return engine.Setup{}, fmt.Errorf("battle monster group config id=%d has no members", group.CfgID)
-		}
-		for _, member := range group.Members {
-			_, position, err := monsterMemberValues(member)
-			if err != nil {
-				return engine.Setup{}, fmt.Errorf("battle monster group config id=%d: %w", group.CfgID, err)
+		for _, member := range members {
+			if err := member.GetError(); err != nil {
+				return engine.Setup{}, err
 			}
-			if _, duplicate := opponentPositions[position]; duplicate {
-				return engine.Setup{}, fmt.Errorf("battle monster group config id=%d has duplicate position=%d", group.CfgID, position)
-			}
+			position := member.GetPosition()
 			opponentPositions[position] = struct{}{}
-			unit, err := c.buildMonsterUnit(member)
+			unit, err := c.buildMonsterUnit(member.GetID(), position)
 			if err != nil {
 				return engine.Setup{}, err
 			}

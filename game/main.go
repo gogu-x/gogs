@@ -65,9 +65,7 @@ func main() {
 				fmt.Sprintf("game_%v", serverID),
 			)
 
-			//加载配置表
-			err = glconf.LoadAllConfs(conf.GconfDbUri, conf.GconfDb, true)
-			if err != nil {
+			if err := glconf.LoadAllConfs(conf.GconfDbUri, conf.GconfDb, true); err != nil {
 				tlog.Log.Error("load confs error: %v", err)
 				return err
 			}

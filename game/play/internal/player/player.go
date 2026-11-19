@@ -55,7 +55,7 @@ func NewPlayerData(uid uint64) *Player {
 		ShopMgr:      &shop.Mgr{},
 		TowerMgr:     tower.NewTowerMgr(),
 	}
-	if config := glconf.GetPlayerInitRoleCfgNoErr(1); config != nil && config.GetRoleConfigID() > 0 && config.GetLevel() > 0 && glconf.GetBattleRoleCfgNoErr(config.GetRoleConfigID()) != nil {
+	if config := glconf.GetValidPlayerInitRole(1); config != nil {
 		player.GetRoleMgr().SetCharacter(&role.Role{
 			ID: fmt.Sprintf("%d-role", uid), ConfigID: config.GetRoleConfigID(),
 			Level: config.GetLevel(), Star: config.GetStar(), Breakthrough: config.GetBreakthrough(),

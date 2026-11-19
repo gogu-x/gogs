@@ -5,7 +5,6 @@ import (
 	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
-	"strconv"
 )
 
 // CreatePlayerActvs 按配置创建缺少的个人活动；完成实例也参与去重。
@@ -37,19 +36,20 @@ func (as *ActvService) CreatePlayerActvs(
 			ActvID: as.playerIDs.NextID(), CfgID: cfgID, OwnerID: OwnerID(uid),
 			OwnerScope: ScopePlayer, TemplateType: TemplateType(row.GetType()), StartTs: now,
 		}
-		if duration, err := trigger.ParseDuration(row.GetDuration()); err != nil || duration < 0 {
+		timing := glconf.GetActvTiming(row)
+		if duration, err := timing.GetPlayerDuration(); err != nil || duration < 0 {
 			continue
 		} else if duration > 0 {
 			meta.EndTs = now + duration
 		}
 		if row.GetTriggerType() == 5 {
-			parentCfg, err := strconv.ParseInt(row.GetTriggerVal(), 10, 32)
-			if err != nil {
+			parentCfg, ok := timing.GetParentID()
+			if !ok {
 				continue
 			}
 			var parent *ActvMeta
 			for _, a := range as.ListActvs(ScopePlayer, OwnerID(uid)) {
-				if a.GetMeta().GetCfgID() == int32(parentCfg) {
+				if a.GetMeta().GetCfgID() == parentCfg {
 					parent = a.GetMeta()
 					break
 				}

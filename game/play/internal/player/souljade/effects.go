@@ -7,7 +7,7 @@ import (
 
 // EffectAffixIDs 返回已装备魂玉的有效效果词条，同类型效果按槽位顺序取首个。
 func EffectAffixIDs(mgr *Mgr) []int32 {
-	config := initConfig()
+	config := glconf.GetSoulJadeInit()
 	if mgr == nil || config == nil {
 		return nil
 	}
@@ -22,8 +22,8 @@ func EffectAffixIDs(mgr *Mgr) []int32 {
 		}
 		seenItems[item.GetConfigID()] = true
 		for _, affix := range item.GetAffixes() {
-			effect := glconf.GetSoulJadeEffectAffixCfgNoErr(affix.GetAttribute())
-			if !glconf.ValidSoulJadeEffectAffixCfg(effect) || seenEffects[effect.GetEffectType()] {
+			effect := glconf.GetValidSoulJadeEffectAffix(affix.GetAttribute())
+			if effect == nil || seenEffects[effect.GetEffectType()] {
 				continue
 			}
 			seenEffects[effect.GetEffectType()] = true

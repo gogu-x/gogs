@@ -54,7 +54,7 @@ func (c *Compiler) CalculateRoleAttributes(role *pb.Role) (RoleAttributes, error
 func (configuredRoleStatCalculator) Calculate(roleState *pb.Role, role *glconf.BattleRoleCfg, equips []*glconf.BattleEquipCfg) (RoleAttributes, error) {
 	attributes := RoleAttributes{MaxHP: role.MaxHP, Attack: role.Attack, Defense: role.Defense, Speed: role.Speed}
 	for _, equip := range equips {
-		modifiers := battleAttributeValues(equip.Modifier)
+		modifiers := glconf.GetBattleEquipAttributes(equip)
 		attributes.MaxHP += modifiers[0]
 		attributes.Attack += modifiers[1]
 		attributes.Defense += modifiers[2]

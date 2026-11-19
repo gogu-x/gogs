@@ -5,12 +5,9 @@ package trigger
 import (
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gogu-x/gogs/glconf"
-	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
 )
 
@@ -25,8 +22,6 @@ const (
 )
 
 const (
-	// dateLayout 是绝对日期类型的时间格式。
-	dateLayout = "2006-01-02 15:04:05"
 	// SettlementRetentionSeconds 是活动实例统一保留的十四天结算窗口，单位为秒。
 	SettlementRetentionSeconds int64 = 14 * 24 * 60 * 60
 	// maxRoundsPerConfig 是单个配置的最大轮次数，保证实例编号不冲突。
@@ -34,7 +29,7 @@ const (
 )
 
 // ErrUnsupported 表示配置的时间类型当前版本尚未支持。
-var ErrUnsupported = errors.New("unsupported actv trigger type")
+var ErrUnsupported = glconf.ErrUnsupportedActvTiming
 
 // Plan 是一条活动配置解析后的时间规则，所有时间为 Unix 秒。
 // 第 k 轮（k 从 0 开始）开始时间 = FirstStartTs + k*RepeatInterval；不循环时只有第 0 轮。
@@ -75,64 +70,17 @@ func NewPlan(cfg *glconf.ActvOnlineCfg, openTs int64, loc *time.Location) (*Plan
 	if !cfg.GetAvailable() {
 		return nil, fmt.Errorf("actv config %d is not available", cfg.GetID())
 	}
-	if loc == nil {
-		loc = time.Local
-	}
-	plan := &Plan{
-		Cfg:          cfg,
-		CfgID:        cfg.GetID(),
-		TemplateType: cfg.GetType(),
-		TriggerType:  Type(cfg.GetTriggerType()),
-		Reopen:       cfg.IsReopen(),
-	}
-	var err error
-	if plan.Duration, err = ParseDuration(cfg.GetDuration()); err != nil {
-		return nil, fmt.Errorf("config %d duration: %w", cfg.GetID(), err)
-	}
-	if plan.Duration <= 0 {
-		return nil, fmt.Errorf("config %d duration must be positive, got %q", cfg.GetID(), cfg.GetDuration())
-	}
-	if plan.CloseAfterEnd, err = ParseDuration(cfg.CloseAfterEnd); err != nil {
-		return nil, fmt.Errorf("config %d close_after_end: %w", cfg.GetID(), err)
-	}
-	if plan.Forecast, err = ParseDuration(cfg.ForecastBeforeStart); err != nil {
-		return nil, fmt.Errorf("config %d forecast_before_start: %w", cfg.GetID(), err)
-	}
-	if plan.RepeatInterval, err = ParseDuration(cfg.GetTriggerRept()); err != nil {
-		return nil, fmt.Errorf("config %d trigger_rept: %w", cfg.GetID(), err)
-	}
-	openDayLimit, err := ParseDuration(cfg.OpenDayLimit)
+	timing, err := glconf.GetActvTiming(cfg).ServerTiming(openTs, loc)
 	if err != nil {
-		return nil, fmt.Errorf("config %d open_day_limit: %w", cfg.GetID(), err)
+		return nil, err
 	}
-	if openDayLimit > 0 {
-		if openTs <= 0 {
-			return nil, fmt.Errorf("config %d open_day_limit requires server open time", cfg.GetID())
-		}
-		plan.EarliestStart = openTs + openDayLimit
-	}
-
-	switch plan.TriggerType {
-	case TypeAbsolute:
-		start, err := time.ParseInLocation(dateLayout, strings.TrimSpace(cfg.GetTriggerVal()), loc)
-		if err != nil {
-			return nil, fmt.Errorf("config %d trigger_val date: %w", cfg.GetID(), err)
-		}
-		plan.FirstStartTs = start.Unix()
-	case TypeServerOpen:
-		if openTs <= 0 {
-			return nil, fmt.Errorf("config %d trigger type %d requires server open time", cfg.GetID(), plan.TriggerType)
-		}
-		offset, err := ParseDuration(cfg.GetTriggerVal())
-		if err != nil {
-			return nil, fmt.Errorf("config %d trigger_val offset: %w", cfg.GetID(), err)
-		}
-		start, _ := comm.DayBounds(time.Unix(openTs, 0).In(loc))
-		plan.FirstStartTs = start + offset
-	default:
-		return nil, fmt.Errorf("config %d trigger type %d: %w", cfg.GetID(), plan.TriggerType, ErrUnsupported)
-	}
-	return plan, nil
+	return &Plan{
+		Cfg: cfg, CfgID: cfg.GetID(), TemplateType: cfg.GetType(),
+		TriggerType: Type(cfg.GetTriggerType()), Reopen: cfg.IsReopen(),
+		FirstStartTs: timing.GetFirstStart(), EarliestStart: timing.GetEarliestStart(),
+		Duration: timing.GetDuration(), CloseAfterEnd: timing.GetCloseAfterEnd(),
+		Forecast: timing.GetForecast(), RepeatInterval: timing.GetInterval(),
+	}, nil
 }
 
 // BuildPlans 解析全部活动配置；未启用的配置静默跳过，不支持的时间类型和格式错误记录日志后跳过。
@@ -256,31 +204,4 @@ func (plan *Plan) interval() int64 {
 		return plan.RepeatInterval
 	}
 	return 0
-}
-
-// ParseDuration 解析配置中的时长，单位支持 d/h/m/s，返回秒数。空串和 "0" 视为 0。
-func ParseDuration(value string) (int64, error) {
-	value = strings.TrimSpace(value)
-	if value == "" || value == "0" {
-		return 0, nil
-	}
-	unit := value[len(value)-1]
-	var seconds int64
-	switch unit {
-	case 'd':
-		seconds = 86400
-	case 'h':
-		seconds = 3600
-	case 'm':
-		seconds = 60
-	case 's':
-		seconds = 1
-	default:
-		return 0, fmt.Errorf("invalid duration %q: unit must be d/h/m/s", value)
-	}
-	number, err := strconv.ParseInt(value[:len(value)-1], 10, 64)
-	if err != nil || number < 0 {
-		return 0, fmt.Errorf("invalid duration %q", value)
-	}
-	return number * seconds, nil
 }

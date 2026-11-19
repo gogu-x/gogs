@@ -2,7 +2,6 @@ package talent
 
 import (
 	"math"
-	"sort"
 
 	"github.com/gogu-x/gogs/game/play/internal/player/growth"
 	"github.com/gogu-x/gogs/glconf"
@@ -10,67 +9,16 @@ import (
 	"github.com/gogu-x/gogs/pb/cspb/pb_talent"
 )
 
-func ruleConfig() *glconf.TalentRuleCfg {
-	rules := glconf.GetAllTalentRuleCfg()
-	if len(rules) != 1 {
-		return nil
-	}
-	rule := rules[0]
-	if rule.GetBasePoints() < 0 || rule.GetPointsPerLevel() < 0 || rule.GetPointsPerBreakthrough() < 0 || rule.GetMaxPoints() < rule.GetBasePoints() || rule.GetLevelPointStart() < 0 {
-		return nil
-	}
-	return rule
-}
-
 func catalogReady() bool {
-	if ruleConfig() == nil {
-		return false
-	}
-	nodes := glconf.GetAllTalentNodeCfg()
-	if len(nodes) == 0 || len(glconf.GetAllTalentBranchCfg()) == 0 {
-		return false
-	}
-	for _, node := range nodes {
-		if node.GetCfgID() < 0 || glconf.GetTalentBranchCfgNoErr(node.GetBranchID()) == nil || node.GetPointCost() < 0 {
-			return false
-		}
-		if node.GetMaxHpPermille() < 0 || node.GetAttackPermille() < 0 || node.GetDefensePermille() < 0 || node.GetSpeedPermille() < 0 {
-			return false
-		}
-		seen := make(map[int32]bool)
-		cursor := node
-		for cursor != nil {
-			id := cursor.GetCfgID()
-			if seen[id] {
-				return false
-			}
-			seen[id] = true
-			if cursor.GetIsRoot() {
-				if cursor.GetPointCost() != 0 || cursor.GetParentID() >= 0 {
-					return false
-				}
-				break
-			}
-			if cursor.GetPointCost() <= 0 {
-				return false
-			}
-			cursor = glconf.GetTalentNodeCfgNoErr(cursor.GetParentID())
-			if cursor == nil {
-				return false
-			}
-		}
-	}
-	return true
+	return glconf.GetValidTalentRule() != nil && glconf.GetTalentCatalog() != nil
 }
 
 func rootNodes() map[int32]bool {
-	result := make(map[int32]bool)
-	for _, node := range glconf.GetAllTalentNodeCfg() {
-		if node.GetIsRoot() {
-			result[node.GetCfgID()] = true
-		}
+	learned := make(map[int32]bool)
+	for _, root := range glconf.GetTalentCatalog().GetRoots() {
+		learned[root] = true
 	}
-	return result
+	return learned
 }
 
 // EnsureRoots grants newly configured free roots without resetting learned nodes.
@@ -84,7 +32,7 @@ func EnsureRoots(mgr *Mgr) bool {
 		mgr.SetLearned(learned)
 	}
 	changed := false
-	for nodeID := range rootNodes() {
+	for _, nodeID := range glconf.GetTalentCatalog().GetRoots() {
 		if !learned[nodeID] {
 			learned[nodeID] = true
 			changed = true
@@ -98,7 +46,7 @@ func EnsureRoots(mgr *Mgr) bool {
 
 // EarnedPoints derives points exclusively from server progression and rule data.
 func EarnedPoints(level, breakthrough int32) int32 {
-	rule := ruleConfig()
+	rule := glconf.GetValidTalentRule()
 	if rule == nil {
 		return 0
 	}
@@ -189,7 +137,7 @@ func (mgr *Mgr) resetBranch(branch int32) {
 			delete(learned, nodeID)
 		}
 	}
-	for nodeID := range rootNodes() {
+	for _, nodeID := range glconf.GetTalentCatalog().GetRoots() {
 		learned[nodeID] = true
 	}
 }
@@ -211,7 +159,8 @@ func Bonuses(mgr *Mgr) *pb_common.GrowthBonuses {
 
 // View publishes authoritative rules and presentation metadata from configuration.
 func View(mgr *Mgr, roleID string, earned int32) *pb_talent.RoleTalentData {
-	if mgr == nil || !catalogReady() {
+	catalog := glconf.GetTalentCatalog()
+	if mgr == nil || catalog == nil || glconf.GetValidTalentRule() == nil {
 		return nil
 	}
 	spent := SpentPoints(mgr)
@@ -219,8 +168,7 @@ func View(mgr *Mgr, roleID string, earned int32) *pb_talent.RoleTalentData {
 	if available < 0 {
 		available = 0
 	}
-	definitions := glconf.GetAllTalentNodeCfg()
-	sort.Slice(definitions, func(i, j int) bool { return definitions[i].GetCfgID() < definitions[j].GetCfgID() })
+	definitions := catalog.GetNodes()
 	nodes := make([]*pb_talent.TalentNodeDefinition, 0, len(definitions))
 	owned := make([]int32, 0, len(mgr.GetLearned()))
 	learned := mgr.GetLearned()
@@ -230,8 +178,7 @@ func View(mgr *Mgr, roleID string, earned int32) *pb_talent.RoleTalentData {
 			owned = append(owned, definition.GetCfgID())
 		}
 	}
-	branchConfigs := glconf.GetAllTalentBranchCfg()
-	sort.Slice(branchConfigs, func(i, j int) bool { return branchConfigs[i].GetCfgID() < branchConfigs[j].GetCfgID() })
+	branchConfigs := catalog.GetBranches()
 	branches := make([]*pb_talent.TalentBranchDefinition, 0, len(branchConfigs))
 	for _, branch := range branchConfigs {
 		branches = append(branches, &pb_talent.TalentBranchDefinition{BranchId: branch.GetCfgID(), Name: branch.GetName(), IconKey: branch.GetIconKey()})

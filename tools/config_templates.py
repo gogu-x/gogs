@@ -98,31 +98,43 @@ def get_registry_template():
     return '''// Package {{package_name}} 包含自动生成的游戏配置。
 package {{package_name}}
 
-import "fmt"
+import (
+    "fmt"
+    "sync"
+)
 
 type confLoader func(dbURI, dbName, confName string) (*CsvConf, error)
 
 type confMeta struct {
     source string
     loader confLoader
-    csv    *CsvConf
 }
 
-var confs []*confMeta
+func (meta *confMeta) getSource() string { return meta.source }
+func (meta *confMeta) getLoader() confLoader { return meta.loader }
+
+var (
+    initGameCfgOnce sync.Once
+    confs           []confMeta
+)
 
 // InitGameCfg 注册全部自动生成的配置表；可重复调用。
 func InitGameCfg() {
-    confs = confs[:0]
-{% for name in names %}    confs = append(confs, &confMeta{source: {{name}}Key, loader: load{{name}}})
-{% endfor %}}
+    initGameCfgOnce.Do(func() {
+        confs = []confMeta{
+{% for name in names %}            {source: {{name}}Key, loader: load{{name}}},
+{% endfor %}        }
+    })
+}
 
-// LoadAllConfs 从 MongoDB 加载全部配置表。
+// LoadAllConfs 初始化配置表和内置回调，再从 MongoDB 加载全部配置表。
 // dbURI 是 MongoDB URI，dbName 是配置数据库名。isHotLoad 保留用于兼容旧调用。
 func LoadAllConfs(dbURI, dbName string, isHotLoad bool) error {
     _ = isHotLoad
     InitGameCfg()
-    for _, meta := range confs {
-        if err := loadConf(meta, dbURI, dbName); err != nil {
+    registerConfigCallbacksOnce()
+    for index := range confs {
+        if err := loadConf(&confs[index], dbURI, dbName); err != nil {
             return err
         }
     }
@@ -137,9 +149,7 @@ func LoadConfs(
     isHotLoad bool,
 ) error {
     _ = isHotLoad
-    if len(confs) == 0 {
-        InitGameCfg()
-    }
+    InitGameCfg()
     for _, name := range names {
         meta := getConfMeta(name)
         if meta == nil {
@@ -153,8 +163,8 @@ func LoadConfs(
 }
 
 func getConfMeta(name string) *confMeta {
-    for _, meta := range confs {
-        if meta.source == name {
+    for index := range confs {
+        if meta := &confs[index]; meta.getSource() == name {
             return meta
         }
     }
@@ -162,11 +172,13 @@ func getConfMeta(name string) *confMeta {
 }
 
 func loadConf(meta *confMeta, dbURI, dbName string) error {
-    table, err := meta.loader(dbURI, dbName, meta.source)
+    key := meta.getSource()
+    loader := meta.getLoader()
+    table, err := loader(dbURI, dbName, key)
     if err != nil {
-        return fmt.Errorf("load configuration %s: %w", meta.source, err)
+        return fmt.Errorf("load configuration %s: %w", key, err)
     }
-    meta.csv = table
+    runAfterLoadCallbacks(key, table)
     return nil
 }
 '''

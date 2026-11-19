@@ -2,16 +2,29 @@ package glconf
 
 // installRecordsForTest 用内存记录替换单张配置表，供不连接 MongoDB 的单元测试使用。
 func installRecordsForTest(prototype interface{}, records []interface{}, store func(*CsvConf)) error {
-	table, err := newCsv(prototype)
+	table, err := newConfigForTest(prototype, records)
 	if err != nil {
 		return err
 	}
-	if err := table.replaceRecords("test", records); err != nil {
-		return err
-	}
+	InitGameCfg()
+	registerConfigCallbacksOnce()
 	store(table)
+	runAfterLoadCallbacks(table.configTypeName(), table)
 	return nil
 }
+
+func newConfigForTest(prototype interface{}, records []interface{}) (*CsvConf, error) {
+	table, err := newCsv(prototype)
+	if err != nil {
+		return nil, err
+	}
+	if err := table.replaceRecords("test", records); err != nil {
+		return nil, err
+	}
+	return table, nil
+}
+
+func (table *CsvConf) configTypeName() string { return table.typeRecord.Name() }
 
 func interfacesOf[T any](values []*T) []interface{} {
 	records := make([]interface{}, 0, len(values))

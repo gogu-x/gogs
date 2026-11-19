@@ -74,7 +74,7 @@ func BuildRoleEquipmentData(
 	}
 	items := equipmentMgr.GetItems()
 	slots := make([]*pb_equipment.EquipmentSlotDefinition, 0)
-	for _, slot := range glconf.GetAllEquipmentSlotCfg() {
+	for _, slot := range glconf.GetOrderedEquipmentSlots() {
 		slots = append(slots, &pb_equipment.EquipmentSlotDefinition{
 			Slot: pb_equipment.EquipSlot(slot.GetCfgID()), Name: slot.GetName(), IconKey: slot.GetIconKey(),
 		})
@@ -82,7 +82,6 @@ func BuildRoleEquipmentData(
 	if len(slots) == 0 {
 		return nil, pb_common.ErrCode_INTERNAL
 	}
-	sort.Slice(slots, func(i, j int) bool { return slots[i].GetSlot() < slots[j].GetSlot() })
 	data := &pb_equipment.RoleEquipmentData{
 		RoleId: character.GetID(), RoleLevel: character.GetLevel(), Slots: slots,
 	}
@@ -105,21 +104,8 @@ func BuildRoleEquipmentData(
 			IconKey:     config.GetIconKey(),
 		}
 		_, entry.Equipped = equipped[itemID]
-		for _, modifier := range config.GetModifier() {
-			if modifier == nil || modifier.GetTyp() != "battle_attribute" {
-				continue
-			}
-			switch modifier.GetId() {
-			case 1:
-				entry.MaxHp += modifier.GetVal()
-			case 2:
-				entry.Attack += modifier.GetVal()
-			case 3:
-				entry.Defense += modifier.GetVal()
-			case 4:
-				entry.Speed += modifier.GetVal()
-			}
-		}
+		modifiers := glconf.GetBattleEquipAttributes(config)
+		entry.MaxHp, entry.Attack, entry.Defense, entry.Speed = modifiers[0], modifiers[1], modifiers[2], modifiers[3]
 		if entry.GetEquipped() {
 			data.MaxHp += entry.GetMaxHp()
 			data.Attack += entry.GetAttack()

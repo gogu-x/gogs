@@ -56,15 +56,19 @@ func (actor *Actv) runTrigger() {
 	actor.wheel.After(actvTriggerTimerType, actvTriggerInterval, nil)
 }
 
-// ensureCreationTrigger 在统一触发模块解析并缓存配置；玩家初始化与服务器定时器共用。
+// ensureCreationTrigger 将最新配置绑定到本服的活动模板和开服时间。
 func (actor *Actv) ensureCreationTrigger() {
-	if actor.creationTrigger != nil {
+	catalog := glconf.GetActvTimingCatalog()
+	if actor.creationTrigger != nil && actor.getTriggerCatalog() == catalog {
 		return
 	}
 	actor.creationTrigger = trigger.NewEngine(
-		glconf.GetAllActvOnlineCfg(), actor.actvTemplateScope, conf.ServerOpenTs, time.Local,
+		catalog.GetRows(), actor.actvTemplateScope, conf.ServerOpenTs, time.Local,
 	)
+	actor.triggerCatalog = catalog
 }
+
+func (actor *Actv) getTriggerCatalog() *glconf.ActvTimingCatalog { return actor.triggerCatalog }
 
 // actvTemplateScope 适配模板归属查询，trigger 无需依赖活动服务。
 func (actor *Actv) actvTemplateScope(templateType int32) int32 {

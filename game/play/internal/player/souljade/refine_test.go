@@ -14,7 +14,7 @@ func (failedRandom) Read([]byte) (int, error) { return 0, errors.New("random una
 
 func TestRollRefineAffixes(t *testing.T) {
 	level := &glconf.SoulJadeLevelCfg{AffixCount: 2, RefineMinPermille: 7, RefineMaxPermille: 7}
-	pool := []refineCandidate{{id: 1, weight: 1}, {id: 1001, weight: 1, effect: true}}
+	pool := []glconf.SoulJadeRefineCandidate{{ID: 1, Weight: 1}, {ID: 1001, Weight: 1, Effect: true}}
 	affixes, err := rollRefineAffixes(pool, level, bytes.NewReader(make([]byte, 32)))
 	if err != nil {
 		t.Fatal(err)

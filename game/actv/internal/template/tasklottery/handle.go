@@ -44,7 +44,7 @@ func (b *Behavior) handleClaim(uid uint64, request *pb_actv.ClaimActvTaskReq) {
 	defer c.Close()
 
 	var group, resetType int32
-	for _, t := range cfg.tasks {
+	for _, t := range cfg.GetTasks() {
 		if t.GetCfgID() == request.GetTaskId() {
 			group = t.GetRewardGroupID()
 			resetType = t.GetResetType()
@@ -56,7 +56,7 @@ func (b *Behavior) handleClaim(uid uint64, request *pb_actv.ClaimActvTaskReq) {
 		return
 	}
 	day, taskID := d.GetDayStart(), request.GetTaskId()
-	rs := cfg.rewards[group]
+	rs := cfg.GetRewards(group)
 	result := c.Claim(uint64(request.GetTaskId()), comm.NowUnix(), func(_ task.Owner, _ task.Instance) bool { return b.grant(tx, rs) })
 	switch result {
 	case task.ClaimOK:
@@ -118,14 +118,8 @@ func (b *Behavior) handleDraw(uid uint64, request *pb_actv.DrawActvReq) {
 	tx := &ipb.ActvAssetTrade{UID: uid, ActvID: b.Meta().GetActvID(), Sequence: request.GetSequence()}
 	d := b.playerData()
 
-	pool := cfg.pool
-	allowed := false
-	for _, n := range pool.GetDrawCounts() {
-		if n == request.GetCount() {
-			allowed = true
-		}
-	}
-	if !allowed {
+	pool := cfg.GetPool()
+	if !cfg.AllowsDrawCount(request.GetCount()) {
 		ack.Code = pb_common.ErrCode_PARAM
 		return
 	}
@@ -135,16 +129,16 @@ func (b *Behavior) handleDraw(uid uint64, request *pb_actv.DrawActvReq) {
 	}
 	var rs []*Reward
 	for i := int32(0); i < request.GetCount(); i++ {
-		n, err := rand.Int(rand.Reader, big.NewInt(cfg.weight))
+		n, err := rand.Int(rand.Reader, big.NewInt(cfg.GetWeight()))
 		if err != nil {
 			ack.Code = pb_common.ErrCode_INTERNAL
 			return
 		}
 		v := n.Int64()
-		for _, entry := range cfg.draws {
+		for _, entry := range cfg.GetDraws() {
 			v -= int64(entry.GetWeight())
 			if v < 0 {
-				rs = append(rs, cfg.rewards[entry.GetRewardGroupID()]...)
+				rs = append(rs, cfg.GetRewards(entry.GetRewardGroupID())...)
 				break
 			}
 		}

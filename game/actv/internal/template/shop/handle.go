@@ -2,6 +2,7 @@ package shop
 
 import (
 	gameevent "github.com/gogu-x/gogs/game/event"
+	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_actv"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
@@ -54,7 +55,7 @@ func (b *Shop) handleBuy(uid uint64, request *pb_actv.BuyActvShopReq) {
 	}
 	seq, count := request.GetSequence(), int64(request.GetCount())
 	g := b.goods[request.GetGoodsId()]
-	if seq == 0 || seq != d.GetSequence()+1 || seq == math.MaxUint64 || g == nil || count <= 0 || count > 100 {
+	if seq == 0 || seq != d.GetSequence()+1 || seq == math.MaxUint64 || g == nil || count <= 0 || count > glconf.MaxShopPurchaseCount {
 		ack.Code = pb_common.ErrCode_PARAM
 		return
 	}
@@ -67,7 +68,7 @@ func (b *Shop) handleBuy(uid uint64, request *pb_actv.BuyActvShopReq) {
 		ack.Code = pb_common.ErrCode_PARAM
 		return
 	}
-	rewards, ok := goodsRewards(g.GetRewardGroupID(), count)
+	rewards, ok := glconf.ShopRewards(g.GetRewardGroupID(), count)
 	if !ok {
 		return
 	}

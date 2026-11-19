@@ -46,12 +46,12 @@ func NewEmpty() *Mgr {
 
 // New initializes inventory exclusively from loaded configuration.
 func New(uid uint64) *Mgr {
-	config := initConfig()
+	config := glconf.GetSoulJadeInit()
 	if config == nil {
 		return nil
 	}
-	level := glconf.GetSoulJadeLevelCfgNoErr(config.GetSoulJadeLevel())
-	if !validLevel(level) {
+	level := glconf.GetValidSoulJadeLevel(config.GetSoulJadeLevel())
+	if level == nil {
 		return nil
 	}
 	items := make(map[string]*Item)

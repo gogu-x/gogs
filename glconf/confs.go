@@ -2,56 +2,68 @@
 // Package glconf 包含自动生成的游戏配置。
 package glconf
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type confLoader func(dbURI, dbName, confName string) (*CsvConf, error)
 
 type confMeta struct {
 	source string
 	loader confLoader
-	csv    *CsvConf
 }
 
-var confs []*confMeta
+func (meta *confMeta) getSource() string     { return meta.source }
+func (meta *confMeta) getLoader() confLoader { return meta.loader }
+
+var (
+	initGameCfgOnce sync.Once
+	confs           []confMeta
+)
 
 // InitGameCfg 注册全部自动生成的配置表；可重复调用。
 func InitGameCfg() {
-	confs = confs[:0]
-	confs = append(confs, &confMeta{source: ActvItemCfgKey, loader: loadActvItemCfg})
-	confs = append(confs, &confMeta{source: ActvLotteryPoolCfgKey, loader: loadActvLotteryPoolCfg})
-	confs = append(confs, &confMeta{source: ActvLotteryRewardCfgKey, loader: loadActvLotteryRewardCfg})
-	confs = append(confs, &confMeta{source: ActvOnlineCfgKey, loader: loadActvOnlineCfg})
-	confs = append(confs, &confMeta{source: ActvRewardCfgKey, loader: loadActvRewardCfg})
-	confs = append(confs, &confMeta{source: ActvShopCfgKey, loader: loadActvShopCfg})
-	confs = append(confs, &confMeta{source: ActvShopGoodsCfgKey, loader: loadActvShopGoodsCfg})
-	confs = append(confs, &confMeta{source: ActvTaskCfgKey, loader: loadActvTaskCfg})
-	confs = append(confs, &confMeta{source: ActvTaskLotteryCfgKey, loader: loadActvTaskLotteryCfg})
-	confs = append(confs, &confMeta{source: BattleEquipCfgKey, loader: loadBattleEquipCfg})
-	confs = append(confs, &confMeta{source: BattleMonsterCfgKey, loader: loadBattleMonsterCfg})
-	confs = append(confs, &confMeta{source: BattleMonsterGroupCfgKey, loader: loadBattleMonsterGroupCfg})
-	confs = append(confs, &confMeta{source: BattleRoleCfgKey, loader: loadBattleRoleCfg})
-	confs = append(confs, &confMeta{source: BattleRuleCfgKey, loader: loadBattleRuleCfg})
-	confs = append(confs, &confMeta{source: BattleSkillCfgKey, loader: loadBattleSkillCfg})
-	confs = append(confs, &confMeta{source: BattleStatusCfgKey, loader: loadBattleStatusCfg})
-	confs = append(confs, &confMeta{source: D2DailyGiftCfgKey, loader: loadD2DailyGiftCfg})
-	confs = append(confs, &confMeta{source: EquipmentSlotCfgKey, loader: loadEquipmentSlotCfg})
-	confs = append(confs, &confMeta{source: LoadoutInitCfgKey, loader: loadLoadoutInitCfg})
-	confs = append(confs, &confMeta{source: PlayerInitRoleCfgKey, loader: loadPlayerInitRoleCfg})
-	confs = append(confs, &confMeta{source: SoulJadeCfgKey, loader: loadSoulJadeCfg})
-	confs = append(confs, &confMeta{source: SoulJadeEffectAffixCfgKey, loader: loadSoulJadeEffectAffixCfg})
-	confs = append(confs, &confMeta{source: SoulJadeLevelCfgKey, loader: loadSoulJadeLevelCfg})
-	confs = append(confs, &confMeta{source: TalentBranchCfgKey, loader: loadTalentBranchCfg})
-	confs = append(confs, &confMeta{source: TalentNodeCfgKey, loader: loadTalentNodeCfg})
-	confs = append(confs, &confMeta{source: TalentRuleCfgKey, loader: loadTalentRuleCfg})
+	initGameCfgOnce.Do(func() {
+		confs = []confMeta{
+			{source: ActvItemCfgKey, loader: loadActvItemCfg},
+			{source: ActvLotteryPoolCfgKey, loader: loadActvLotteryPoolCfg},
+			{source: ActvLotteryRewardCfgKey, loader: loadActvLotteryRewardCfg},
+			{source: ActvOnlineCfgKey, loader: loadActvOnlineCfg},
+			{source: ActvRewardCfgKey, loader: loadActvRewardCfg},
+			{source: ActvShopCfgKey, loader: loadActvShopCfg},
+			{source: ActvShopGoodsCfgKey, loader: loadActvShopGoodsCfg},
+			{source: ActvTaskCfgKey, loader: loadActvTaskCfg},
+			{source: ActvTaskLotteryCfgKey, loader: loadActvTaskLotteryCfg},
+			{source: BattleEquipCfgKey, loader: loadBattleEquipCfg},
+			{source: BattleMonsterCfgKey, loader: loadBattleMonsterCfg},
+			{source: BattleMonsterGroupCfgKey, loader: loadBattleMonsterGroupCfg},
+			{source: BattleRoleCfgKey, loader: loadBattleRoleCfg},
+			{source: BattleRuleCfgKey, loader: loadBattleRuleCfg},
+			{source: BattleSkillCfgKey, loader: loadBattleSkillCfg},
+			{source: BattleStatusCfgKey, loader: loadBattleStatusCfg},
+			{source: D2DailyGiftCfgKey, loader: loadD2DailyGiftCfg},
+			{source: EquipmentSlotCfgKey, loader: loadEquipmentSlotCfg},
+			{source: LoadoutInitCfgKey, loader: loadLoadoutInitCfg},
+			{source: PlayerInitRoleCfgKey, loader: loadPlayerInitRoleCfg},
+			{source: SoulJadeCfgKey, loader: loadSoulJadeCfg},
+			{source: SoulJadeEffectAffixCfgKey, loader: loadSoulJadeEffectAffixCfg},
+			{source: SoulJadeLevelCfgKey, loader: loadSoulJadeLevelCfg},
+			{source: TalentBranchCfgKey, loader: loadTalentBranchCfg},
+			{source: TalentNodeCfgKey, loader: loadTalentNodeCfg},
+			{source: TalentRuleCfgKey, loader: loadTalentRuleCfg},
+		}
+	})
 }
 
-// LoadAllConfs 从 MongoDB 加载全部配置表。
+// LoadAllConfs 初始化配置表和内置回调，再从 MongoDB 加载全部配置表。
 // dbURI 是 MongoDB URI，dbName 是配置数据库名。isHotLoad 保留用于兼容旧调用。
 func LoadAllConfs(dbURI, dbName string, isHotLoad bool) error {
 	_ = isHotLoad
 	InitGameCfg()
-	for _, meta := range confs {
-		if err := loadConf(meta, dbURI, dbName); err != nil {
+	registerConfigCallbacksOnce()
+	for index := range confs {
+		if err := loadConf(&confs[index], dbURI, dbName); err != nil {
 			return err
 		}
 	}
@@ -66,9 +78,7 @@ func LoadConfs(
 	isHotLoad bool,
 ) error {
 	_ = isHotLoad
-	if len(confs) == 0 {
-		InitGameCfg()
-	}
+	InitGameCfg()
 	for _, name := range names {
 		meta := getConfMeta(name)
 		if meta == nil {
@@ -82,8 +92,8 @@ func LoadConfs(
 }
 
 func getConfMeta(name string) *confMeta {
-	for _, meta := range confs {
-		if meta.source == name {
+	for index := range confs {
+		if meta := &confs[index]; meta.getSource() == name {
 			return meta
 		}
 	}
@@ -91,10 +101,12 @@ func getConfMeta(name string) *confMeta {
 }
 
 func loadConf(meta *confMeta, dbURI, dbName string) error {
-	table, err := meta.loader(dbURI, dbName, meta.source)
+	key := meta.getSource()
+	loader := meta.getLoader()
+	table, err := loader(dbURI, dbName, key)
 	if err != nil {
-		return fmt.Errorf("load configuration %s: %w", meta.source, err)
+		return fmt.Errorf("load configuration %s: %w", key, err)
 	}
-	meta.csv = table
+	runAfterLoadCallbacks(key, table)
 	return nil
 }

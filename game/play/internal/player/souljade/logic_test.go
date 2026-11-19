@@ -119,7 +119,7 @@ func TestUpgradeCostsCapAndRefineBounds(t *testing.T) {
 		t.Fatal("rejected upgrade partially changed state")
 	}
 	mgr.SetEssence(100000)
-	for item.GetLevel() < maxLevel() {
+	for item.GetLevel() < glconf.GetMaxSoulJadeLevel() {
 		if code := Upgrade(mgr, instanceID); code != pb_common.ErrCode_OK {
 			t.Fatal(code)
 		}

@@ -14,8 +14,8 @@ func buildSoulJadeCharges(role *pb.Role) ([]engine.ChargeEffectConfig, error) {
 	charges := make([]engine.ChargeEffectConfig, 0, len(ids))
 	seen := make(map[pb.EffectType]bool, len(ids))
 	for _, id := range ids {
-		config := glconf.GetSoulJadeEffectAffixCfgNoErr(id)
-		if !glconf.ValidSoulJadeEffectAffixCfg(config) {
+		config := glconf.GetValidSoulJadeEffectAffix(id)
+		if config == nil {
 			return nil, fmt.Errorf("role id=%s has invalid soul jade effect affix id=%d", role.GetRoleId(), id)
 		}
 		kind := config.GetEffectType()

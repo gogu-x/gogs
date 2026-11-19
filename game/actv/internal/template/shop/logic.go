@@ -33,7 +33,7 @@ func (*Shop) Create(a *service.Actv, c conf.ActvConfig) service.ActvBehavior {
 func (b *Shop) OnInit() {
 	b.data = base.NewComp[PlayerData](1)
 	b.AddComp(b.data)
-	goods, valid := loadGoods(b.Meta().GetCfgID())
+	goods, valid := glconf.ShopGoods(b.Meta().GetCfgID())
 	b.goods, b.valid = goods, valid
 	if !valid {
 		tlog.Log.Error("[shop/OnInit] 商店配置无效, actv=%v, cfg=%v", b.Meta().GetActvID(), b.Meta().GetCfgID())

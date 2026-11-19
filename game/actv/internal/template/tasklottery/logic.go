@@ -75,7 +75,7 @@ func (b *Behavior) refresh(uid uint64, now time.Time, login bool) {
 	}
 	changed := false
 	if day > d.GetDayStart() {
-		for _, t := range cfg.tasks {
+		for _, t := range cfg.GetTasks() {
 			if t.GetResetType() == 1 {
 				c.Remove(uint64(t.GetCfgID()))
 			}
@@ -85,7 +85,7 @@ func (b *Behavior) refresh(uid uint64, now time.Time, login bool) {
 		changed = true
 	}
 	if b.isOpen(now.Unix()) {
-		for _, t := range cfg.tasks {
+		for _, t := range cfg.GetTasks() {
 			if _, ok := c.Get(uint64(t.GetCfgID())); !ok {
 				params := make([]int64, 0, len(t.GetGoalParams()))
 				for _, p := range t.GetGoalParams() {

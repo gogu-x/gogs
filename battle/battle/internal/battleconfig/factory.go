@@ -2,13 +2,11 @@ package battleconfig
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/glconf"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
-	cspb "github.com/gogu-x/gogs/pb/cspb/pb_common"
 )
 
 func (c *Compiler) buildRoleUnit(role *pb.Role, team pb.BattleTeam) (engine.UnitConfig, error) {
@@ -94,43 +92,7 @@ func (c *Compiler) applyRoleEquips(role *pb.Role, config *glconf.BattleRoleCfg) 
 	return c.roleStats.Calculate(role, config, equips)
 }
 
-func battleAttributeValues(modifiers []*cspb.TypIDVal) [4]int64 {
-	var totals [4]int64
-	for _, modifier := range modifiers {
-		if modifier == nil || modifier.Typ != "battle_attribute" {
-			continue
-		}
-		// BattleEquipCfg and BattleStatusCfg define IDs 1..4 as
-		// max_hp, attack, defense, and speed, respectively.
-		index := int(modifier.Id) - 1
-		if index >= 0 && index < len(totals) {
-			totals[index] += modifier.Val
-		}
-	}
-	return totals
-}
-
-func monsterMemberValues(member *cspb.TypIDVal) (int32, int32, error) {
-	if member == nil {
-		return 0, 0, fmt.Errorf("has nil monster member")
-	}
-	if member.Typ != "battle_monster" {
-		return 0, 0, fmt.Errorf("has invalid monster member type=%q", member.Typ)
-	}
-	if member.Id == 0 {
-		return 0, 0, fmt.Errorf("has empty monster config id")
-	}
-	if member.Val <= 0 || member.Val > math.MaxInt32 {
-		return 0, 0, fmt.Errorf("has invalid monster position=%d", member.Val)
-	}
-	return member.Id, int32(member.Val), nil
-}
-
-func (c *Compiler) buildMonsterUnit(member *cspb.TypIDVal) (engine.UnitConfig, error) {
-	monsterID, position, err := monsterMemberValues(member)
-	if err != nil {
-		return engine.UnitConfig{}, err
-	}
+func (c *Compiler) buildMonsterUnit(monsterID, position int32) (engine.UnitConfig, error) {
 	config := glconf.GetBattleMonsterCfg(monsterID)
 	if config == nil {
 		return engine.UnitConfig{}, fmt.Errorf("monster battle config not found: monster_config_id=%d", monsterID)
@@ -216,7 +178,7 @@ func (c *Compiler) buildStatus(id int32) (engine.StatusConfig, error) {
 	if config == nil {
 		return engine.StatusConfig{}, fmt.Errorf("battle status config not found: status_config_id=%d", id)
 	}
-	modifiers := battleAttributeValues(config.Modifier)
+	modifiers := glconf.GetBattleStatusAttributes(config)
 	status := engine.StatusConfig{
 		ID: strconv.Itoa(int(config.CfgID)), Kind: pb.StatusType(config.Kind),
 		DurationTurns: int(config.DurationTurns), Potency: config.Potency,

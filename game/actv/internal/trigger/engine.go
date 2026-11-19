@@ -2,7 +2,6 @@ package trigger
 
 import (
 	"github.com/gogu-x/gogs/glconf"
-	"strconv"
 	"time"
 )
 
@@ -118,15 +117,15 @@ func PlayerCreationConfigs(rows []*glconf.ActvOnlineCfg, history map[int32]bool)
 		if r == nil || !r.GetAvailable() || r.GetTriggerType() != 5 || r.IsReopen() || len(r.GetServerGroups()) > 0 || history[r.GetID()] {
 			continue
 		}
-		parent, err := strconv.ParseInt(r.GetTriggerVal(), 10, 32)
-		if err != nil || !parents[int32(parent)] {
+		parent, ok := glconf.GetActvTiming(r).GetParentID()
+		if !ok || !parents[parent] {
 			continue
 		}
-		parentRow := glconf.GetActvOnlineCfgNoErr(int32(parent))
+		parentRow := glconf.GetActvOnlineCfgNoErr(parent)
 		if parentRow == nil || !parentRow.GetAvailable() {
 			continue
 		}
-		if r.GetID() == int32(parent) || r.GetType() != 7003 {
+		if r.GetID() == parent || r.GetType() != 7003 {
 			continue
 		}
 		selected = append(selected, r)

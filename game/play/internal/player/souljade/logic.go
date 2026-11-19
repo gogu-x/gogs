@@ -2,6 +2,7 @@ package souljade
 
 import (
 	"crypto/rand"
+	"slices"
 	"sort"
 
 	"github.com/gogu-x/gogs/game/play/internal/player/growth"
@@ -10,21 +11,9 @@ import (
 	"github.com/gogu-x/gogs/pb/cspb/pb_souljade"
 )
 
-func initConfig() *glconf.LoadoutInitCfg {
-	records := glconf.GetAllLoadoutInitCfg()
-	if len(records) != 1 {
-		return nil
-	}
-	config := records[0]
-	if config.GetSoulJadeSlotCount() <= 0 || config.GetSoulJadeEssence() < 0 {
-		return nil
-	}
-	return config
-}
-
 // NormalizeSlots removes unavailable slots and duplicate references after a config change.
 func NormalizeSlots(mgr *Mgr) bool {
-	config := initConfig()
+	config := glconf.GetSoulJadeInit()
 	if mgr == nil || config == nil {
 		return false
 	}
@@ -52,62 +41,19 @@ func NormalizeSlots(mgr *Mgr) bool {
 	return changed
 }
 
-func validLevel(config *glconf.SoulJadeLevelCfg) bool {
-	if config == nil || config.GetCfgID() <= 0 || config.GetUpgradeCost() < 0 || config.GetRefineCost() < 0 || config.GetUpgradePermille() < 0 {
-		return false
-	}
-	minimum, maximum := config.GetRefineMinPermille(), config.GetRefineMaxPermille()
-	if minimum <= 0 || maximum < minimum || config.GetNewAffixPermille() <= 0 || config.GetNewAffixPermille() > maximum {
-		return false
-	}
-	allowed := make(map[int32]bool)
-	for _, attribute := range config.GetAllowedAttributes() {
-		if attribute < 1 || attribute > 4 || allowed[attribute] {
-			return false
-		}
-		allowed[attribute] = true
-	}
-	count := config.GetAffixCount()
-	return count > 0 && int(count) <= len(allowed)
-}
-
-func nextLevel(current int32) *glconf.SoulJadeLevelCfg {
-	var next *glconf.SoulJadeLevelCfg
-	for _, config := range glconf.GetAllSoulJadeLevelCfg() {
-		id := config.GetCfgID()
-		if id > current && (next == nil || id < next.GetCfgID()) {
-			next = config
-		}
-	}
-	return next
-}
-
-func maxLevel() int32 {
-	var maximum int32
-	for _, config := range glconf.GetAllSoulJadeLevelCfg() {
-		if id := config.GetCfgID(); id > maximum {
-			maximum = id
-		}
-	}
-	return maximum
-}
-
 func validItem(item *Item) bool {
 	if item == nil || glconf.GetSoulJadeCfgNoErr(item.GetConfigID()) == nil {
 		return false
 	}
-	level := glconf.GetSoulJadeLevelCfgNoErr(item.GetLevel())
-	if !validLevel(level) {
+	level := glconf.GetValidSoulJadeLevel(item.GetLevel())
+	if level == nil {
 		return false
 	}
 	affixes := item.GetAffixes()
 	if len(affixes) != int(level.GetAffixCount()) {
 		return false
 	}
-	allowed := make(map[int32]bool)
-	for _, attribute := range level.GetAllowedAttributes() {
-		allowed[attribute] = true
-	}
+	allowed := level.GetAllowedAttributes()
 	seen := make(map[int32]bool)
 	for _, affix := range affixes {
 		attribute, value := affix.GetAttribute(), affix.GetPermille()
@@ -115,10 +61,10 @@ func validItem(item *Item) bool {
 			return false
 		}
 		if effect := glconf.GetSoulJadeEffectAffixCfgNoErr(attribute); effect != nil {
-			if !glconf.ValidSoulJadeEffectAffixCfg(effect) || value != 0 {
+			if glconf.GetValidSoulJadeEffectAffix(attribute) == nil || value != 0 {
 				return false
 			}
-		} else if !allowed[attribute] || value <= 0 || value > level.GetRefineMaxPermille() {
+		} else if !slices.Contains(allowed, attribute) || value <= 0 || value > level.GetRefineMaxPermille() {
 			return false
 		}
 		seen[attribute] = true
@@ -148,7 +94,7 @@ func Change(mgr *Mgr, slot int32, instanceID string) pb_common.ErrCode {
 	if mgr == nil {
 		return pb_common.ErrCode_LOADOUT_UNAVAILABLE
 	}
-	config := initConfig()
+	config := glconf.GetSoulJadeInit()
 	if config == nil {
 		return pb_common.ErrCode_CONFIG_UNAVAILABLE
 	}
@@ -188,8 +134,8 @@ func Change(mgr *Mgr, slot int32, instanceID string) pb_common.ErrCode {
 
 // UpgradeCost returns the configured cost for leaving the current level.
 func UpgradeCost(item *Item) int64 {
-	level := glconf.GetSoulJadeLevelCfgNoErr(item.GetLevel())
-	if !validLevel(level) || nextLevel(item.GetLevel()) == nil {
+	level := glconf.GetValidSoulJadeLevel(item.GetLevel())
+	if level == nil || glconf.GetNextSoulJadeLevel(item.GetLevel()) == nil {
 		return 0
 	}
 	return level.GetUpgradeCost()
@@ -197,7 +143,7 @@ func UpgradeCost(item *Item) int64 {
 
 // RefineCost returns the current configured reroll cost.
 func RefineCost(item *Item) int64 {
-	if level := glconf.GetSoulJadeLevelCfgNoErr(item.GetLevel()); validLevel(level) {
+	if level := glconf.GetValidSoulJadeLevel(item.GetLevel()); level != nil {
 		return level.GetRefineCost()
 	}
 	return 0
@@ -215,11 +161,11 @@ func Upgrade(mgr *Mgr, instanceID string) pb_common.ErrCode {
 	if !validItem(item) {
 		return pb_common.ErrCode_INVALID_ITEM_STATE
 	}
-	next := nextLevel(item.GetLevel())
+	next := glconf.GetNextSoulJadeLevel(item.GetLevel())
 	if next == nil {
 		return pb_common.ErrCode_MAX_LEVEL_REACHED
 	}
-	if !validLevel(next) {
+	if glconf.GetValidSoulJadeLevel(next.GetCfgID()) != next {
 		return pb_common.ErrCode_CONFIG_UNAVAILABLE
 	}
 	cost := UpgradeCost(item)
@@ -260,13 +206,13 @@ func Refine(mgr *Mgr, instanceID string) pb_common.ErrCode {
 	if !validItem(item) {
 		return pb_common.ErrCode_INVALID_ITEM_STATE
 	}
-	level := glconf.GetSoulJadeLevelCfgNoErr(item.GetLevel())
+	level := glconf.GetValidSoulJadeLevel(item.GetLevel())
 	cost := level.GetRefineCost()
 	if mgr.GetEssence() < cost {
 		return pb_common.ErrCode_INSUFFICIENT_ESSENCE
 	}
-	pool, ok := refinePool(level)
-	if !ok {
+	pool := glconf.GetSoulJadeRefinePool(item.GetLevel())
+	if len(pool) == 0 {
 		return pb_common.ErrCode_CONFIG_UNAVAILABLE
 	}
 	affixes, err := rollRefineAffixes(pool, level, rand.Reader)
@@ -287,7 +233,7 @@ func Refine(mgr *Mgr, instanceID string) pb_common.ErrCode {
 // Bonuses includes only configured, owned, equipped and distinct definitions.
 func Bonuses(mgr *Mgr) *pb_common.GrowthBonuses {
 	result := &pb_common.GrowthBonuses{}
-	config := initConfig()
+	config := glconf.GetSoulJadeInit()
 	if mgr == nil || config == nil {
 		return result
 	}
@@ -314,7 +260,7 @@ func Bonuses(mgr *Mgr) *pb_common.GrowthBonuses {
 
 // View publishes configured names, icons, costs, slots and battle modifiers.
 func View(mgr *Mgr, roleID string) *pb_souljade.RoleSoulJadeData {
-	config := initConfig()
+	config := glconf.GetSoulJadeInit()
 	if mgr == nil || config == nil {
 		return nil
 	}
@@ -335,7 +281,7 @@ func View(mgr *Mgr, roleID string) *pb_souljade.RoleSoulJadeData {
 		for _, affix := range item.GetAffixes() {
 			affixes = append(affixes, &pb_souljade.SoulJadeAffix{Attribute: affix.GetAttribute(), Permille: affix.GetPermille()})
 		}
-		viewItems = append(viewItems, &pb_souljade.SoulJadeItem{InstanceId: key, ConfigId: item.GetConfigID(), Name: definition.GetName(), Rarity: definition.GetRarity(), IconKey: definition.GetIconKey(), Level: item.GetLevel(), MaxLevel: maxLevel(), Affixes: affixes, UpgradeCost: UpgradeCost(item), RefineCost: RefineCost(item)})
+		viewItems = append(viewItems, &pb_souljade.SoulJadeItem{InstanceId: key, ConfigId: item.GetConfigID(), Name: definition.GetName(), Rarity: definition.GetRarity(), IconKey: definition.GetIconKey(), Level: item.GetLevel(), MaxLevel: glconf.GetMaxSoulJadeLevel(), Affixes: affixes, UpgradeCost: UpgradeCost(item), RefineCost: RefineCost(item)})
 	}
 	slots := mgr.GetSlots()
 	viewSlots := make([]*pb_souljade.SoulJadeSlot, 0, config.GetSoulJadeSlotCount())

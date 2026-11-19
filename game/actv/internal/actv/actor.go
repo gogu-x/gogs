@@ -8,6 +8,7 @@ import (
 	"github.com/gogu-x/gogs/game/actv/internal/service"
 	templates "github.com/gogu-x/gogs/game/actv/internal/template"
 	"github.com/gogu-x/gogs/game/actv/internal/trigger"
+	"github.com/gogu-x/gogs/glconf"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/db/mongorpc"
@@ -31,7 +32,8 @@ type pendingActvRequest struct {
 
 // Actv 统一管理不同归属对象的活动状态及其存盘生命周期。
 type Actv struct {
-	creationTrigger *trigger.Engine // 统一配置触发创建引擎。
+	creationTrigger *trigger.Engine           // 统一配置触发创建引擎。
+	triggerCatalog  *glconf.ActvTimingCatalog // 当前触发引擎使用的配置快照。
 	serverID        uint64
 	router          tree.Router
 	wheel           *timer.TimeWheel
