@@ -4,9 +4,9 @@ import "fmt"
 
 const (
 	// gamePprofBasePort 是 game 诊断基础端口，实际端口加区服编号。
-	gamePprofBasePort = 16000
+	gamePprofBasePort = 1500
 	// gatePprofBasePort 是 Gate 诊断基础端口，实际端口加网关编号。
-	gatePprofBasePort = 26000
+	gatePprofBasePort = 2500
 )
 
 // GamePprofAddr 根据区服编号生成本机诊断地址。
