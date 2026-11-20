@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_gateway"
 	"github.com/gogu-x/tree"
@@ -77,9 +78,9 @@ func newGsAgent(
 	}
 }
 
-// Name 返回当前网关会话代理的唯一名称。
+// Name 返回玩家会话代理的注册名；同一玩家的新会话以同名覆盖旧会话，供推送方按名称查找。
 func (g *GsAgent) Name() string {
-	return fmt.Sprintf("gateway-uid-%d-%d", g.uid, g.generation)
+	return def.SessionAgentName(g.uid)
 }
 
 // MailboxSize 为批量战报等连续推送保留足够的有序出站消息队列。
@@ -156,6 +157,10 @@ func (g *GsAgent) onOutbound(ctx tree.Context, msg interface{}) {
 	// 解码后发送客户端协议消息。
 	msgInfo, ok := msg.(*ipb.PushToMsg)
 	if !ok {
+		return
+	}
+	// 玩家 Actor 直接推送时携带会话代次；不属于本会话的消息不写入客户端。
+	if generation := msgInfo.GetGeneration(); generation != 0 && generation != g.generation {
 		return
 	}
 	data, err := codec.ProtoCodec.Marshal(msgInfo.Msg)

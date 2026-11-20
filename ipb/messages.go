@@ -64,6 +64,13 @@ type PlayerSessionOpened struct {
 	Generation uint64 // 本次网关会话版本。
 }
 
+// CloseSession 请求网关关闭指定代理的会话，例如直接推送时代理出站队列已满。
+type CloseSession struct {
+	UID      uint64   // 玩家唯一 ID。
+	AgentPID tree.PID // 要关闭的会话代理；已被新会话替换时网关忽略该请求。
+	Reason   string   // 关闭原因，仅用于日志。
+}
+
 // GetUID 返回会话已打开的玩家编号。
 func (message *PlayerSessionOpened) GetUID() uint64 {
 	if message == nil {

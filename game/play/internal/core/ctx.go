@@ -1,7 +1,6 @@
 package core
 
 import (
-	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/play/internal/player"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/tree"
@@ -87,16 +86,15 @@ func (ctx *Context) CastCall(
 	return ctx.TreeCtx.RequestCallback(pid, msg, callback) != nil
 }
 
-// CastPlayerMsg 通过网关向在线玩家推送协议消息。
+// CastPlayerMsg 按命名规则查找玩家会话代理并直接推送协议消息，不经过游戏网关。
 func (ctx *Context) CastPlayerMsg(uid uint64, msg proto.Message) bool {
 	if ctx == nil || ctx.TreeCtx == nil || uid == 0 || msg == nil {
 		return false
 	}
-	gatePID, ok := ctx.TreeCtx.Lookup(def.GameGate)
-	if !ok {
-		return false
+	if ctx.Actor != nil {
+		return ctx.Actor.push(ctx.TreeCtx, uid, msg)
 	}
-	return ctx.TreeCtx.Send(gatePID, &ipb.PushToMsg{UID: uid, Msg: msg})
+	return ipb.PushToSession(ctx.TreeCtx, uid, 0, msg)
 }
 
 // Emit 同步触发当前玩家角色的业务事件。

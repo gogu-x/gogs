@@ -14,30 +14,40 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// directContext 验证 Actv 直接向 Gate 投递，无 Player 回调信封。
+// directContext 验证 Actv 按名称查找会话代理并直接投递，无 Player 回调信封。
 type directContext struct {
 	tree.Context
-	reply *ipb.PushToMsg
-	sent  int
+	reply  *ipb.PushToMsg
+	target tree.PID
+	sent   int
 }
 
 func (c *directContext) RequestEnvelope() *tree.Envelope { return nil }
 func (c *directContext) Lookup(name string) (tree.PID, bool) {
+	if name == def.SessionAgentName(7) {
+		return testAgentPID, true
+	}
 	return tree.PID{ID: 1}, name == def.GameGate
 }
-func (c *directContext) Send(_ tree.PID, value interface{}) bool {
+func (c *directContext) Send(pid tree.PID, value interface{}) bool {
 	c.reply = value.(*ipb.PushToMsg)
+	c.target = pid
 	c.sent++
 	return true
 }
+func (c *directContext) TrySend(pid tree.PID, value interface{}) bool { return c.Send(pid, value) }
 
 func directRequest() *ipb.ActvList {
 	return &ipb.ActvList{ActvMessage: &ipb.ActvMessage{UID: 7, Generation: 3, Online: true, Message: &pb_actv.GetActvListReq{}}}
 }
+
+// testAgentPID 是测试玩家 7 当前会话代理的进程标识。
+var testAgentPID = tree.PID{ID: 99, Name: "gateway-uid-7"}
+
 func assertDirect(t *testing.T, c *directContext, code pb_common.ErrCode) {
 	t.Helper()
-	if c.sent != 1 || c.reply == nil || c.reply.GetUID() != 7 || c.reply.GetGeneration() != 3 {
-		t.Fatal("直发次数、玩家或会话版本不符")
+	if c.sent != 1 || c.reply == nil || c.reply.GetUID() != 7 || c.reply.GetGeneration() != 3 || c.target != testAgentPID {
+		t.Fatal("直发次数、玩家、会话版本或会话代理不符")
 	}
 	ack, ok := c.reply.Msg.(*pb_actv.GetActvListAck)
 	if !ok || ack.GetCode() != code {

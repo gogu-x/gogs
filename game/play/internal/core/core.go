@@ -43,7 +43,7 @@ type PlayerActor struct {
 	selfPID            tree.PID                 // 当前玩家 Actor 的进程标识。
 	store              *mongorpc.Store          // 玩家持久化存储入口，通过 Mongo Actor 异步加载和保存数据。
 	model              *player.PersistenceModel // 玩家持久化模型，负责数据快照及存盘后的脏标记处理。
-	gatePID            tree.PID                 // 游戏网关 Actor 的进程标识，用于推送消息和协调玩家回收。
+	gatePID            tree.PID                 // 游戏网关 Actor 的进程标识，用于协调会话和玩家回收。
 	ready              bool                     // 玩家内存数据是否已就绪，可以处理业务请求。
 	loadErr            error                    // 玩家数据初始化或加载失败的原因。
 	pending            []interface{}            // 玩家数据加载期间暂存的消息，就绪后按顺序处理。
@@ -725,16 +725,23 @@ func (actor *PlayerActor) notifyEvictReady(ctx tree.Context) {
 	}
 }
 
-// push 通过所属网关转发客户端响应。
-func (actor *PlayerActor) push(ctx tree.Context, uid uint64, msg interface{}) bool {
-	gatePID := actor.gatePID
-	if gatePID.ID == 0 {
-		gatePID, _ = ctx.Lookup(def.GameGate)
-	}
-	if gatePID.ID == 0 {
+// PushToClient 向当前玩家的在线客户端推送协议消息，可在异步回调中配合回调上下文使用。
+func (actor *PlayerActor) PushToClient(ctx tree.Context, msg interface{}) bool {
+	if actor == nil || ctx == nil || msg == nil {
 		return false
 	}
-	return ctx.Send(gatePID, &ipb.PushToMsg{UID: uid, Msg: msg})
+	return actor.push(ctx, actor.UID, msg)
+}
+
+// push 按命名规则查找玩家会话代理并直接投递，不经过游戏网关。
+//
+// 推送给当前玩家时携带本 Actor 绑定的会话版本，代理据此丢弃发往旧连接的响应。
+func (actor *PlayerActor) push(ctx tree.Context, uid uint64, msg interface{}) bool {
+	var generation uint64
+	if uid == actor.UID && actor.sessionActive {
+		generation = actor.sessionGeneration
+	}
+	return ipb.PushToSession(ctx, uid, generation, msg)
 }
 
 // EventFunc 是玩家业务事件的监听器签名。

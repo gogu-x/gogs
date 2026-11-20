@@ -99,8 +99,10 @@ func TestCalendarMidnight(t *testing.T) {
 func TestPushAndBusinessRouting(t *testing.T) {
 	b := newTestBehavior()
 	gate := &sevenDayGate{messages: make(chan *ipb.PushToMsg, 8)}
-	pid := tree.SpawnOne(gate)
-	t.Cleanup(func() { tree.Stop(pid) })
+	for _, uid := range []uint64{7, 8} {
+		pid := tree.SpawnOne(&sevenDayGate{name: def.SessionAgentName(uid), messages: gate.messages})
+		t.Cleanup(func() { tree.Stop(pid) })
+	}
 	b.HandleEvent(gameevent.NewPlayer(gameevent.NameUserLogin, 7, 1))
 	select {
 	case push := <-gate.messages:
@@ -123,9 +125,13 @@ func TestPushAndBusinessRouting(t *testing.T) {
 	}
 }
 
-type sevenDayGate struct{ messages chan *ipb.PushToMsg }
+// sevenDayGate 以玩家会话代理名称注册，接收按名称直推的消息。
+type sevenDayGate struct {
+	name     string
+	messages chan *ipb.PushToMsg
+}
 
-func (*sevenDayGate) Name() string        { return def.GameGate }
+func (gate *sevenDayGate) Name() string   { return gate.name }
 func (*sevenDayGate) OnInit(tree.Context) {}
 func (*sevenDayGate) OnStop(tree.Context) {}
 func (gate *sevenDayGate) HandleMessage(_ tree.Context, message interface{}) {

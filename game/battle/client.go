@@ -320,10 +320,12 @@ func (c *Client) getState(ctx tree.Context, msg *GetState) {
 	ctx.Response(c.state(msg.UID).State, nil)
 }
 
+// push 按命名规则查找玩家会话代理并直接推送战斗消息，不经过 Gate。
+//
+// 投递为非阻塞：玩家离线或代理队列已满时丢弃本条推送，避免全区共用的战斗客户端被拖住。
+// 丢弃只影响客户端演出，结算仍由 finished 中的 PlayerMessage 投递。
 func (c *Client) push(ctx tree.Context, uid uint64, msg proto.Message) {
-	if gate, ok := ctx.Lookup(def.GameGate); ok {
-		ctx.Send(gate, &ipb.PushToMsg{UID: uid, Msg: msg})
-	}
+	ipb.PushToSession(ctx, uid, 0, msg)
 }
 
 // ClusterSelector 从通用服务注册表轮询 Battle 节点。

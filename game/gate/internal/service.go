@@ -93,7 +93,7 @@ func (g *GateActor) MailboxSize() int { return 8 * 1024 }
 func (g *GateActor) OnInit(ctx tree.Context) {
 	g.router.Register(&openSession{}, g.onOpenSession)
 	g.router.Register(&closeSession{}, g.onCloseSession)
-	g.router.Register(&ipb.PushToMsg{}, g.onPushToMsg)
+	g.router.Register(&ipb.CloseSession{}, g.onPlayerCloseSession)
 	g.router.Register(&ipb.PlayerMessage{}, g.onPlayerMessage)
 	g.router.Register(&ipb.PlayerActorEvictReady{}, g.onPlayerActorEvictReady)
 	g.router.Register(&ipb.PlayerActorStopped{}, g.onPlayerActorStopped)
@@ -314,10 +314,17 @@ func (g *GateActor) createSession(ctx tree.Context, open *openSession) (*openedS
 	}
 	g.nextGen++
 	generation := g.nextGen
+	// 先创建会话代理：同名注册会覆盖旧会话，玩家 Actor 绑定新会话后按名称推送即到达新代理。
+	agentPID := tree.SpawnOne(newGsAgent(uid, generation, open.stream, ctx.Self(), state.pid))
 	if !ctx.Send(state.pid, &ipb.PlayerSessionOpened{UID: uid, Generation: generation}) {
+		// 玩家 Actor 已失效：代理持有旧玩家 PID，需与新玩家 Actor 一起重建。
+		// 旧代理退出时框架只删除 PID 一致的名称登记，不影响新代理。
+		ctx.Send(agentPID, &stopAgent{})
 		state.pid = g.spawnPlayerActor(ctx, uid, nil)
 		tlog.Log.Info("[gate/GateActor.createSession] 玩家 Actor 已失效，创建新 Actor, pid=%v playerPID=%v", uid, state.pid)
+		agentPID = tree.SpawnOne(newGsAgent(uid, generation, open.stream, ctx.Self(), state.pid))
 		if !ctx.Send(state.pid, &ipb.PlayerSessionOpened{UID: uid, Generation: generation}) {
+			ctx.Send(agentPID, &stopAgent{})
 			delete(g.playerActors, uid)
 			return nil, fmt.Errorf("could not bind gateway session to player actor")
 		}
@@ -325,8 +332,6 @@ func (g *GateActor) createSession(ctx tree.Context, open *openSession) (*openedS
 	if previous, exists := g.sessions[uid]; exists {
 		ctx.Send(previous.pid, &stopAgent{})
 	}
-	agent := newGsAgent(uid, generation, open.stream, ctx.Self(), state.pid)
-	agentPID := tree.SpawnOne(agent)
 	g.sessions[uid] = session{
 		pid:        agentPID,
 		playerPID:  state.pid,
@@ -360,23 +365,19 @@ func (g *GateActor) onCloseSession(ctx tree.Context, msg interface{}) {
 	tlog.Log.Info("[gate/GateActor.onCloseSession] 网关会话已关闭, pid=%v reason=%v", closed.uid, closed.reason)
 }
 
-// onPushToMsg 将玩家 Actor 的协议响应转发到在线会话。
-func (g *GateActor) onPushToMsg(ctx tree.Context, msg interface{}) {
-	push, ok := msg.(*ipb.PushToMsg)
-	if !ok || push == nil || push.Msg == nil {
+// onPlayerCloseSession 处理推送方发起的会话关闭请求，例如直接推送时代理出站队列已满。
+//
+// 只关闭请求中指定的代理；该代理已被新会话替换时忽略，避免误关新连接。
+func (g *GateActor) onPlayerCloseSession(ctx tree.Context, msg interface{}) {
+	request, ok := msg.(*ipb.CloseSession)
+	if !ok || request == nil {
 		return
 	}
-	current, ok := g.sessions[push.UID]
-	if !ok {
+	current, ok := g.sessions[request.UID]
+	if !ok || current.pid != request.AgentPID {
 		return
 	}
-	if generation := push.GetGeneration(); generation != 0 && generation != current.generation {
-		tlog.Log.Debug("[gate/GateActor.onPushToMsg] 忽略旧会话响应, pid=%v generation=%v", push.GetUID(), generation)
-		return
-	}
-	if !ctx.TrySend(current.pid, push) {
-		g.closeCurrent(ctx, push.UID, current, "outbound mailbox is full")
-	}
+	g.closeCurrent(ctx, request.UID, current, request.Reason)
 }
 
 // onPlayerMessage 将服务器发给玩家的消息路由到对应玩家 Actor。

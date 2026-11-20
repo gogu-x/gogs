@@ -1,6 +1,7 @@
 package ctl_battle
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gogu-x/gogs/def"
@@ -23,7 +24,11 @@ type combatStatsGate struct {
 }
 
 func (gate *combatStatsGate) Lookup(name string) (tree.PID, bool) {
-	return tree.PID{ID: 1}, name == def.GameGate
+	return tree.PID{ID: 1}, name == def.GameGate || strings.HasPrefix(name, def.SessionAgentPrefix)
+}
+
+func (gate *combatStatsGate) TrySend(pid tree.PID, value interface{}) bool {
+	return gate.Send(pid, value)
 }
 
 func (gate *combatStatsGate) Send(_ tree.PID, value interface{}) bool {

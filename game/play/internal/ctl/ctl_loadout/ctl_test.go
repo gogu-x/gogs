@@ -1,6 +1,7 @@
 package ctl_loadout
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gogu-x/gogs/def"
@@ -28,8 +29,10 @@ type captureGate struct {
 }
 
 func (gate *captureGate) Lookup(name string) (tree.PID, bool) {
-	return tree.PID{ID: 1}, name == def.GameGate
+	return tree.PID{ID: 1}, name == def.GameGate || strings.HasPrefix(name, def.SessionAgentPrefix)
 }
+
+func (gate *captureGate) TrySend(pid tree.PID, value interface{}) bool { return gate.Send(pid, value) }
 
 func (gate *captureGate) Send(_ tree.PID, value interface{}) bool {
 	push, ok := value.(*ipb.PushToMsg)

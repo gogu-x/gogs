@@ -13,7 +13,6 @@ import (
 	"github.com/gogu-x/gogs/game/play/internal/player/loadout"
 	"github.com/gogu-x/gogs/game/play/internal/player/role"
 	"github.com/gogu-x/gogs/game/play/internal/player/souljade"
-	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/tree"
@@ -36,7 +35,7 @@ func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 		if ack.GetCode() != pb_common.ErrCode_OK {
 			tlog.Log.Error("[ctl_battle/OnCreateBattle] 创建战斗失败, pid=%v code=%v err=%v response=%T", uid, ack.GetCode(), err, value)
 		}
-		pushBattleAck(callbackCtx, uid, ack)
+		pushBattleAck(ctx.Actor, callbackCtx, uid, ack)
 	})
 	if !ok {
 		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Code: pb_common.ErrCode_BATTLE_UNAVAILABLE})
@@ -193,12 +192,9 @@ func OnBattleFinished(ctx *core.Context, settlement *battle.Settlement) {
 	ctx.Emit(core.BattleSettled, arg)
 }
 
-func pushBattleAck(ctx tree.Context, uid uint64, ack *pb_battle.StartBattleAck) {
-	if gate, ok := ctx.Lookup(def.GameGate); ok {
-		if !ctx.Send(gate, &ipb.PushToMsg{UID: uid, Msg: ack}) {
-			tlog.Log.Error("[ctl_battle/pushBattleAck] 战斗响应投递失败, pid=%v", uid)
-		}
-		return
+// pushBattleAck 在玩家 Actor 的回调协程内向当前玩家客户端推送开战响应。
+func pushBattleAck(actor *core.PlayerActor, ctx tree.Context, uid uint64, ack *pb_battle.StartBattleAck) {
+	if !actor.PushToClient(ctx, ack) {
+		tlog.Log.Error("[ctl_battle/pushBattleAck] 战斗响应投递失败, pid=%v", uid)
 	}
-	tlog.Log.Error("[ctl_battle/pushBattleAck] 网关 Actor 不可用, pid=%v", uid)
 }

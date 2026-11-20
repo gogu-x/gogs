@@ -3,7 +3,6 @@ package ctl_guild
 import (
 	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/play/internal/core"
-	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/gogs/pb/cspb/pb_guild"
 	"github.com/gogu-x/tree"
@@ -23,7 +22,7 @@ func CreateGuild(ctx *core.Context, req *pb_guild.CreateGuildReq) {
 			ack = &pb_guild.CreateGuildAck{Code: pb_common.ErrCode_INTERNAL}
 			tlog.Log.Error("[guild/CreateGuild] 创建联盟请求失败, pid=%v err=%v responseType=%T", uid, err, value)
 		}
-		pushAck(callbackCtx, uid, ack)
+		pushAck(ctx.Actor, callbackCtx, uid, ack)
 	}) {
 		ctx.CastPlayerMsg(uid, &pb_guild.CreateGuildAck{Code: pb_common.ErrCode_INTERNAL})
 		tlog.Log.Error("[guild/CreateGuild] 联盟 Actor 不可用, pid=%v", uid)
@@ -43,7 +42,7 @@ func JoinGuild(ctx *core.Context, req *pb_guild.JoinGuildReq) {
 			ack = &pb_guild.JoinGuildAck{Code: pb_common.ErrCode_INTERNAL}
 			tlog.Log.Error("[guild/JoinGuild] 加入联盟请求失败, pid=%v err=%v responseType=%T", uid, err, value)
 		}
-		pushAck(callbackCtx, uid, ack)
+		pushAck(ctx.Actor, callbackCtx, uid, ack)
 	}) {
 		ctx.CastPlayerMsg(uid, &pb_guild.JoinGuildAck{Code: pb_common.ErrCode_INTERNAL})
 		tlog.Log.Error("[guild/JoinGuild] 联盟 Actor 不可用, pid=%v", uid)
@@ -63,7 +62,7 @@ func LeaveGuild(ctx *core.Context, req *pb_guild.LeaveGuildReq) {
 			ack = &pb_guild.LeaveGuildAck{Code: pb_common.ErrCode_INTERNAL}
 			tlog.Log.Error("[guild/LeaveGuild] 离开联盟请求失败, pid=%v err=%v responseType=%T", uid, err, value)
 		}
-		pushAck(callbackCtx, uid, ack)
+		pushAck(ctx.Actor, callbackCtx, uid, ack)
 	}) {
 		ctx.CastPlayerMsg(uid, &pb_guild.LeaveGuildAck{Code: pb_common.ErrCode_INTERNAL})
 		tlog.Log.Error("[guild/LeaveGuild] 联盟 Actor 不可用, pid=%v", uid)
@@ -83,20 +82,16 @@ func GetGuild(ctx *core.Context, req *pb_guild.GetGuildReq) {
 			ack = &pb_guild.GetGuildAck{Code: pb_common.ErrCode_INTERNAL}
 			tlog.Log.Error("[guild/GetGuild] 查询联盟请求失败, pid=%v err=%v responseType=%T", uid, err, value)
 		}
-		pushAck(callbackCtx, uid, ack)
+		pushAck(ctx.Actor, callbackCtx, uid, ack)
 	}) {
 		ctx.CastPlayerMsg(uid, &pb_guild.GetGuildAck{Code: pb_common.ErrCode_INTERNAL})
 		tlog.Log.Error("[guild/GetGuild] 联盟 Actor 不可用, pid=%v", uid)
 	}
 }
 
-func pushAck(ctx tree.Context, uid uint64, ack interface{}) {
-	gatePID, ok := ctx.Lookup(def.GameGate)
-	if !ok {
-		tlog.Log.Error("[guild/pushAck] 网关 Actor 不可用, pid=%v", uid)
-		return
-	}
-	if !ctx.Send(gatePID, &ipb.PushToMsg{UID: uid, Msg: ack}) {
+// pushAck 在玩家 Actor 的回调协程内向当前玩家客户端推送联盟响应。
+func pushAck(actor *core.PlayerActor, ctx tree.Context, uid uint64, ack interface{}) {
+	if !actor.PushToClient(ctx, ack) {
 		tlog.Log.Error("[guild/pushAck] 联盟响应投递失败, pid=%v", uid)
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// forwardActvRequest 只投递请求，由 Actv 直接向 Gate 发送结果。
+// forwardActvRequest 只投递请求，由 Actv 直接向玩家会话代理发送结果。
 func forwardActvRequest(
 	ctx *core.Context,
 	actvID uint64,

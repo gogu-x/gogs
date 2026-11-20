@@ -1,5 +1,7 @@
 package def
 
+import "strconv"
+
 // Actor 名称常量，用于 ActorSystem Spawn/Lookup，避免魔法字符串
 const (
 	// CROSS 跨服模块
@@ -43,3 +45,12 @@ const (
 
 // BattleActorName 返回某场战斗的 per-battle battle 注册名（跨进程 NATS 寻址目标）。
 func BattleActorName(battleID string) string { return BattleActorPrefix + battleID }
+
+// SessionAgentPrefix 是玩家网关会话代理注册名的前缀。
+const SessionAgentPrefix = "gateway-uid-"
+
+// SessionAgentName 返回玩家网关会话代理的注册名，只含玩家编号。
+//
+// 同一玩家顶号时新代理以同名注册并覆盖旧登记；旧代理退出时框架只删除 PID 一致的登记，
+// 因此按该名称查找总是得到当前会话代理。推送方据此直接投递，不经过游戏网关。
+func SessionAgentName(uid uint64) string { return SessionAgentPrefix + strconv.FormatUint(uid, 10) }

@@ -46,9 +46,10 @@ func (s *fakeSender) counts() (int, int) {
 	return s.starts, s.confirms
 }
 
+// gateCapture 以玩家 7 的会话代理名称注册，接收按名称直推的战斗消息。
 type gateCapture struct{ messages chan *ipb.PushToMsg }
 
-func (g *gateCapture) Name() string        { return def.GameGate }
+func (g *gateCapture) Name() string        { return def.SessionAgentName(7) }
 func (g *gateCapture) OnInit(tree.Context) {}
 func (g *gateCapture) OnStop(tree.Context) {}
 func (g *gateCapture) HandleMessage(_ tree.Context, msg interface{}) {
