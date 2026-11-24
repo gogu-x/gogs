@@ -49,20 +49,24 @@ func (c *Conn) onWsMsg(ctx tree.Context, msg interface{}) {
 	c.router.Route(ctx, inner)
 }
 
+// onFrame 转发游戏服下行消息。只读取消息头判断是否需要网关钩子处理（如登录响应），
+// 其余消息不解码消息体，直接把原始字节写入 WebSocket。
 func (c *Conn) onFrame(ctx tree.Context, msg interface{}) {
 	frame := msg.(*pb_gateway.Frame)
-	if len(frame.GetPayload()) == 0 {
+	id, ok := frameMsgID(frame.GetPayload())
+	if !ok {
 		return
 	}
-	inner, err := codec.ProtoCodec.Unmarshal(frame.GetPayload())
-	if err != nil {
-		tlog.Log.Info("ConnActor[%d]: decode game payload: %v", c.connID, err)
-		return
-	}
-	msgType := reflect.TypeOf(inner)
-	if hookHandler, ok := c.hook[msgType]; ok {
-		hookHandler(ctx, inner)
-		return
+	if _, hooked := c.hookIDs[id]; hooked {
+		inner, err := codec.ProtoCodec.Unmarshal(frame.GetPayload())
+		if err != nil {
+			tlog.Log.Info("ConnActor[%d]: decode game payload: %v", c.connID, err)
+			return
+		}
+		if hookHandler, exists := c.hook[reflect.TypeOf(inner)]; exists {
+			hookHandler(ctx, inner)
+			return
+		}
 	}
 
 	//写入ws消息流

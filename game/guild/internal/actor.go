@@ -37,6 +37,9 @@ func NewGuildActor() *GuildActor {
 // Name 返回联盟 Actor 的注册名称。
 func (guild *GuildActor) Name() string { return def.Guild }
 
+// MailboxSize 为全服联盟查询、登录同步和存盘期间的突发请求预留缓冲。
+func (guild *GuildActor) MailboxSize() int { return 32 * 1024 }
+
 // OnInit 注册处理方法并加载联盟数据。
 func (guild *GuildActor) OnInit(ctx tree.Context) {
 	guild.registerHandlers()

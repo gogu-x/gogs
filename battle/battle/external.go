@@ -90,3 +90,6 @@ func DefaultBattleModes() map[pb.BattleType]BattleMode {
 	}
 	return modes
 }
+
+// NewMemoryRepository 创建用于本地运行或测试的内存战报仓储。
+func NewMemoryRepository() Repository { return internal.NewMemoryRepository() }

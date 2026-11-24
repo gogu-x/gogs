@@ -41,13 +41,14 @@ type Conn struct {
 	token    string
 	state    connState
 	hook     map[reflect.Type]hookHandler
+	hookIDs  map[uint16]struct{} // 注册了钩子的消息编号，用于不解码消息体即可判断是否需要钩子处理
 	stream   pb_gateway.Gateway_StreamClient
 	router   tree.Router
 	codec    codec.Codec
 }
 
 func New(connID uint64, c *websocket.Conn, cd codec.Codec) *Conn {
-	return &Conn{connID: connID, conn: c, codec: cd, hook: make(map[reflect.Type]hookHandler)}
+	return &Conn{connID: connID, conn: c, codec: cd, hook: make(map[reflect.Type]hookHandler), hookIDs: make(map[uint16]struct{})}
 }
 
 func (c *Conn) Name() string { return constant.ConnName(c.connID) }

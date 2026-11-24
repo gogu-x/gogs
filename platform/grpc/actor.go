@@ -27,7 +27,8 @@ func (a *Platform) Name() string { return def.PF }
 
 func (a *Platform) OnInit(ctx tree.Context) {
 	if err := service.EnsureIndexes(a.db); err != nil {
-		tlog.Error("[grpc/Platform.OnInit] 初始化索引失败, err=%v", err)
+		// UID 计数器未就绪时继续注册会分配到已占用的 uid，必须停止启动。
+		tlog.Fatal("[grpc/Platform.OnInit] 初始化账号索引或 UID 计数器失败, err=%v", err)
 	}
 
 	a.router.Register(&pb_pf.RegisterReq{}, a.onRegister)

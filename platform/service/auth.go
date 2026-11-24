@@ -51,7 +51,13 @@ func Register(db *mongo.Database, req *pb_pf.RegisterReq) (*pb_pf.AuthAck, error
 		tlog.Log.Error("Register password hash failed: server_id=%d err=%v", req.ServerId, err)
 		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
 	}
-	uid := store.NextUID()
+	uidCtx, uidCancel := bg()
+	defer uidCancel()
+	uid, err := store.NextUID(uidCtx, db)
+	if err != nil {
+		tlog.Log.Error("Register uid allocation failed: server_id=%d err=%v", req.ServerId, err)
+		return &pb_pf.AuthAck{Code: pb_pf.ErrCode_INTERNAL}, nil
+	}
 	newAcc := &store.Account{
 		ID: bson.NewObjectID(), Account: req.Account,
 		PasswordHash: string(hash), UID: uid, CreatedAt: time.Now(),
@@ -163,18 +169,33 @@ func VerifyToken(req *pb_pf.VerifyTokenReq) (*pb_pf.VerifyAck, error) {
 	return &pb_pf.VerifyAck{Valid: true, Uid: uid, Code: pb_pf.ErrCode_OK}, nil
 }
 
-// EnsureIndexes creates account indexes during startup.
+// EnsureIndexes creates account indexes and seeds the UID counter during startup.
+//
+// 账号名在区服内唯一；uid 全局唯一。历史数据中已有重复 uid 时唯一索引无法建立，
+// 只记录错误不阻止启动，新分配的 uid 由计数器保证不再重复，历史重复需人工处理。
 func EnsureIndexes(db *mongo.Database) error {
 	ctx, cancel := bg()
 	defer cancel()
-	_, err := db.Collection(store.ColAccounts).Indexes().CreateOne(ctx, mongo.IndexModel{
+	accounts := db.Collection(store.ColAccounts)
+	_, err := accounts.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "account", Value: 1}, {Key: "server_id", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	})
 	if err != nil {
-		tlog.Log.Error("EnsureIndexes failed: err=%v", err)
+		tlog.Log.Error("EnsureIndexes account index failed: err=%v", err)
 		return err
 	}
-	tlog.Log.Info("EnsureIndexes succeeded")
+	if _, err := accounts.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "uid", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	}); err != nil {
+		tlog.Log.Error("EnsureIndexes uid unique index failed, existing accounts contain duplicate uid: err=%v", err)
+	}
+	seq, err := store.SeedUIDCounter(ctx, db)
+	if err != nil {
+		tlog.Log.Error("EnsureIndexes uid counter seed failed: err=%v", err)
+		return err
+	}
+	tlog.Log.Info("EnsureIndexes succeeded, uid counter=%d", seq)
 	return nil
 }
