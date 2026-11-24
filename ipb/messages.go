@@ -135,57 +135,6 @@ type SaveAllGuilds struct{}
 // SaveAllActvs 请求活动 Actor 存盘所有已变更的活动数据。
 type SaveAllActvs struct{}
 
-// ActvList 将列表查询独立路由到活动 Actor，并保留玩家会话信息。
-type ActvList struct {
-	*ActvMessage // 玩家身份、会话版本及原始请求。
-}
-
-// ActvMessage 将玩家活动请求从玩家 Actor 转发到全局活动 Actor。
-type ActvMessage struct {
-	UID        uint64      // 玩家唯一 ID。
-	ActvID     uint64      // 活动实例 ID；活动列表请求为 0。
-	Generation uint64      // 当前网关会话版本。
-	Online     bool        // 转发请求时玩家是否在线。
-	Message    interface{} // 要处理的活动业务请求。
-}
-
-// GetUID 返回活动请求所属玩家的编号。
-func (message *ActvMessage) GetUID() uint64 {
-	if message == nil {
-		return 0
-	}
-	return message.UID
-}
-
-// GetActvID 返回活动请求目标实例的编号。
-func (message *ActvMessage) GetActvID() uint64 {
-	if message == nil {
-		return 0
-	}
-	return message.ActvID
-}
-
-// GetGeneration 返回转发活动请求时使用的网关会话版本。
-func (message *ActvMessage) GetGeneration() uint64 {
-	if message == nil {
-		return 0
-	}
-	return message.Generation
-}
-
-// GetOnline 返回转发活动请求时玩家是否在线。
-func (message *ActvMessage) GetOnline() bool {
-	return message != nil && message.Online
-}
-
-// GetMessage 返回需要处理的活动业务请求。
-func (message *ActvMessage) GetMessage() interface{} {
-	if message == nil {
-		return nil
-	}
-	return message.Message
-}
-
 // CreatePlayerActv 请求活动 Actor 为玩家创建一份按需活动实例。
 type CreatePlayerActv struct {
 	UID      uint64 // 活动归属玩家 ID。
@@ -242,8 +191,9 @@ func (message *CreateGuildActvOwner) GetGuildID() uint64 {
 
 // StopPlayerActor 请求玩家 Actor 存盘并在满足条件后停止。
 type StopPlayerActor struct {
-	UID      uint64 // 玩家唯一 ID。
-	Shutdown bool   // 为 true 时关闭会话并在完成存盘后停止 Actor。
+	UID              uint64        // 玩家唯一 ID。
+	QueuedDeliveries []interface{} // 关服前网关已接收、需要在最终存盘前处理的业务投递。
+	Shutdown         bool          // 为 true 时关闭会话并在完成存盘后停止 Actor。
 }
 
 // GetUID 返回停止请求对应的玩家 ID。
@@ -259,11 +209,28 @@ func (message *StopPlayerActor) GetShutdown() bool {
 	return message != nil && message.Shutdown
 }
 
-// PlayerMessage 通过网关玩家目录向指定玩家投递服务器业务命令。
-type PlayerMessage struct {
-	UID     uint64      // 命令目标玩家 ID。
-	Message interface{} // 要交给玩家 Actor 处理的业务消息。
+// DeliverToPlayer 请求游戏网关把服务端业务交给指定玩家 Actor 处理。
+//
+// Guild、Battle、Actv 等模块修改或查询玩家数据时统一发送该消息，由网关定位在线玩家、
+// 复用驻留的 Actor，或在允许时唤醒离线玩家。以请求方式发送时，玩家 Actor 的执行结果
+// 回到原调用方；以单向方式发送时不回复。
+type DeliverToPlayer struct {
+	UID           uint64      // 目标玩家 ID。
+	Payload       interface{} // 交给玩家 Actor 业务路由处理的消息。
+	RequireOnline bool        // 为 true 时仅在玩家有在线会话时执行，否则立即拒绝，不唤醒离线玩家。
 }
+
+// GetUID 返回目标玩家 ID。
+func (m *DeliverToPlayer) GetUID() uint64 { return m.UID }
+
+// GetPayload 返回交给玩家 Actor 处理的业务消息。
+func (m *DeliverToPlayer) GetPayload() interface{} { return m.Payload }
+
+// GetRequireOnline 返回是否要求玩家在线才执行。
+func (m *DeliverToPlayer) GetRequireOnline() bool { return m.RequireOnline }
+
+// GetQueuedDeliveries 返回关服时移交给玩家 Actor 的业务投递。
+func (m *StopPlayerActor) GetQueuedDeliveries() []interface{} { return m.QueuedDeliveries }
 
 // PlayerActorEvictReady 通知网关离线玩家 Actor 已存盘并可以停止。
 type PlayerActorEvictReady struct {

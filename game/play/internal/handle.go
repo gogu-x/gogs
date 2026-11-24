@@ -1,9 +1,9 @@
 package internal
 
 import (
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/game/battle"
 	"github.com/gogu-x/gogs/game/play/internal/core"
-	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_actv"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_assets"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_auth"
 	"github.com/gogu-x/gogs/game/play/internal/ctl/ctl_battle"
@@ -24,18 +24,18 @@ import (
 // InitRoutes 注册单个玩家角色的全部业务路由。
 func InitRoutes(actor *core.PlayerActor) {
 	core.RegisterSysMsg(actor, (*ipb.ActvAssetTrade)(nil), ctl_assets.OnActvAssetTrade)
-	core.RegisterPlayerMsg(actor, (*pb_actv.GetActvShopReq)(nil), ctl_actv.OnGetActvShop)
-	core.RegisterPlayerMsg(actor, (*pb_actv.RefreshActvShopReq)(nil), ctl_actv.OnRefreshActvShop)
-	core.RegisterPlayerMsg(actor, (*pb_actv.GetTaskLotteryReq)(nil), ctl_actv.OnGetTaskLottery)
-	core.RegisterPlayerMsg(actor, (*pb_actv.ClaimActvTaskReq)(nil), ctl_actv.OnClaimActvTask)
-	core.RegisterPlayerMsg(actor, (*pb_actv.DrawActvReq)(nil), ctl_actv.OnDrawActv)
-	core.RegisterPlayerMsg(actor, (*pb_actv.BuyActvShopReq)(nil), ctl_actv.OnBuyActvShop)
+	core.ForwardPlayerMsg(actor, (*pb_actv.GetActvShopReq)(nil), def.ActorActv)
+	core.ForwardPlayerMsg(actor, (*pb_actv.RefreshActvShopReq)(nil), def.ActorActv)
+	core.ForwardPlayerMsg(actor, (*pb_actv.GetTaskLotteryReq)(nil), def.ActorActv)
+	core.ForwardPlayerMsg(actor, (*pb_actv.ClaimActvTaskReq)(nil), def.ActorActv)
+	core.ForwardPlayerMsg(actor, (*pb_actv.DrawActvReq)(nil), def.ActorActv)
+	core.ForwardPlayerMsg(actor, (*pb_actv.BuyActvShopReq)(nil), def.ActorActv)
 
-	core.RegisterPlayerMsg(actor, (*pb_actv.GetSevenDayLoginReq)(nil), ctl_actv.OnGetSevenDayLogin)
+	core.ForwardPlayerMsg(actor, (*pb_actv.GetSevenDayLoginReq)(nil), def.ActorActv)
 	core.RegisterSysMsg(actor, (*pb_auth.LoginGameReq)(nil), ctl_auth.AutoLogin)
-	core.RegisterPlayerMsg(actor, (*pb_actv.GetActvListReq)(nil), ctl_actv.OnGetActvList)
-	core.RegisterPlayerMsg(actor, (*pb_actv.GetProgressReq)(nil), ctl_actv.OnGetActvProgress)
-	core.RegisterPlayerMsg(actor, (*pb_actv.ClaimRewardReq)(nil), ctl_actv.OnClaimActvReward)
+	core.ForwardPlayerMsg(actor, (*pb_actv.GetActvListReq)(nil), def.ActorActv)
+	core.ForwardPlayerMsg(actor, (*pb_actv.GetProgressReq)(nil), def.ActorActv)
+	core.ForwardPlayerMsg(actor, (*pb_actv.ClaimRewardReq)(nil), def.ActorActv)
 	core.RegisterPlayerMsg(actor, (*pb_battle.StartBattleReq)(nil), ctl_battle.OnCreateBattle)
 	core.RegisterPlayerMsg(actor, (*pb_common.GetRoleCombatStatsReq)(nil), ctl_battle.OnGetRoleCombatStats)
 	core.RegisterPlayerMsg(actor, (*pb_equipment.GetRoleEquipmentReq)(nil), ctl_equipment.OnGetRoleEquipment)
@@ -47,9 +47,10 @@ func InitRoutes(actor *core.PlayerActor) {
 	core.RegisterPlayerMsg(actor, (*pb_talent.GetRoleTalentReq)(nil), ctl_loadout.GetTalent)
 	core.RegisterPlayerMsg(actor, (*pb_talent.LearnRoleTalentReq)(nil), ctl_loadout.LearnTalent)
 	core.RegisterPlayerMsg(actor, (*pb_talent.ResetRoleTalentReq)(nil), ctl_loadout.ResetTalent)
-	core.RegisterPlayerMsg(actor, (*pb_guild.CreateGuildReq)(nil), ctl_guild.Create)
-	core.RegisterPlayerMsg(actor, (*pb_guild.JoinGuildReq)(nil), ctl_guild.Join)
-	core.RegisterPlayerMsg(actor, (*pb_guild.LeaveGuildReq)(nil), ctl_guild.Leave)
-	core.RegisterPlayerMsg(actor, (*pb_guild.GetGuildReq)(nil), ctl_guild.Get)
+	core.ForwardPlayerMsg(actor, (*pb_guild.CreateGuildReq)(nil), def.Guild)
+	core.ForwardPlayerMsg(actor, (*pb_guild.JoinGuildReq)(nil), def.Guild)
+	core.ForwardPlayerMsg(actor, (*pb_guild.LeaveGuildReq)(nil), def.Guild)
+	core.ForwardPlayerMsg(actor, (*pb_guild.GetGuildReq)(nil), def.Guild)
+	core.RegisterSysMsg(actor, (*ipb.PlayerGuildMembership)(nil), ctl_guild.OnMembership)
 	core.RegisterSysMsg(actor, (*battle.Settlement)(nil), ctl_battle.OnBattleFinished)
 }

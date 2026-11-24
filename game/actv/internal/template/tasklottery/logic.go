@@ -135,6 +135,7 @@ func (b *Behavior) push(uid uint64) {
 
 // query 向玩家返回当前任务抽奖活动的数据。
 func (b *Behavior) query(uid uint64) {
+	reply := b.RequestReply(uid)
 	now := comm.Now()
 	b.refresh(uid, now, false)
 	ack := &pb_actv.GetTaskLotteryAck{Code: pb_common.ErrCode_ACTV_UNAVAILABLE}
@@ -144,7 +145,7 @@ func (b *Behavior) query(uid uint64) {
 			ack.Code = pb_common.ErrCode_OK
 		}
 	}
-	b.PushToPlayer(uid, ack)
+	reply(ack)
 }
 
 // spend 只准备通用道具扣除，实际余额由玩家侧统一校验。

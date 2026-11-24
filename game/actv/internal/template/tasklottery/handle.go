@@ -19,6 +19,7 @@ func (b *Behavior) handleGet(uid uint64, request *pb_actv.GetTaskLotteryReq) { b
 // handleClaim 在通用任务领取校验通过后提交奖励。
 // @actv.request
 func (b *Behavior) handleClaim(uid uint64, request *pb_actv.ClaimActvTaskReq) {
+	reply := b.RequestReply(uid)
 	ack := &pb_actv.ActvOperationAck{Code: pb_common.ErrCode_ACTV_UNAVAILABLE, Sequence: request.GetSequence()}
 	sent := false
 	defer func() {
@@ -26,7 +27,7 @@ func (b *Behavior) handleClaim(uid uint64, request *pb_actv.ClaimActvTaskReq) {
 			return
 		}
 		ack.Data = b.state(uid)
-		b.PushToPlayer(uid, ack)
+		reply(ack)
 	}()
 	if !b.checkOperation(uid, ack) {
 		return
@@ -69,7 +70,7 @@ func (b *Behavior) handleClaim(uid uint64, request *pb_actv.ClaimActvTaskReq) {
 		return
 	}
 	b.processing = tx.GetSequence()
-	sent = ipb.RequestActvAssets(tx, func(code pb_common.ErrCode) {
+	sent = ipb.RequestPlayerAssetTrade(tx, func(code pb_common.ErrCode) {
 		b.processing = 0
 		ack.Code = code
 		d.Sequence = tx.GetSequence()
@@ -86,7 +87,7 @@ func (b *Behavior) handleClaim(uid uint64, request *pb_actv.ClaimActvTaskReq) {
 		}
 		b.players.MarkDirty()
 		ack.Data = b.state(uid)
-		b.PushToPlayer(uid, ack)
+		reply(ack)
 		b.push(uid)
 		tlog.Log.Info("[tasklottery/handleClaim] 资产回调完成, pid=%v, sequence=%v, code=%v", uid, tx.GetSequence(), code)
 	})
@@ -99,6 +100,7 @@ func (b *Behavior) handleClaim(uid uint64, request *pb_actv.ClaimActvTaskReq) {
 // handleDraw 扣除单次成本乘抽数，先确定全部奖励再提交快照。
 // @actv.request
 func (b *Behavior) handleDraw(uid uint64, request *pb_actv.DrawActvReq) {
+	reply := b.RequestReply(uid)
 	ack := &pb_actv.ActvOperationAck{Code: pb_common.ErrCode_ACTV_UNAVAILABLE, Sequence: request.GetSequence()}
 	sent := false
 	defer func() {
@@ -106,7 +108,7 @@ func (b *Behavior) handleDraw(uid uint64, request *pb_actv.DrawActvReq) {
 			return
 		}
 		ack.Data = b.state(uid)
-		b.PushToPlayer(uid, ack)
+		reply(ack)
 	}()
 	if !b.checkOperation(uid, ack) {
 		return
@@ -149,7 +151,7 @@ func (b *Behavior) handleDraw(uid uint64, request *pb_actv.DrawActvReq) {
 	}
 	drawCount, poolID := int64(request.GetCount()), int64(pool.GetCfgID())
 	b.processing = tx.GetSequence()
-	sent = ipb.RequestActvAssets(tx, func(code pb_common.ErrCode) {
+	sent = ipb.RequestPlayerAssetTrade(tx, func(code pb_common.ErrCode) {
 		b.processing = 0
 		ack.Code = code
 		d.Sequence = tx.GetSequence()
@@ -163,7 +165,7 @@ func (b *Behavior) handleDraw(uid uint64, request *pb_actv.DrawActvReq) {
 		}
 		b.players.MarkDirty()
 		ack.Data = b.state(uid)
-		b.PushToPlayer(uid, ack)
+		reply(ack)
 		b.push(uid)
 		tlog.Log.Info("[tasklottery/handleDraw] 资产回调完成, pid=%v, sequence=%v, code=%v", uid, tx.GetSequence(), code)
 	})

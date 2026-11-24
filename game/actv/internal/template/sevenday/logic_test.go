@@ -113,11 +113,12 @@ func TestPushAndBusinessRouting(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("未收到主动推送")
 	}
+	b.SetRequestGeneration(2)
 	b.HandleRequest(8, &pb_actv.GetSevenDayLoginReq{ActvId: 100})
 	select {
 	case push := <-gate.messages:
 		ack, ok := push.Msg.(*pb_actv.GetSevenDayLoginAck)
-		if !ok || push.GetUID() != 8 || ack.GetCode() != pb_common.ErrCode_ACTV_NOT_FOUND {
+		if !ok || push.GetUID() != 8 || push.GetGeneration() != 2 || ack.GetCode() != pb_common.ErrCode_ACTV_NOT_FOUND {
 			t.Fatal("越权查询没有由业务 ACK 拒绝")
 		}
 	case <-time.After(time.Second):

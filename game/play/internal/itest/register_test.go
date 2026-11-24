@@ -5,9 +5,12 @@ import (
 	"testing"
 	"time"
 
+	playinternal "github.com/gogu-x/gogs/game/play/internal"
 	"github.com/gogu-x/gogs/game/play/internal/core"
 	"github.com/gogu-x/gogs/game/play/internal/player"
+	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/tree"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var errNoPlayer = errors.New("PlayerActor 数据未加载")
@@ -31,6 +34,46 @@ func spawnPlayerActor(t *testing.T, boot func(*core.PlayerActor)) tree.PID {
 	pid := tree.SpawnOne(actor)
 	t.Cleanup(func() { tree.Stop(pid) })
 	return pid
+}
+
+// guildSaveSnapshot 读取玩家存盘所用的独立快照及其标脏状态。
+type guildSaveSnapshot struct{}
+
+// TestPlayerGuildMembershipIsPersisted 验证所属联盟由玩家 Actor 修改，并进入 BSON 存盘快照。
+func TestPlayerGuildMembershipIsPersisted(t *testing.T) {
+	pid := spawnPlayerActor(t, func(actor *core.PlayerActor) {
+		playinternal.InitRoutes(actor)
+		actor.GetPlayer().SetDirty(false)
+		core.RegisterSysMsg(actor, (*guildSaveSnapshot)(nil), func(ctx *core.Context, _ *guildSaveSnapshot) {
+			current := ctx.GetPlayer()
+			ctx.Response(current.DeepCopy(), nil)
+		})
+	})
+
+	for _, guildID := range []uint64{9, 0} {
+		tree.Send(pid, &ipb.PlayerGuildMembership{UID: testUID, GuildID: guildID})
+		value, err := tree.Request(pid, &guildSaveSnapshot{}).AwaitTimeout(time.Second)
+		if err != nil {
+			t.Fatalf("读取玩家存盘快照失败: %v", err)
+		}
+		snapshot := value.(*player.Player)
+		if snapshot.GetGuildID() != guildID || !snapshot.IsDirty() {
+			t.Fatalf("联盟编号未更新或未标脏，期望联盟编号 %v", guildID)
+		}
+		encoded, err := bson.Marshal(snapshot)
+		if err != nil {
+			t.Fatalf("编码玩家 BSON 失败: %v", err)
+		}
+		var stored struct {
+			GuildID *uint64 `bson:"guild_id"`
+		}
+		if err := bson.Unmarshal(encoded, &stored); err != nil {
+			t.Fatalf("读取玩家 BSON 失败: %v", err)
+		}
+		if stored.GuildID == nil || *stored.GuildID != guildID {
+			t.Fatalf("玩家 BSON 中缺少正确的 guild_id，期望 %v", guildID)
+		}
+	}
 }
 
 // TestContextResponseReachesRequester 验证 Context.TreeCtx 使用当前消息的上下文。

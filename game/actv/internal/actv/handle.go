@@ -11,7 +11,6 @@ import (
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/comm"
 	"github.com/gogu-x/tree/tlog"
-	"google.golang.org/protobuf/proto"
 )
 
 const maxActvInstanceID = uint64(1<<63 - 1)
@@ -19,67 +18,55 @@ const maxActvInstanceID = uint64(1<<63 - 1)
 // registerHandlers 注册全局活动 Actor 的内部消息处理器。
 func (actor *Actv) registerHandlers() {
 	tree.RegisterFunc(&actor.router, &sspb.Event{}, actor.onEvent)
-	tree.RegisterFunc(&actor.router, &ipb.ActvMessage{}, actor.onPlayerActvMessage)
+	tree.RegisterFunc(&actor.router, &ipb.ForwardedRequest{}, actor.onForwardedRequest)
 	tree.RegisterFunc(&actor.router, &ipb.SaveAllActvs{}, actor.onSaveAllActvs)
-	tree.RegisterFunc(&actor.router, &ipb.ActvList{}, actor.handleGetActvList)
 }
 
-// onPlayerActvMessage 将玩家活动请求分发到实例绑定的模板行为；玩家数据未就绪时按玩家暂存。
-func (actor *Actv) onPlayerActvMessage(ctx tree.Context, message *ipb.ActvMessage) {
-	if ctx == nil || !actor.acceptActvRequest(message) {
+// onForwardedRequest 处理玩家 Actor 转交的活动请求：全局或玩家活动数据加载期间按收件顺序暂存，
+// 就绪后活动列表由本 Actor 直接回包，其余请求按请求中的活动编号交给模板处理。
+func (actor *Actv) onForwardedRequest(ctx tree.Context, forwarded *ipb.ForwardedRequest) {
+	if ctx == nil || forwarded == nil || forwarded.GetUID() == 0 || forwarded.GetRequest() == nil {
+		tlog.Log.Error("[actv/Actv.onForwardedRequest] 活动请求无效")
 		return
 	}
-	actor.dispatchPlayerRequest(ctx, message)
+	if !actor.acceptRequest(ctx, forwarded) || !actor.playerRequestReady(ctx, forwarded) {
+		return
+	}
+	uid := forwarded.GetUID()
+	if _, ok := forwarded.GetRequest().(*pb_actv.GetActvListReq); ok {
+		tlog.Log.Info("[actv/Actv.onForwardedRequest] 获取活动列表, pid=%v", uid)
+		pushActv(ctx, forwarded, actor.actvList(uid))
+		return
+	}
+	target, ok := forwarded.GetRequest().(interface{ GetActvId() uint64 })
+	if !ok || target.GetActvId() > maxActvInstanceID {
+		actor.rejectRequest(ctx, forwarded, fmt.Errorf("invalid actv request %T", forwarded.GetRequest()))
+		return
+	}
+	actor.actvService.HandleRequest(uid, int64(target.GetActvId()), forwarded.GetRequest(), forwarded.GetGeneration())
 }
 
-// actvPlayerRequest 提供请求排队所需的玩家身份。
-type actvPlayerRequest interface{ GetUID() uint64 }
-
-// acceptActvRequest 在全局活动数据加载期间保留原始消息类型。
-func (actor *Actv) acceptActvRequest(message actvPlayerRequest) bool {
-	if !actor.ready {
-		if len(actor.pending) >= maxPendingActvRequests {
-			tlog.Log.Error("[actv/Actv.acceptActvRequest] 活动等待队列已满, pid=%v", message.GetUID())
-			return false
-		}
-		actor.pending = append(actor.pending, pendingActvRequest{message: message})
-		return false
-	}
+// acceptRequest 在全局活动数据加载期间暂存请求；加载失败或暂存已满时拒绝请求。
+func (actor *Actv) acceptRequest(ctx tree.Context, forwarded *ipb.ForwardedRequest) bool {
 	if actor.loadErr != nil {
-		tlog.Log.Error("[actv/Actv.acceptActvRequest] 活动数据加载失败, pid=%v err=%v", message.GetUID(), actor.loadErr)
+		actor.rejectRequest(ctx, forwarded, actor.loadErr)
 		return false
 	}
-	return true
+	if actor.ready {
+		return true
+	}
+	if len(actor.pending) >= maxPendingActvRequests {
+		actor.rejectRequest(ctx, forwarded, fmt.Errorf("actv initialization queue full"))
+		return false
+	}
+	actor.pending = append(actor.pending, pendingActvRequest{message: forwarded})
+	return false
 }
 
-// handlePlayerActvMessage 只分发消息；列表和具体业务各自选择推送。
-func (actor *Actv) handlePlayerActvMessage(ctx tree.Context, message *ipb.ActvMessage) {
-	uid := message.GetUID()
-	request, ok := message.GetMessage().(proto.Message)
-	if uid == 0 || !ok || request == nil || !request.ProtoReflect().IsValid() {
-		tlog.Log.Error("[actv/Actv.handlePlayerActvMessage] 活动请求无效, pid=%v", uid)
-		return
-	}
-	if actor.actvService == nil {
-		tlog.Log.Error("[actv/Actv.handlePlayerActvMessage] 活动服务不可用, pid=%v", uid)
-		return
-	}
-	actvID := message.GetActvID()
-	if actvID > maxActvInstanceID {
-		tlog.Log.Error("[actv/Actv.handlePlayerActvMessage] 活动编号无效, pid=%v actv=%v", uid, actvID)
-		return
-	}
-	actor.actvService.HandleRequest(uid, int64(actvID), request)
-}
-
-// handleGetActvList 处理活动列表请求并推送当前已加载的活动信息。
-func (actor *Actv) handleGetActvList(ctx tree.Context, message *ipb.ActvList) {
-	if ctx == nil || message == nil || message.GetUID() == 0 || !actor.acceptActvRequest(message) || !actor.playerRequestReady(message) {
-		return
-	}
-	uid := message.GetUID()
-	tlog.Log.Info("[actv/Actv.handleGetActvList] 获取活动列表, pid=%v", uid)
-	pushActv(ctx, message, actor.actvList(uid))
+// rejectRequest 记录活动请求无法处理的原因，并向发起请求的会话推送 ErrorNtf(INTERNAL)。
+func (actor *Actv) rejectRequest(ctx tree.Context, forwarded *ipb.ForwardedRequest, err error) {
+	tlog.Log.Error("[actv/Actv.rejectRequest] 活动请求无法处理, pid=%v type=%T err=%v", forwarded.GetUID(), forwarded.GetRequest(), err)
+	pushActv(ctx, forwarded, ipb.NewErrorNotification(forwarded.GetRequest(), pb_common.ErrCode_INTERNAL))
 }
 
 // onSaveAllActvs 保存所有活动实例的脏元数据。
@@ -128,12 +115,12 @@ func (actor *Actv) onEvent(ctx tree.Context, message *sspb.Event) {
 		return
 	}
 	if actor.loadErr != nil {
-		logPlayerInputFailure(message, actor.loadErr)
+		logEventFailure(message, actor.loadErr)
 		return
 	}
 	if !actor.ready {
 		if len(actor.pending) >= maxPendingActvRequests {
-			logPlayerInputFailure(message, fmt.Errorf("actv initialization queue full"))
+			logEventFailure(message, fmt.Errorf("actv initialization queue full"))
 			return
 		}
 		actor.addPendingEvent(message)
@@ -146,7 +133,7 @@ func (actor *Actv) onEvent(ctx tree.Context, message *sspb.Event) {
 	// 这里只等待已经开始的玩家初始化，不负责事件归属分发，也不启动加载。
 	if message.GetEventTyp() == gameevent.TypePlayerLifecycle {
 		if state := actor.players[gameevent.PlayerUID(message)]; state != nil && (state.loading || state.reload) {
-			state.queuePending(gameevent.Clone(message))
+			state.queuePending(ctx, actor, gameevent.Clone(message))
 			return
 		}
 	}
@@ -194,7 +181,7 @@ func (actor *Actv) drainPending(ctx tree.Context) {
 	pending := actor.pending
 	actor.pending = nil
 	if actor.loadErr != nil {
-		respondPending(ctx, pending, actor.loadErr)
+		actor.rejectPending(ctx, pending, actor.loadErr)
 		return
 	}
 	for _, item := range pending {

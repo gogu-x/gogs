@@ -1,14 +1,20 @@
 package itest
 
 import (
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
+	"google.golang.org/protobuf/proto"
 	"testing"
 	"time"
 
 	"github.com/gogu-x/gogs/def"
+	playinternal "github.com/gogu-x/gogs/game/play/internal"
 	"github.com/gogu-x/gogs/game/play/internal/core"
+	"github.com/gogu-x/gogs/game/play/internal/player"
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_auth"
+	"github.com/gogu-x/gogs/pb/cspb/pb_guild"
 	"github.com/gogu-x/tree"
+	"github.com/gogu-x/tree/db/mongorpc"
 )
 
 // recorderActor 把收到的消息转发到通道，用于模拟会话代理或游戏网关。
@@ -27,9 +33,21 @@ func (r *recorderActor) Name() string        { return r.name }
 func (r *recorderActor) MailboxSize() int    { return r.mailbox }
 func (r *recorderActor) OnInit(tree.Context) {}
 func (r *recorderActor) OnStop(tree.Context) {}
-func (r *recorderActor) HandleMessage(_ tree.Context, m interface{}) {
+func (r *recorderActor) HandleMessage(ctx tree.Context, m interface{}) {
 	if r.block != nil {
 		<-r.block
+	}
+	if forwarded, ok := m.(*ipb.ForwardedRequest); ok {
+		req, _ := forwarded.GetRequest().(*pb_guild.GetGuildReq)
+		r.received <- guildForwarded{
+			request: req, generation: forwarded.GetGeneration(),
+			hasEnvelope: ctx.RequestEnvelope() != nil,
+		}
+		return
+	}
+	if _, ok := m.(*mongorpc.FindOne); ok {
+		r.received <- ctx.RequestEnvelope()
+		return
 	}
 	r.received <- m
 }
@@ -103,6 +121,81 @@ func TestPushFindsSessionAgentByName(t *testing.T) {
 	}
 }
 
+// guildForwarded 记录联盟 Actor 收到的转发请求及其会话代次。
+type guildForwarded struct {
+	request     *pb_guild.GetGuildReq
+	generation  uint64
+	hasEnvelope bool
+}
+
+// TestGuildRequestCarriesSessionGeneration 验证联盟请求以 ForwardedRequest 转交，携带原始请求和会话代次。
+func TestGuildRequestCarriesSessionGeneration(t *testing.T) {
+	guild := newRecorder(def.Guild)
+	spawnRecorder(t, guild)
+	player := spawnPlayerActor(t, playinternal.InitRoutes)
+	request := &pb_guild.GetGuildReq{UID: testUID, GuildId: 1}
+
+	tree.Send(player, &ipb.PlayerSessionOpened{UID: testUID, Generation: 7})
+	tree.Send(player, &ipb.PlayerInbound{UID: testUID, Generation: 7, Message: request})
+
+	message := receive[guildForwarded](t, guild)
+	if message.generation != 7 || message.request != request || message.hasEnvelope {
+		t.Fatalf("转发的会话代次或请求不匹配，收到 %+v", message)
+	}
+}
+
+// TestForwardTargetUnavailablePushesErrorNtf 验证转发目标 Actor 不存在时向客户端推送 ErrorNtf(INTERNAL)。
+func TestForwardTargetUnavailablePushesErrorNtf(t *testing.T) {
+	agent := newRecorder(def.SessionAgentName(testUID))
+	spawnRecorder(t, agent)
+	player := spawnPlayerActor(t, playinternal.InitRoutes)
+	request := &pb_guild.GetGuildReq{UID: testUID, GuildId: 1}
+
+	tree.Send(player, &ipb.PlayerSessionOpened{UID: testUID, Generation: 7})
+	tree.Send(player, &ipb.PlayerInbound{UID: testUID, Generation: 7, Message: request})
+
+	for {
+		push := receive[*ipb.PushToMsg](t, agent)
+		ntf, ok := push.Msg.(*pb_common.ErrorNtf)
+		if !ok {
+			continue // 登录等其他推送
+		}
+		if push.Generation != 7 || ntf.GetCode() != pb_common.ErrCode_INTERNAL || ntf.GetRequestType() != string(proto.MessageName(request)) {
+			t.Fatalf("错误通知不符: generation=%v ntf=%+v", push.Generation, ntf)
+		}
+		return
+	}
+}
+
+// TestGuildRequestWaitingForPlayerLoad 验证玩家加载时换线后只转发新会话的请求。
+func TestGuildRequestWaitingForPlayerLoad(t *testing.T) {
+	mongo := newRecorder(def.Mongo)
+	spawnRecorder(t, mongo)
+	guild := newRecorder(def.Guild)
+	spawnRecorder(t, guild)
+	pid := tree.SpawnOne(&core.PlayerActor{UID: testUID, Boot: playinternal.InitRoutes})
+	t.Cleanup(func() { tree.Stop(pid) })
+	load := receive[*tree.Envelope](t, mongo)
+
+	tree.Send(pid, &ipb.PlayerSessionOpened{UID: testUID, Generation: 7})
+	tree.Send(pid, &ipb.PlayerInbound{
+		UID: testUID, Generation: 7, Message: &pb_guild.GetGuildReq{UID: testUID, GuildId: 1},
+	})
+	tree.Send(pid, &ipb.PlayerSessionOpened{UID: testUID, Generation: 8})
+	request := &pb_guild.GetGuildReq{UID: testUID, GuildId: 2}
+	for range 2 {
+		tree.Send(pid, &ipb.PlayerInbound{UID: testUID, Generation: 8, Message: request})
+	}
+	load.Respond(&player.Player{UID: testUID}, nil)
+
+	for range 2 {
+		message := receive[guildForwarded](t, guild)
+		if message.generation != 8 || message.request != request || message.hasEnvelope {
+			t.Fatalf("加载后应只转发新会话的普通请求，收到 %+v", message)
+		}
+	}
+}
+
 // TestPushWithoutSessionAgentFails 验证玩家没有在线会话代理时推送失败且不请求关闭会话。
 func TestPushWithoutSessionAgentFails(t *testing.T) {
 	gate := newRecorder(def.GameGate)
@@ -140,5 +233,26 @@ func TestPushFullAgentRequestsSessionClose(t *testing.T) {
 	closeReq := receive[*ipb.CloseSession](t, gate)
 	if closeReq.UID != testUID || closeReq.AgentPID != agentPID {
 		t.Fatalf("close uid=%v agent=%v, want uid=%v agent=%v", closeReq.UID, closeReq.AgentPID, testUID, agentPID)
+	}
+}
+
+// TestShutdownDrainsRoutedRequests 验证加载期间收到关服时，先执行已受理业务再回复关服。
+func TestShutdownDrainsRoutedRequests(t *testing.T) {
+	mongo := newRecorder(def.Mongo)
+	spawnRecorder(t, mongo)
+	pid := tree.SpawnOne(&core.PlayerActor{UID: testUID, Boot: func(actor *core.PlayerActor) {
+		core.RegisterSysMsg(actor, (*testReq)(nil), func(ctx *core.Context, req *testReq) { ctx.Response(req.GetUID(), nil) })
+	}})
+	t.Cleanup(func() { tree.Stop(pid) })
+	load := receive[*tree.Envelope](t, mongo)
+	req := &testReq{UID: testUID}
+	reply := tree.NewRequest(req, tree.PID{}, nil, nil)
+	stop := tree.Request(pid, &ipb.StopPlayerActor{UID: testUID, Shutdown: true, QueuedDeliveries: []interface{}{ipb.WrapWithReply(req, reply)}})
+	load.Respond(&player.Player{UID: testUID}, nil)
+	if result, err := reply.AwaitTimeout(time.Second); err != nil || result != testUID {
+		t.Fatalf("暂存请求结果为 %v, %v", result, err)
+	}
+	if _, err := stop.AwaitTimeout(time.Second); err != nil {
+		t.Fatalf("关服失败 %v", err)
 	}
 }

@@ -25,6 +25,7 @@ type ActvBehavior interface {
 	OnClosed()
 	OnPack() *pb_actv.ActvInfo
 	HandleEvent(event *sspb.Event)
+	SetRequestGeneration(uint64) // 绑定同步分发期间的请求会话代次。
 	HandleRequest(uid uint64, request proto.Message)
 }
 

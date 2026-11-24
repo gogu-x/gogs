@@ -133,7 +133,7 @@ func (actor *Actv) onPlayerLoadFinished(
 	if err != nil {
 		tlog.Log.Error("[actv/Actv.onPlayerLoadFinished] 玩家活动数据加载失败, pid=%v err=%v", uid, err)
 		delete(actor.players, uid)
-		respondPending(ctx, state.pending, err)
+		actor.rejectPending(ctx, state.pending, err)
 		return
 	}
 	actor.applyPlayerData(uid, state)
@@ -203,72 +203,68 @@ func docCount(docs *[]service.ActvDataDoc) int {
 func (actor *Actv) initializePlayer(ctx tree.Context, event *sspb.Event) {
 	uid := gameevent.PlayerUID(event)
 	if uid == 0 {
-		logPlayerInputFailure(event, fmt.Errorf("player initialization requires uid"))
+		logEventFailure(event, fmt.Errorf("player initialization requires uid"))
 		return
 	}
 	actor.ensurePlayerLoaded(ctx, uid)
 }
 
-// dispatchPlayerRequest 只处理请求：初始化期间暂存，未初始化则拒绝，不隐式加载数据。
-func (actor *Actv) dispatchPlayerRequest(ctx tree.Context, message *ipb.ActvMessage) {
-	if actor.playerRequestReady(message) {
-		actor.handlePlayerActvMessage(ctx, message)
-	}
-}
-
-// playerRequestReady 共用玩家加载检查，排队时保留列表和业务请求各自的类型。
-func (actor *Actv) playerRequestReady(message actvPlayerRequest) bool {
-	uid := message.GetUID()
+// playerRequestReady 检查玩家活动数据是否就绪；初始化期间按收件顺序暂存，未初始化则拒绝，
+// 不隐式加载数据。
+func (actor *Actv) playerRequestReady(ctx tree.Context, forwarded *ipb.ForwardedRequest) bool {
+	uid := forwarded.GetUID()
 	if actor.actvService == nil {
-		tlog.Log.Error("[actv/Actv.playerRequestReady] 活动服务不可用, pid=%v", uid)
+		actor.rejectRequest(ctx, forwarded, fmt.Errorf("actv service unavailable"))
 		return false
 	}
 	if actor.actvService.IsPlayerLoaded(uid) {
 		return true
 	}
 	if state := actor.players[uid]; state != nil && (state.loading || state.reload) {
-		state.queuePending(message)
+		state.queuePending(ctx, actor, forwarded)
 		return false
 	}
-	tlog.Log.Error("[actv/Actv.playerRequestReady] 玩家活动尚未初始化, pid=%v", uid)
+	actor.rejectRequest(ctx, forwarded, fmt.Errorf("player actv not initialized"))
 	return false
 }
 
-// queuePending 初始化只暂存原始消息，沿用收件顺序，事件与请求各自由独立入口回放。
-func (state *playerLoadState) queuePending(message interface{}) {
-	if len(state.pending) >= maxPendingPlayerRequests {
-		logPlayerInputFailure(message, fmt.Errorf("player actv initialization queue full"))
+// queuePending 在玩家活动数据初始化期间按收件顺序暂存事件或请求；已满时拒绝。
+func (state *playerLoadState) queuePending(ctx tree.Context, actor *Actv, message interface{}) {
+	if len(state.pending) < maxPendingPlayerRequests {
+		state.pending = append(state.pending, pendingActvRequest{message: message})
 		return
 	}
-	state.pending = append(state.pending, pendingActvRequest{message: message})
+	actor.rejectPending(ctx, []pendingActvRequest{{message: message}}, fmt.Errorf("player actv initialization queue full"))
 }
 
-// replayPending 只恢复初始化期间的收件顺序，不解析 UID、不加载数据、不执行模板业务。
+// replayPending 按收件顺序重新处理初始化期间暂存的事件和请求。
 func (actor *Actv) replayPending(ctx tree.Context, item pendingActvRequest) {
 	switch message := item.message.(type) {
 	case *sspb.Event:
 		actor.onEvent(ctx, message)
-	case *ipb.ActvMessage:
-		actor.onPlayerActvMessage(ctx, message)
-	case *ipb.ActvList:
-		actor.handleGetActvList(ctx, message)
+	case *ipb.ForwardedRequest:
+		actor.onForwardedRequest(ctx, message)
 	}
 }
 
-// logPlayerInputFailure 记录事件或请求加载失败，保留事件归属及名称便于定位。
-func logPlayerInputFailure(message interface{}, err error) {
-	if event, ok := message.(*sspb.Event); ok {
-		tlog.Log.Error(
-			"[actv/logPlayerInputFailure] 玩家活动事件处理失败, pid=%v event=%v err=%v",
-			gameevent.PlayerUID(event), event.GetName(), err,
-		)
-		return
+// rejectPending 结束无法处理的暂存项：请求推送 ErrorNtf，事件记录日志。
+func (actor *Actv) rejectPending(ctx tree.Context, pending []pendingActvRequest, err error) {
+	for _, item := range pending {
+		switch message := item.message.(type) {
+		case *ipb.ForwardedRequest:
+			actor.rejectRequest(ctx, message, err)
+		case *sspb.Event:
+			logEventFailure(message, err)
+		}
 	}
-	request, ok := message.(actvPlayerRequest)
-	if !ok {
-		return
-	}
-	tlog.Log.Error("[actv/logPlayerInputFailure] 活动请求不可用, pid=%v err=%v", request.GetUID(), err)
+}
+
+// logEventFailure 记录活动事件无法处理的原因，保留事件归属及名称便于定位。
+func logEventFailure(event *sspb.Event, err error) {
+	tlog.Log.Error(
+		"[actv/logEventFailure] 玩家活动事件处理失败, pid=%v event=%v err=%v",
+		gameevent.PlayerUID(event), event.GetName(), err,
+	)
 }
 
 // onPlayerOwnerReleased 存盘玩家相关的脏数据并从内存卸载。
@@ -337,13 +333,6 @@ func (actor *Actv) saveDocs(
 		if !actor.lifecycle.Save(ctx, (*service.ActvDataDoc)(nil), doc, finish) {
 			finish(ctx, fmt.Errorf("actv data save not scheduled, id=%v", doc.GetID()))
 		}
-	}
-}
-
-// respondPending 统一结束加载失败或已释放玩家的暂存请求。
-func respondPending(ctx tree.Context, pending []pendingActvRequest, err error) {
-	for _, item := range pending {
-		logPlayerInputFailure(item.message, err)
 	}
 }
 

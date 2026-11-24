@@ -558,13 +558,13 @@ func TestHandleRequestRouting(t *testing.T) {
 	}
 	behavior := actv.GetExt().(*reqBehavior)
 	request := &pb_actv.GetProgressReq{}
-	svc.HandleRequest(7, 10, request)
-	svc.HandleRequest(8, 10, request)
+	svc.HandleRequest(7, 10, request, 1)
+	svc.HandleRequest(8, 10, request, 1)
 	if len(behavior.uids) != 1 || behavior.uids[0] != 7 {
 		t.Fatal("归属校验未由业务执行")
 	}
 	svc.EndActv(10)
-	svc.HandleRequest(7, 10, request)
+	svc.HandleRequest(7, 10, request, 1)
 	if len(behavior.uids) != 1 {
 		t.Fatal("业务未拒绝已结束活动")
 	}

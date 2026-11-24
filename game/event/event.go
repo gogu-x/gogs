@@ -2,6 +2,7 @@
 package event
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -67,7 +68,7 @@ func IsServerClosing(message interface{}) bool {
 	return ok && event != nil && event.GetEventTyp() == TypeServerLifecycle && event.GetName() == NameServerClosing
 }
 
-// SendToActors sends an event to each named Actor and waits for every response.
+// SendToActors 按序投递生命周期事件；关服时等待各模块应答并汇总失败。
 func SendToActors(message *sspb.Event, actorNames []string) error {
 	if message == nil {
 		err := fmt.Errorf("event message is nil")
@@ -79,8 +80,7 @@ func SendToActors(message *sspb.Event, actorNames []string) error {
 		pid, _ := tree.Lookup(actorName)
 		if IsServerClosing(message) {
 			if _, err := tree.Request(pid, Clone(message)).AwaitTimeout(eventDeliveryTimeout); err != nil {
-				deliveryErr = fmt.Errorf("shutdown actor %s: %w", actorName, err)
-				break
+				deliveryErr = errors.Join(deliveryErr, fmt.Errorf("shutdown actor %s: %w", actorName, err))
 			}
 		} else {
 			tree.Send(pid, Clone(message))

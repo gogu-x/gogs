@@ -14,10 +14,11 @@ import (
 // BaseBehavior 为绑定单个活动实例的模块提供默认生命周期、组件注册和通用信息行为。
 // 活动模块可嵌入该结构，只覆盖自身需要定制的方法。
 type BaseBehavior struct {
-	Actv        *service.Actv   // 当前活动实例，元数据修改直接作用于存盘对象。
-	ActvCfg     conf.ActvConfig // 当前活动实例配置。
-	comps       []service.Component
-	playerComps []service.PlayerComponent
+	Actv              *service.Actv   // 当前活动实例，元数据修改直接作用于存盘对象。
+	ActvCfg           conf.ActvConfig // 当前活动实例配置。
+	requestGeneration uint64          // 同步分发期间的会话代次。
+	comps             []service.Component
+	playerComps       []service.PlayerComponent
 }
 
 // Bind 绑定活动实例和配置，供模板 Create 调用。
@@ -95,6 +96,14 @@ func (b *BaseBehavior) OnPack() *pb_actv.ActvInfo {
 		OwnerScope: pb_actv.ActvOwnerScope(meta.GetOwnerScope()), OwnerId: uint64(meta.GetOwnerID()),
 		Status: status, StartTime: start, EndTime: end,
 	}
+}
+
+// SetRequestGeneration 绑定当前活动请求的会话代次。
+func (b *BaseBehavior) SetRequestGeneration(generation uint64) { b.requestGeneration = generation }
+
+// RequestReply 固定本次请求的回复目标，异步回调可在后续请求到达后安全使用。
+func (b *BaseBehavior) RequestReply(uid uint64) func(proto.Message) bool {
+	return ipb.SessionReply(uid, b.requestGeneration)
 }
 
 // PushToPlayer 按玩家编号向当前在线会话推送，不依赖正在处理的请求。

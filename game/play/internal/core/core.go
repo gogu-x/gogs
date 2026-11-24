@@ -27,6 +27,12 @@ const (
 	maxPendingMessages = 512
 )
 
+// pendingInbound 保留待处理的网关消息及其独立的 Tree 消息上下文。
+type pendingInbound struct {
+	context tree.Context
+	message *ipb.PlayerInbound
+}
+
 // PlayerActor 独占一名玩家的数据和业务消息队列。
 //
 // 玩家状态只在所属协程内访问；网关负责按玩家编号建立和复用该角色。
@@ -80,11 +86,9 @@ func (actor *PlayerActor) OnInit(ctx tree.Context) {
 	actor.registerTimers()
 	actor.scheduleIdleEviction()
 	uid := actor.UID
-	for _, message := range actor.initialMessages {
-		if !actor.addPending(message) {
-			tlog.Log.Error("[play/PlayerActor.OnInit] 初始玩家消息超出队列上限, pid=%v", uid)
-		}
-	}
+	// 网关已限制初始业务数量，开服事件不能挤掉最后一条已受理消息。
+	actor.pending = actor.initialMessages
+	actor.initialMessages = nil
 	if actor.Boot != nil {
 		actor.Boot(actor)
 	}
@@ -96,6 +100,7 @@ func (actor *PlayerActor) OnInit(ctx tree.Context) {
 		actor.model = player.NewPersistenceModel(actor.Player)
 		actor.ready = true
 		actor.scheduleAutoSave()
+		actor.drainPending(ctx)
 		return
 	}
 
@@ -216,6 +221,7 @@ func (actor *PlayerActor) failLoad(ctx tree.Context, err error) {
 	actor.loadErr = err
 	tlog.Log.Error("[play/PlayerActor.failLoad] 玩家数据加载失败, pid=%v err=%v", uid, err)
 	for _, message := range actor.takePending() {
+		ipb.RejectDelivery(message, err)
 		if actor.loginRequest(message) != nil {
 			actor.sendLoginFailure(ctx, pb_common.ErrCode_INTERNAL)
 		}
@@ -237,16 +243,22 @@ func (actor *PlayerActor) failLoad(ctx tree.Context, err error) {
 func (actor *PlayerActor) queueWhileLoading(ctx tree.Context, msg interface{}) {
 	uid := actor.UID
 	if actor.loadErr != nil {
+		ipb.RejectDelivery(msg, actor.loadErr)
 		if actor.loginRequest(msg) != nil {
 			actor.sendLoginFailure(ctx, pb_common.ErrCode_INTERNAL)
 		}
 		return
 	}
 	if len(actor.pending) >= maxPendingMessages {
+		ipb.RejectDelivery(msg, errors.New("player load queue full"))
 		tlog.Log.Error("[play/PlayerActor.queueWhileLoading] 玩家加载期间请求队列已满, pid=%v limit=%v", uid, maxPendingMessages)
 		if actor.loginRequest(msg) != nil {
 			actor.sendLoginFailure(ctx, pb_common.ErrCode_INTERNAL)
 		}
+		return
+	}
+	if inbound, ok := msg.(*ipb.PlayerInbound); ok {
+		actor.addPending(&pendingInbound{context: ctx, message: inbound})
 		return
 	}
 	actor.addPending(msg)
@@ -261,10 +273,19 @@ func (actor *PlayerActor) addPending(msg interface{}) bool {
 	return true
 }
 
+// addShutdownPending 追加网关已接收的关服消息，不重复占用常规加载队列配额。
+func (actor *PlayerActor) addShutdownPending(message interface{}) {
+	actor.pending = append(actor.pending, message)
+}
+
 // drainPending 在玩家数据加载完成后分发已暂存的消息。
 func (actor *PlayerActor) drainPending(ctx tree.Context) {
 	pending := actor.takePending()
 	for _, msg := range pending {
+		if inbound, ok := msg.(*pendingInbound); ok {
+			actor.onPlayerInbound(inbound.context, inbound.message)
+			continue
+		}
 		actor.messageRouter.Route(ctx, msg)
 	}
 }
@@ -350,6 +371,9 @@ func (actor *PlayerActor) onServerClosing() {
 
 // loginRequest 从直接消息或封装消息中提取登录请求。
 func (actor *PlayerActor) loginRequest(msg interface{}) *pb_auth.LoginGameReq {
+	if pending, ok := msg.(*pendingInbound); ok {
+		msg = pending.message
+	}
 	if inbound, ok := msg.(*ipb.PlayerInbound); ok && inbound != nil {
 		msg = inbound.Message
 	}
@@ -579,6 +603,16 @@ func (actor *PlayerActor) stopIfSaved(ctx tree.Context, message *ipb.StopPlayerA
 		return
 	}
 	if message.GetShutdown() {
+		for _, pending := range message.GetQueuedDeliveries() {
+			if actor.ready {
+				actor.messageRouter.Route(ctx, pending)
+			} else if actor.loadErr != nil {
+				ipb.RejectDelivery(pending, actor.loadErr)
+			} else {
+				// 此批业务已由网关限流接收，加载完成后须先处理再最终存盘。
+				actor.addShutdownPending(pending)
+			}
+		}
 		actor.accepting = false
 		actor.shutdownStop = true
 		actor.shutdownRequest = ctx.RequestEnvelope()
@@ -737,11 +771,12 @@ func (actor *PlayerActor) PushToClient(ctx tree.Context, msg interface{}) bool {
 //
 // 推送给当前玩家时携带本 Actor 绑定的会话版本，代理据此丢弃发往旧连接的响应。
 func (actor *PlayerActor) push(ctx tree.Context, uid uint64, msg interface{}) bool {
-	var generation uint64
 	if uid == actor.UID && actor.sessionActive {
-		generation = actor.sessionGeneration
+		return ipb.ReplyToSession(
+			ctx, uid, actor.sessionGeneration, msg,
+		)
 	}
-	return ipb.PushToSession(ctx, uid, generation, msg)
+	return ipb.NotifyCurrentSession(ctx, uid, msg)
 }
 
 // EventFunc 是玩家业务事件的监听器签名。

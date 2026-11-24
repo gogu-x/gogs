@@ -247,30 +247,43 @@ func (c *Client) finished(ctx tree.Context, msg *pb.BattleFinishedNtf) {
 	if r.BattleID != "" && r.BattleID != msg.BattleId {
 		return
 	}
-	// Finished 可恢复丢失的 Created；重复 Finished 只确认，不重复推给客户端。
+	// Finished 可恢复丢失的 Created；重复 Finished 只确认，不重复推给客户端或重复结算。
 	if _, alreadyApplied := c.completed[msg.BattleId]; !alreadyApplied {
+		// 先把结算交给网关：投递失败时不记录完成、不向 Battle 确认，由 Battle 重发结束通知，
+		// 避免确认后结算丢失。
+		settlement := c.buildSettlement(msg)
+		if !c.deliverSettlement(ctx, settlement) {
+			return
+		}
 		c.completed[msg.BattleId] = msg.Checksum
 		r.BattleID = msg.BattleId
 		r.Checksum = msg.Checksum
 		r.Status = Finished
 		c.push(ctx, msg.Uid, msg)
-
-		// 结算按 UID 交给网关的玩家目录。玩家在线时直达现有 Actor，离线时
-		// 网关创建临时 PlayerActor，加载、处理并存盘后回收。
-		settlement := c.buildSettlement(msg)
-		gatePID, gateAvailable := ctx.Lookup(def.GameGate)
-		if !gateAvailable {
-			tlog.Log.Error("[battle/Client.finished] 网关 Actor 不可用，战斗结算未投递, uid=%v battleID=%v", msg.GetUid(), msg.GetBattleId())
-		} else {
-			for _, participant := range settlement.Participants {
-				if !ctx.Send(gatePID, &ipb.PlayerMessage{UID: participant.UID, Message: settlement}) {
-					tlog.Log.Error("[battle/Client.finished] 玩家结算投递失败, uid=%v battleID=%v", participant.UID, settlement.BattleID)
-				}
-			}
-		}
 	}
 
 	_ = c.sender.Confirm(r.Node, &pb.BattleResultConfirmedNtf{BattleId: msg.BattleId, Uid: msg.Uid})
+}
+
+// deliverSettlement 经网关把结算交给每名参战玩家；玩家在线时直达现有 Actor，离线时网关
+// 唤醒临时 PlayerActor 加载、处理并存盘后回收。
+//
+// 使用非阻塞投递，网关队列满时返回 false，由调用方放弃本次确认等待 Battle 重发，
+// 不让全区共用的战斗客户端被网关拖住。当前只有发起人一名参战者；多人结算时需要按参战者
+// 记录已投递状态，避免重发时重复结算已成功的玩家。
+func (c *Client) deliverSettlement(ctx tree.Context, settlement *Settlement) bool {
+	gatePID, ok := ctx.Lookup(def.GameGate)
+	if !ok {
+		tlog.Log.Error("[battle/Client.deliverSettlement] 网关 Actor 不可用，等待 Battle 重发结束通知, battleID=%v", settlement.BattleID)
+		return false
+	}
+	for _, participant := range settlement.Participants {
+		if !ctx.TrySend(gatePID, &ipb.DeliverToPlayer{UID: participant.UID, Payload: settlement}) {
+			tlog.Log.Error("[battle/Client.deliverSettlement] 网关队列已满，等待 Battle 重发结束通知, uid=%v battleID=%v", participant.UID, settlement.BattleID)
+			return false
+		}
+	}
+	return true
 }
 
 // buildSettlement 把 battle 的结果通知转成结算输入。
@@ -323,9 +336,9 @@ func (c *Client) getState(ctx tree.Context, msg *GetState) {
 // push 按命名规则查找玩家会话代理并直接推送战斗消息，不经过 Gate。
 //
 // 投递为非阻塞：玩家离线或代理队列已满时丢弃本条推送，避免全区共用的战斗客户端被拖住。
-// 丢弃只影响客户端演出，结算仍由 finished 中的 PlayerMessage 投递。
+// 丢弃只影响客户端演出，结算仍由 deliverSettlement 投递。
 func (c *Client) push(ctx tree.Context, uid uint64, msg proto.Message) {
-	ipb.PushToSession(ctx, uid, 0, msg)
+	ipb.NotifyCurrentSession(ctx, uid, msg)
 }
 
 // ClusterSelector 从通用服务注册表轮询 Battle 节点。

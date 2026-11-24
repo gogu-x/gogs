@@ -94,7 +94,7 @@ func (ctx *Context) CastPlayerMsg(uid uint64, msg proto.Message) bool {
 	if ctx.Actor != nil {
 		return ctx.Actor.push(ctx.TreeCtx, uid, msg)
 	}
-	return ipb.PushToSession(ctx.TreeCtx, uid, 0, msg)
+	return ipb.NotifyCurrentSession(ctx.TreeCtx, uid, msg)
 }
 
 // Emit 同步触发当前玩家角色的业务事件。

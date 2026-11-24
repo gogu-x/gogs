@@ -9,6 +9,7 @@ import (
 // handleGetSevenDayLogin 提供可选补拉接口，所有业务校验及响应由模板决定。
 // @actv.request
 func (b *Behavior) handleGetSevenDayLogin(uid uint64, request *pb_actv.GetSevenDayLoginReq) {
+	reply := b.RequestReply(uid)
 	meta := b.Meta()
 	ack := &pb_actv.GetSevenDayLoginAck{Code: pb_common.ErrCode_OK}
 	now := comm.Now()
@@ -23,5 +24,5 @@ func (b *Behavior) handleGetSevenDayLogin(uid uint64, request *pb_actv.GetSevenD
 		b.advance(now, b.online)
 		ack.Data = b.packState()
 	}
-	b.PushToPlayer(uid, ack)
+	reply(ack)
 }

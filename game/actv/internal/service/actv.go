@@ -360,7 +360,7 @@ func (as *ActvService) ListAllActvs() []*Actv {
 
 // HandleRequest 只负责定位和同步路由，业务处理器自行决定是否推送及推送内容。
 func (as *ActvService) HandleRequest(
-	uid uint64, actvID int64, request proto.Message,
+	uid uint64, actvID int64, request proto.Message, generation uint64,
 ) {
 	if uid == 0 || request == nil || !request.ProtoReflect().IsValid() || actvID <= 0 {
 		tlog.Log.Error("[actv/HandleRequest] 请求参数无效, pid=%v actv=%v", uid, actvID)
@@ -376,6 +376,8 @@ func (as *ActvService) HandleRequest(
 		return
 	}
 	behavior := actv.GetExt()
+	behavior.SetRequestGeneration(generation)
+	defer behavior.SetRequestGeneration(0)
 	behavior.HandleRequest(uid, request)
 }
 

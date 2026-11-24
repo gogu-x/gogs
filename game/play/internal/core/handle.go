@@ -1,6 +1,8 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/sspb"
 	"github.com/gogu-x/tree"
@@ -67,5 +69,23 @@ func (actor *PlayerActor) onUnhandledMessage(ctx tree.Context, message interface
 		actor.queueWhileLoading(ctx, message)
 		return
 	}
+	if delivery, ok := message.(*ipb.DeliveryWithReply); ok {
+		actor.routeDeliveryWithReply(ctx, delivery)
+		return
+	}
 	actor.routeMessage(ctx, message)
+}
+
+// routeDeliveryWithReply 执行需要回复原调用方的服务端业务投递。
+//
+// 业务处理函数通过 ctx.Response 把结果回给原调用方。处理函数 panic 时先向调用方回复错误
+// 再继续向上抛出，由框架记录堆栈；否则调用方会一直等待一个永远不会到来的结果。
+func (actor *PlayerActor) routeDeliveryWithReply(ctx tree.Context, delivery *ipb.DeliveryWithReply) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			delivery.Reply(nil, fmt.Errorf("player %d handler panic: %v", actor.UID, recovered))
+			panic(recovered)
+		}
+	}()
+	actor.routeMessage(delivery.ReplyContext(ctx), delivery.GetPayload())
 }

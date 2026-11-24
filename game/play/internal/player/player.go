@@ -21,10 +21,11 @@ import (
 // Player 保存玩家持久化数据和运行期各模块数据。
 // +deepcopy-gen=true
 type Player struct {
-	UID   uint64 `bson:"_id"`   // 玩家唯一 ID。
-	Name  string `bson:"name"`  // 玩家名称。
-	Level uint32 `bson:"level"` // 玩家等级。
-	State int    `bson:"state"` // 玩家状态。
+	UID     uint64 `bson:"_id"`      // 玩家唯一 ID。
+	Name    string `bson:"name"`     // 玩家名称。
+	Level   uint32 `bson:"level"`    // 玩家等级。
+	State   int    `bson:"state"`    // 玩家状态。
+	GuildID uint64 `bson:"guild_id"` // 所属联盟编号，0 表示无联盟。
 
 	AssetMgr     *asset.Mgr     `bson:"asset"`      // 资产模块数据。
 	BagMgr       *bag.Mgr       `bson:"bag"`        // 背包模块数据。
@@ -106,6 +107,24 @@ func (p *Player) GetUID() uint64 {
 		return 0
 	}
 	return p.UID
+}
+
+// GetGuildID 返回玩家存档中的联盟编号。
+func (p *Player) GetGuildID() uint64 {
+	if p == nil {
+		return 0
+	}
+	return p.GuildID
+}
+
+// SetGuildID 更新玩家的联盟编号，发生变化时标记存盘。
+func (p *Player) SetGuildID(guildID uint64) bool {
+	if p == nil || p.GetGuildID() == guildID {
+		return false
+	}
+	p.GuildID = guildID
+	p.MarkDirty()
+	return true
 }
 
 // GetRoleMgr 返回玩家角色模块。

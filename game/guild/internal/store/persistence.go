@@ -1,4 +1,4 @@
-package internal
+package store
 
 import (
 	"time"
@@ -7,28 +7,27 @@ import (
 	"github.com/gogu-x/tree/timer"
 )
 
-const guildSaveTickerType = timer.TimerType(1000003)
-
-// PersistenceModel adapts in-memory guild aggregates to Mongo lifecycle storage.
+// PersistenceModel 将内存中的联盟聚合适配到 Mongo 存盘流程。
 type PersistenceModel struct {
-	store *Store
+	store      *Store
+	tickerType timer.TimerType
 }
 
-// NewPersistenceModel binds persistence callbacks to a guild store.
-func NewPersistenceModel(store *Store) *PersistenceModel {
-	return &PersistenceModel{store: store}
+// NewPersistenceModel 绑定联盟仓库及 Actor 使用的存盘定时器类型。
+func NewPersistenceModel(store *Store, tickerType timer.TimerType) *PersistenceModel {
+	return &PersistenceModel{store: store, tickerType: tickerType}
 }
 
-// GetCollection returns the guild document collection name.
+// GetCollection 返回联盟文档集合名。
 func (model *PersistenceModel) GetCollection() string { return "guild" }
 
-// GetPrototype returns the guild persistence type.
+// GetPrototype 返回联盟文档原型。
 func (model *PersistenceModel) GetPrototype() interface{} { return (*Guild)(nil) }
 
-// GetIDField returns the guild document key field.
+// GetIDField 返回联盟文档主键字段。
 func (model *PersistenceModel) GetIDField() string { return "_id" }
 
-// GetKey returns a guild's document ID.
+// GetKey 从联盟文档提取主键。
 func (model *PersistenceModel) GetKey(data interface{}) interface{} {
 	guild, ok := data.(*Guild)
 	if !ok || guild == nil {
@@ -37,7 +36,7 @@ func (model *PersistenceModel) GetKey(data interface{}) interface{} {
 	return guild.GetID()
 }
 
-// Clone creates a detached guild persistence snapshot.
+// Clone 创建独立的联盟存盘快照。
 func (model *PersistenceModel) Clone(data interface{}) interface{} {
 	guild, ok := data.(*Guild)
 	if !ok || guild == nil {
@@ -48,7 +47,7 @@ func (model *PersistenceModel) Clone(data interface{}) interface{} {
 	return snapshot
 }
 
-// Range visits dirty in-memory guild documents for lifecycle persistence.
+// Range 遍历待存盘的联盟文档。
 func (model *PersistenceModel) Range(callback func(interface{}) bool) {
 	if model == nil || model.store == nil || callback == nil {
 		return
@@ -61,10 +60,10 @@ func (model *PersistenceModel) Range(callback func(interface{}) bool) {
 	})
 }
 
-// GetSaveInterval returns the periodic guild persistence interval.
+// GetSaveInterval 返回定期存盘间隔。
 func (model *PersistenceModel) GetSaveInterval() time.Duration { return time.Minute }
 
-// AfterSave clears dirty state only when the saved snapshot is still current.
+// AfterSave 在快照版本仍为最新时清除脏标记。
 func (model *PersistenceModel) AfterSave(_ tree.Context, data interface{}) error {
 	snapshot, ok := data.(*Guild)
 	if !ok || snapshot == nil || model == nil || model.store == nil {
@@ -77,11 +76,11 @@ func (model *PersistenceModel) AfterSave(_ tree.Context, data interface{}) error
 	return nil
 }
 
-// MackDirty reports whether the guild still needs to be saved.
+// MackDirty 返回联盟文档是否需要存盘。
 func (model *PersistenceModel) MackDirty(data interface{}) bool {
 	guild, ok := data.(*Guild)
 	return ok && guild != nil && guild.IsDirty()
 }
 
-// GetTickerType returns the actor timer event used for periodic guild saves.
-func (model *PersistenceModel) GetTickerType() timer.TimerType { return guildSaveTickerType }
+// GetTickerType 返回 Actor 定期存盘事件的类型。
+func (model *PersistenceModel) GetTickerType() timer.TimerType { return model.tickerType }

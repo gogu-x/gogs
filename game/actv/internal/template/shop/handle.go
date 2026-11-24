@@ -15,6 +15,7 @@ import (
 // handleGet 查询商店，不读取主活动的内部状态。
 // @actv.request
 func (b *Shop) handleGet(uid uint64, request *pb_actv.GetActvShopReq) {
+	reply := b.RequestReply(uid)
 	b.refresh(uid, comm.Now())
 	ack := &pb_actv.GetActvShopAck{Code: pb_common.ErrCode_ACTV_UNAVAILABLE}
 	if b.valid {
@@ -23,18 +24,19 @@ func (b *Shop) handleGet(uid uint64, request *pb_actv.GetActvShopReq) {
 			ack.Code = pb_common.ErrCode_OK
 		}
 	}
-	b.PushToPlayer(uid, ack)
+	reply(ack)
 }
 
 // handleBuy 检查活动开放、商品、数量及限购，再委托通用接口检查道具余额。
 // @actv.request
 func (b *Shop) handleBuy(uid uint64, request *pb_actv.BuyActvShopReq) {
+	reply := b.RequestReply(uid)
 	ack := &pb_actv.BuyActvShopAck{Code: pb_common.ErrCode_ACTV_UNAVAILABLE, Sequence: request.GetSequence()}
 	sent := false
 	defer func() {
 		if !sent {
 			ack.Data = b.state(uid)
-			b.PushToPlayer(uid, ack)
+			reply(ack)
 		}
 	}()
 	d := b.playerData()
@@ -76,7 +78,7 @@ func (b *Shop) handleBuy(uid uint64, request *pb_actv.BuyActvShopReq) {
 	day := d.GetDayStart()
 	id := g.GetCfgID()
 	b.buying = true
-	submitted := ipb.RequestActvAssets(tx, func(code pb_common.ErrCode) {
+	submitted := ipb.RequestPlayerAssetTrade(tx, func(code pb_common.ErrCode) {
 		b.buying = false
 		ack.Code = code
 		b.refresh(uid, comm.Now())
@@ -92,7 +94,7 @@ func (b *Shop) handleBuy(uid uint64, request *pb_actv.BuyActvShopReq) {
 		}
 		b.data.MarkDirty()
 		ack.Data = b.state(uid)
-		b.PushToPlayer(uid, ack)
+		reply(ack)
 		tlog.Log.Info("[shop/handleBuy] 购买回调完成, pid=%v, sequence=%v, code=%v", uid, seq, ack.GetCode())
 	})
 	if !submitted {
@@ -106,6 +108,7 @@ func (b *Shop) handleBuy(uid uint64, request *pb_actv.BuyActvShopReq) {
 // handleRefresh 按每日规则重置限购并返回最新商店信息。
 // @actv.request
 func (b *Shop) handleRefresh(uid uint64, request *pb_actv.RefreshActvShopReq) {
+	reply := b.RequestReply(uid)
 	ack := &pb_actv.RefreshActvShopAck{Code: pb_common.ErrCode_ACTV_UNAVAILABLE}
 	if b.valid {
 		b.refresh(uid, comm.Now())
@@ -114,5 +117,5 @@ func (b *Shop) handleRefresh(uid uint64, request *pb_actv.RefreshActvShopReq) {
 			ack.Code = pb_common.ErrCode_OK
 		}
 	}
-	b.PushToPlayer(uid, ack)
+	reply(ack)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/gogu-x/gogs/game/play/internal/player/loadout"
 	"github.com/gogu-x/gogs/game/play/internal/player/role"
 	"github.com/gogu-x/gogs/game/play/internal/player/souljade"
+	"github.com/gogu-x/gogs/ipb"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/tree"
@@ -30,12 +31,15 @@ func OnCreateBattle(ctx *core.Context, req *pb_battle.StartBattleReq) {
 		return
 	}
 
-	ok := ctx.CastCall(def.BattleClient, &battle.Begin{Request: request}, func(callbackCtx tree.Context, value interface{}, err error) {
+	reply := ipb.SessionReply(uid, ctx.SessionGeneration())
+	ok := ctx.CastCall(def.BattleClient, &battle.Begin{Request: request}, func(_ tree.Context, value interface{}, err error) {
 		ack := battleStartAck(value, err)
 		if ack.GetCode() != pb_common.ErrCode_OK {
 			tlog.Log.Error("[ctl_battle/OnCreateBattle] 创建战斗失败, pid=%v code=%v err=%v response=%T", uid, ack.GetCode(), err, value)
 		}
-		pushBattleAck(ctx.Actor, callbackCtx, uid, ack)
+		if !reply(ack) {
+			tlog.Log.Error("[ctl_battle/OnCreateBattle] 战斗响应投递失败, pid=%v", uid)
+		}
 	})
 	if !ok {
 		ctx.CastPlayerMsg(uid, &pb_battle.StartBattleAck{Code: pb_common.ErrCode_BATTLE_UNAVAILABLE})
@@ -190,11 +194,4 @@ func OnBattleFinished(ctx *core.Context, settlement *battle.Settlement) {
 	arg := comm.NewArg()
 	arg.Set("settlement", settlement)
 	ctx.Emit(core.BattleSettled, arg)
-}
-
-// pushBattleAck 在玩家 Actor 的回调协程内向当前玩家客户端推送开战响应。
-func pushBattleAck(actor *core.PlayerActor, ctx tree.Context, uid uint64, ack *pb_battle.StartBattleAck) {
-	if !actor.PushToClient(ctx, ack) {
-		tlog.Log.Error("[ctl_battle/pushBattleAck] 战斗响应投递失败, pid=%v", uid)
-	}
 }

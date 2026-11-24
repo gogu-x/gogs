@@ -58,6 +58,27 @@ func (g *gateCapture) HandleMessage(_ tree.Context, msg interface{}) {
 	}
 }
 
+// settlementGate 以游戏网关名称注册，记录战斗客户端交给玩家的结算投递。
+type settlementGate struct{ deliveries chan *ipb.DeliverToPlayer }
+
+func (g *settlementGate) Name() string        { return def.GameGate }
+func (g *settlementGate) OnInit(tree.Context) {}
+func (g *settlementGate) OnStop(tree.Context) {}
+func (g *settlementGate) HandleMessage(_ tree.Context, msg interface{}) {
+	if delivery, ok := msg.(*ipb.DeliverToPlayer); ok {
+		g.deliveries <- delivery
+	}
+}
+
+// spawnSettlementGate 启动记录结算投递的假网关，并在测试结束时停止。
+func spawnSettlementGate(t *testing.T) *settlementGate {
+	t.Helper()
+	gate := &settlementGate{deliveries: make(chan *ipb.DeliverToPlayer, 8)}
+	pid := tree.SpawnOne(gate)
+	t.Cleanup(func() { tree.Stop(pid) })
+	return gate
+}
+
 func clientRequest(uid uint64) *pb.StartBattleReq {
 	return &pb.StartBattleReq{UID: uid, BattleType: pb.BattleType_BATTLE_TYPE_TEST, AttackerRoles: []*pb.Role{{RoleId: "role-1", RoleConfigId: 1}}, MonsterGroupConfigId: 1}
 }
@@ -88,6 +109,7 @@ func TestSendFailureReturnsIdle(t *testing.T) {
 }
 
 func TestCreateUnknownDedupAndIdempotentResult(t *testing.T) {
+	spawnSettlementGate(t)
 	sender := &fakeSender{}
 	gate := &gateCapture{messages: make(chan *ipb.PushToMsg, 8)}
 	pids := []tree.PID{tree.SpawnOne(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4)), tree.SpawnOne(gate)}
@@ -151,6 +173,7 @@ func openBattleClient(t *testing.T, pid tree.PID) {
 
 // TestPrecomputedResultKeepsPlaybackAdmission 验证提前结算和重置都不能绕过演出准入窗口。
 func TestPrecomputedResultKeepsPlaybackAdmission(t *testing.T) {
+	spawnSettlementGate(t)
 	sender := &fakeSender{}
 	gate := &gateCapture{messages: make(chan *ipb.PushToMsg, 8)}
 	pids := []tree.PID{tree.SpawnOne(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4)), tree.SpawnOne(gate)}
@@ -174,5 +197,51 @@ func TestPrecomputedResultKeepsPlaybackAdmission(t *testing.T) {
 	}
 	if starts, _ := sender.counts(); starts != 1 {
 		t.Fatalf("重复创建战斗: %d", starts)
+	}
+}
+
+// TestSettlementNotConfirmedUntilDelivered 验证结算未交给网关时不向 Battle 确认，
+// Battle 重发结束通知后结算只投递一次并完成确认。
+func TestSettlementNotConfirmedUntilDelivered(t *testing.T) {
+	sender := &fakeSender{}
+	pid := tree.SpawnOne(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4))
+	t.Cleanup(func() { tree.Stop(pid) })
+	openBattleClient(t, pid)
+	if _, err := tree.Request(pid, &Begin{Request: clientRequest(7)}).AwaitTimeout(time.Second); err != nil {
+		t.Fatal(err)
+	}
+	finished := &pb.BattleFinishedNtf{BattleId: "retry", Uid: 7, Checksum: "sum"}
+
+	// 网关不存在：不确认、不记录完成。
+	tree.Send(pid, finished)
+	if state := requestState(t, pid, 7); state.Status == Finished {
+		t.Fatalf("结算未投递却已记录完成: %+v", state)
+	}
+	if _, confirms := sender.counts(); confirms != 0 {
+		t.Fatalf("结算未投递却已确认: %d", confirms)
+	}
+
+	// 网关可用后 Battle 重发两次：只投递一次结算，两次都确认。
+	gate := spawnSettlementGate(t)
+	tree.Send(pid, finished)
+	tree.Send(pid, finished)
+	if state := requestState(t, pid, 7); state.Status != Finished {
+		t.Fatalf("重发后未完成结算: %+v", state)
+	}
+	select {
+	case delivery := <-gate.deliveries:
+		if delivery.GetUID() != 7 || delivery.GetRequireOnline() {
+			t.Fatalf("结算投递目标或离线规则错误: %+v", delivery)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("未投递结算")
+	}
+	select {
+	case extra := <-gate.deliveries:
+		t.Fatalf("重复投递结算: %+v", extra)
+	case <-time.After(20 * time.Millisecond):
+	}
+	if _, confirms := sender.counts(); confirms != 2 {
+		t.Fatalf("confirms = %d, want 2", confirms)
 	}
 }

@@ -37,8 +37,8 @@ func (c *directContext) Send(pid tree.PID, value interface{}) bool {
 }
 func (c *directContext) TrySend(pid tree.PID, value interface{}) bool { return c.Send(pid, value) }
 
-func directRequest() *ipb.ActvList {
-	return &ipb.ActvList{ActvMessage: &ipb.ActvMessage{UID: 7, Generation: 3, Online: true, Message: &pb_actv.GetActvListReq{}}}
+func directRequest() *ipb.ForwardedRequest {
+	return &ipb.ForwardedRequest{UID: 7, Generation: 3, Request: &pb_actv.GetActvListReq{}}
 }
 
 // testAgentPID 是测试玩家 7 当前会话代理的进程标识。
@@ -69,7 +69,7 @@ func TestDirectActvLoaded(t *testing.T) {
 func TestDirectActvPending(t *testing.T) {
 	a := &Actv{actvService: service.NewActvService(1), players: make(map[uint64]*playerLoadState)}
 	c := &directContext{}
-	a.handleGetActvList(c, directRequest())
+	a.onForwardedRequest(c, directRequest())
 	if len(a.pending) != 1 || c.sent != 0 {
 		t.Fatal("全局加载期间未暂存")
 	}
@@ -81,7 +81,7 @@ func TestDirectActvPending(t *testing.T) {
 	a.actvService = service.NewActvService(1)
 	state := &playerLoadState{loading: true}
 	a.players[7] = state
-	a.handleGetActvList(c, directRequest())
+	a.onForwardedRequest(c, directRequest())
 	if len(state.pending) != 1 || c.sent != 0 {
 		t.Fatal("玩家加载期间未暂存")
 	}
@@ -89,30 +89,38 @@ func TestDirectActvPending(t *testing.T) {
 	assertDirect(t, c, pb_common.ErrCode_OK)
 }
 
-// TestDirectPendingFailure 验证玩家加载失败及暂存队列满时不伪造业务响应。
+// assertErrorNtf 验证活动请求无法处理时向原会话推送一次 ErrorNtf(INTERNAL)。
+func assertErrorNtf(t *testing.T, c *directContext) {
+	t.Helper()
+	if c.sent != 1 || c.reply == nil || c.reply.GetGeneration() != 3 || c.target != testAgentPID {
+		t.Fatalf("错误通知次数、会话版本或目标不符: sent=%v reply=%+v", c.sent, c.reply)
+	}
+	ntf, ok := c.reply.Msg.(*pb_common.ErrorNtf)
+	if !ok || ntf.GetCode() != pb_common.ErrCode_INTERNAL || ntf.GetRequestType() != string(proto.MessageName(&pb_actv.GetActvListReq{})) {
+		t.Fatalf("错误通知内容不符: %+v", c.reply.Msg)
+	}
+}
+
+// TestDirectPendingFailure 验证玩家加载失败、暂存队列已满时推送 ErrorNtf。
 func TestDirectPendingFailure(t *testing.T) {
 	a := &Actv{ready: true, actvService: service.NewActvService(1), players: make(map[uint64]*playerLoadState)}
 	state := &playerLoadState{loading: true}
 	a.players[7] = state
 	c := &directContext{}
-	a.handleGetActvList(c, directRequest())
+	a.onForwardedRequest(c, directRequest())
 	a.onPlayerLoadFinished(c, 7, state, errors.New("load failed"))
-	if c.sent != 0 {
-		t.Fatal("基础设施失败不应自动发送业务消息")
-	}
+	assertErrorNtf(t, c)
+
 	state = &playerLoadState{loading: true, pending: make([]pendingActvRequest, maxPendingPlayerRequests)}
 	a.players[7] = state
 	c = &directContext{}
-	a.handleGetActvList(c, directRequest())
-	if c.sent != 0 {
-		t.Fatal("基础设施失败不应自动发送业务消息")
-	}
+	a.onForwardedRequest(c, directRequest())
+	assertErrorNtf(t, c)
+
 	a = &Actv{pending: make([]pendingActvRequest, maxPendingActvRequests)}
 	c = &directContext{}
-	a.handleGetActvList(c, directRequest())
-	if c.sent != 0 {
-		t.Fatal("基础设施失败不应自动发送业务消息")
-	}
+	a.onForwardedRequest(c, directRequest())
+	assertErrorNtf(t, c)
 }
 
 // pushBehavior 由业务自主决定是否推送以及推送数量。
@@ -134,10 +142,10 @@ func TestBusinessControlsPush(t *testing.T) {
 	if !svc.AddActv(&service.Actv{Meta: &service.ActvMeta{ActvID: 12, OwnerID: 7, OwnerScope: service.ScopePlayer}, Ext: behavior}) {
 		t.Fatal("初始化失败")
 	}
-	actor := &Actv{actvService: svc}
+	svc.SetPlayerLoaded(7)
+	actor := &Actv{ready: true, actvService: svc}
 	ctx := &directContext{}
-	message := &ipb.ActvMessage{UID: 7, ActvID: 12, Generation: 3, Message: &pb_actv.GetProgressReq{ActvId: 12}}
-	actor.handlePlayerActvMessage(ctx, message)
+	actor.onForwardedRequest(ctx, &ipb.ForwardedRequest{UID: 7, Generation: 3, Request: &pb_actv.GetProgressReq{ActvId: 12}})
 	if ctx.sent != 0 {
 		t.Fatal("业务未推送却出现自动响应")
 	}

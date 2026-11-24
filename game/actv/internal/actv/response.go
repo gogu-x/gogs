@@ -21,5 +21,5 @@ func pushActv(ctx tree.Context, message actvReplySession, response proto.Message
 	if ctx == nil || uid == 0 || response == nil || !response.ProtoReflect().IsValid() {
 		return false
 	}
-	return ipb.PushToSession(ctx, uid, message.GetGeneration(), response)
+	return ipb.ReplyToSession(ctx, uid, message.GetGeneration(), response)
 }

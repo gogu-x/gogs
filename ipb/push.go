@@ -19,6 +19,27 @@ type globalSender struct{}
 func (globalSender) Lookup(name string) (tree.PID, bool)        { return tree.Lookup(name) }
 func (globalSender) TrySend(pid tree.PID, msg interface{}) bool { return tree.TrySend(pid, msg) }
 
+// ReplyToSession 将响应限定到发起请求的会话。
+func ReplyToSession(
+	sender SessionSender, uid uint64, generation uint64, message interface{},
+) bool {
+	return generation != 0 && PushToSession(sender, uid, generation, message)
+}
+
+// SessionReply 捕获发起请求的玩家和代次，供异步业务完成后回复。
+func SessionReply(uid, generation uint64) func(proto.Message) bool {
+	return func(message proto.Message) bool {
+		return ReplyToSession(
+			globalSender{}, uid, generation, message,
+		)
+	}
+}
+
+// NotifyCurrentSession 向投递时在线的会话发送主动通知。
+func NotifyCurrentSession(sender SessionSender, uid uint64, message interface{}) bool {
+	return PushToSession(sender, uid, 0, message)
+}
+
 // PushToSession 按命名规则查找玩家当前会话代理并直接投递，不经过游戏网关。
 //
 // generation 非 0 时，代理只写出与自身会话版本一致的消息，避免旧请求的响应写到新连接；
@@ -46,7 +67,7 @@ func PushToPlayer(uid uint64, message proto.Message) bool {
 	if message == nil || !message.ProtoReflect().IsValid() {
 		return false
 	}
-	return PushToSession(globalSender{}, uid, 0, message)
+	return NotifyCurrentSession(globalSender{}, uid, message)
 }
 
 // requestCloseSession 请求游戏网关关闭指定代理的会话；代理已被替换时网关忽略该请求。

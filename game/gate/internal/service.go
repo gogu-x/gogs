@@ -21,36 +21,36 @@ import (
 )
 
 const (
-	// playerMessageRetryTimerType 表示玩家系统消息重试定时器类型。
-	playerMessageRetryTimerType = timer.TimerType(1000002)
-	// playerMessageRetryInterval 表示玩家系统消息重试间隔。
-	playerMessageRetryInterval = time.Second
-	// maxPendingPlayerMessages 表示单个玩家 Actor 的待发送消息上限。
-	maxPendingPlayerMessages = 512
+	// playerRetryTimerType 是重投排队业务和重试停止离线玩家 Actor 的定时器类型。
+	playerRetryTimerType = timer.TimerType(1000002)
+	// playerRetryInterval 是 playerRetryTimerType 的触发间隔。
+	playerRetryInterval = time.Second
+	// maxQueuedDeliveriesPerPlayer 是单个玩家在网关排队等待的业务投递上限。
+	maxQueuedDeliveriesPerPlayer = 512
 )
 
 type playerActorState struct {
-	pid      tree.PID
-	evicting bool
-	pending  []interface{}
+	pid              tree.PID
+	evicting         bool
+	queuedDeliveries []interface{} // 玩家 Actor 暂时无法接收（正忙、回收中或有更早的排队）时保留的业务投递，按到达顺序重投。
 }
 
-// AddPending 将需要重试的消息加入玩家 Actor 的待发送队列。
-func (state *playerActorState) AddPending(message interface{}) bool {
-	if state == nil || len(state.pending) >= maxPendingPlayerMessages {
+// queueDelivery 将暂时无法交给玩家 Actor 的业务投递加入排队；队列已满时返回 false。
+func (state *playerActorState) queueDelivery(message interface{}) bool {
+	if state == nil || len(state.queuedDeliveries) >= maxQueuedDeliveriesPerPlayer {
 		return false
 	}
-	state.pending = append(state.pending, message)
+	state.queuedDeliveries = append(state.queuedDeliveries, message)
 	return true
 }
 
-// TakePending 取出玩家 Actor 的全部待发送消息。
-func (state *playerActorState) TakePending() []interface{} {
+// takeQueuedDeliveries 取出并清空该玩家全部排队的业务投递。
+func (state *playerActorState) takeQueuedDeliveries() []interface{} {
 	if state == nil {
 		return nil
 	}
-	pending := state.pending
-	state.pending = nil
+	pending := state.queuedDeliveries
+	state.queuedDeliveries = nil
 	return pending
 }
 
@@ -63,8 +63,8 @@ type GateActor struct {
 	pendingOpen       map[uint64]*openSession
 	bannedUIDs        map[uint64]struct{}
 	nextGen           uint64
-	messageRetryWheel *timer.TimeWheel
-	messageRetryTimer *timer.WheelTimer
+	playerRetryWheel  *timer.TimeWheel
+	playerRetryTimer  *timer.WheelTimer
 	serverOpened      bool
 	serverOpenedEvent *sspb.Event
 	shuttingDown      bool
@@ -94,7 +94,7 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 	g.router.Register(&openSession{}, g.onOpenSession)
 	g.router.Register(&closeSession{}, g.onCloseSession)
 	g.router.Register(&ipb.CloseSession{}, g.onPlayerCloseSession)
-	g.router.Register(&ipb.PlayerMessage{}, g.onPlayerMessage)
+	g.router.Register(&ipb.DeliverToPlayer{}, g.onDeliverToPlayer)
 	g.router.Register(&ipb.PlayerActorEvictReady{}, g.onPlayerActorEvictReady)
 	g.router.Register(&ipb.PlayerActorStopped{}, g.onPlayerActorStopped)
 	g.router.Register(&ipb.PlayerLoadFailed{}, g.onPlayerLoadFailed)
@@ -102,9 +102,9 @@ func (g *GateActor) OnInit(ctx tree.Context) {
 	g.router.Register(&ipb.BanUID{}, g.onBanUID)
 	g.router.Register(&ipb.UnbanUID{}, g.onUnbanUID)
 
-	g.messageRetryWheel = timer.NewTimeWheel(32, ctx.Self())
-	g.messageRetryWheel.Register(playerMessageRetryTimerType, func(_ interface{}) {
-		g.onPlayerMessageRetryTimer()
+	g.playerRetryWheel = timer.NewTimeWheel(32, ctx.Self())
+	g.playerRetryWheel.Register(playerRetryTimerType, func(_ interface{}) {
+		g.onPlayerRetryTimer()
 	})
 
 	lis, err := net.Listen("tcp", conf.GameAddr())
@@ -134,12 +134,12 @@ func (g *GateActor) HandleMessage(ctx tree.Context, msg interface{}) {
 
 // OnStop 关闭网关接入并停止相关定时器。
 func (g *GateActor) OnStop(ctx tree.Context) {
-	if g.messageRetryWheel != nil {
-		g.messageRetryWheel.Stop()
+	if g.playerRetryWheel != nil {
+		g.playerRetryWheel.Stop()
 	}
-	if g.messageRetryTimer != nil {
-		g.messageRetryTimer.Stop()
-		g.messageRetryTimer = nil
+	if g.playerRetryTimer != nil {
+		g.playerRetryTimer.Stop()
+		g.playerRetryTimer = nil
 	}
 	for uid, current := range g.sessions {
 		delete(g.sessions, uid)
@@ -202,8 +202,8 @@ func (g *GateActor) onServerOpened(ctx tree.Context, message *sspb.Event) {
 }
 
 // onServerClosing 将关服事件交给网关生命周期协调流程。
-func (g *GateActor) onServerClosing(ctx tree.Context, message *sspb.Event) {
-	g.beginServerShutdown(ctx, message)
+func (g *GateActor) onServerClosing(ctx tree.Context, _ *sspb.Event) {
+	g.beginServerShutdown(ctx)
 }
 
 // spawnPlayerActor 创建玩家 Actor 并传入需要优先处理的初始消息。
@@ -380,37 +380,52 @@ func (g *GateActor) onPlayerCloseSession(ctx tree.Context, msg interface{}) {
 	g.closeCurrent(ctx, request.UID, current, request.Reason)
 }
 
-// onPlayerMessage 将服务器发给玩家的消息路由到对应玩家 Actor。
-func (g *GateActor) onPlayerMessage(ctx tree.Context, msg interface{}) {
+// onDeliverToPlayer 是服务端修改或查询玩家数据的统一入口：按离线规则决定是否受理，
+// 定位在线玩家、复用驻留的 Actor 或唤醒离线玩家；以请求方式到达时保留回复目标，
+// 由玩家 Actor 把实际执行结果回给原调用方。
+func (g *GateActor) onDeliverToPlayer(ctx tree.Context, msg interface{}) {
 	if g.shuttingDown {
-		tlog.Log.Error("[gate/GateActor.onPlayerMessage] 服务关停期间拒绝玩家系统消息, type=%T", msg)
+		ctx.Response(nil, fmt.Errorf("game gateway is shutting down"))
+		tlog.Log.Error("[gate/GateActor.onDeliverToPlayer] 服务关停期间拒绝玩家业务投递, type=%T", msg)
 		return
 	}
-	command, ok := msg.(*ipb.PlayerMessage)
-	if !ok || command == nil || command.UID == 0 || command.Message == nil {
-		tlog.Log.Error("[gate/GateActor.onPlayerMessage] 玩家系统消息无效, type=%T", msg)
+	request, ok := msg.(*ipb.DeliverToPlayer)
+	if !ok || request == nil || request.GetUID() == 0 || request.GetPayload() == nil {
+		ctx.Response(nil, fmt.Errorf("invalid player delivery"))
+		tlog.Log.Error("[gate/GateActor.onDeliverToPlayer] 玩家业务投递无效, type=%T", msg)
 		return
 	}
-	state := g.playerActors[command.UID]
+	uid := request.GetUID()
+	if _, online := g.sessions[uid]; request.GetRequireOnline() && !online {
+		ctx.Response(nil, fmt.Errorf("player %d is offline", uid))
+		return
+	}
+	// 需要结果的请求把回复目标绑在载荷上，排队、唤醒、重投期间一路携带，由玩家 Actor 回复。
+	var delivery interface{} = request.GetPayload()
+	if reply := ctx.RequestEnvelope(); reply != nil {
+		delivery = ipb.WrapWithReply(delivery, reply)
+	}
+	state := g.playerActors[uid]
 	if state == nil {
-		playerPID := g.spawnPlayerActor(ctx, command.UID, []interface{}{command.Message})
-		g.playerActors[command.UID] = &playerActorState{pid: playerPID}
-		tlog.Log.Info("[gate/GateActor.onPlayerMessage] 为离线玩家创建临时 Actor, pid=%v playerPID=%v type=%T", command.UID, playerPID, command.Message)
-		return
+		state = &playerActorState{}
+		g.playerActors[uid] = state
 	}
 	if state.pid.ID == 0 {
-		state.pid = g.spawnPlayerActor(ctx, command.UID, []interface{}{command.Message})
-		tlog.Log.Info("[gate/GateActor.onPlayerMessage] 为离线玩家创建临时 PlayerActor, pid=%v playerPID=%v type=%T", command.UID, state.pid, command.Message)
+		state.pid = g.spawnPlayerActor(ctx, uid, []interface{}{delivery})
+		tlog.Log.Info("[gate/GateActor.onDeliverToPlayer] 为离线玩家唤醒 Actor, pid=%v playerPID=%v type=%T", uid, state.pid, request.GetPayload())
 		return
 	}
-	if state.evicting || !ctx.TrySend(state.pid, command.Message) {
-		if !state.AddPending(command.Message) {
-			tlog.Log.Error("[gate/GateActor.onPlayerMessage] 玩家系统消息缓存已满, pid=%v type=%T", command.UID, command.Message)
-			return
-		}
-		tlog.Log.Info("[gate/GateActor.onPlayerMessage] 玩家 Actor 正忙，系统消息已排队, pid=%v type=%T", command.UID, command.Message)
-		g.schedulePlayerMessageRetry()
+	// 已有排队投递时新投递排在后面，避免较新的业务先于旧业务生效。
+	if !state.evicting && !state.hasQueuedDeliveries() && ctx.TrySend(state.pid, delivery) {
+		return
 	}
+	if !state.queueDelivery(delivery) {
+		ipb.RejectDelivery(delivery, fmt.Errorf("player %d delivery queue is full", uid))
+		tlog.Log.Error("[gate/GateActor.onDeliverToPlayer] 玩家业务投递排队已满, pid=%v type=%T", uid, request.GetPayload())
+		return
+	}
+	tlog.Log.Info("[gate/GateActor.onDeliverToPlayer] 玩家 Actor 正忙或正在回收，业务投递已排队, pid=%v type=%T", uid, request.GetPayload())
+	g.schedulePlayerRetry()
 }
 
 // onPlayerActorEvictReady 在离线玩家 Actor 可以回收时请求其停止。
@@ -426,19 +441,19 @@ func (g *GateActor) onPlayerActorEvictReady(ctx tree.Context, msg interface{}) {
 	if _, online := g.sessions[ready.UID]; online {
 		return
 	}
-	if state.evicting {
+	if state.evicting || g.shuttingDown {
 		return
 	}
-	if state.hasPending() {
-		g.flushPending(state)
-		g.schedulePlayerMessageRetry()
+	if state.hasQueuedDeliveries() {
+		g.resendQueuedDeliveries(state)
+		g.schedulePlayerRetry()
 		return
 	}
 	state.evicting = true
 	if !ctx.Send(state.pid, &ipb.StopPlayerActor{UID: ready.UID}) {
 		tlog.Log.Error("[gate/GateActor.onPlayerActorEvictReady] 请求停止离线玩家 Actor 失败，将由重试定时器重试, pid=%v playerPID=%v", ready.UID, ready.PID)
 	}
-	g.schedulePlayerMessageRetry()
+	g.schedulePlayerRetry()
 }
 
 // onPlayerActorStopped 清理已停止的玩家 Actor 并恢复等待中的会话或消息。
@@ -451,28 +466,43 @@ func (g *GateActor) onPlayerActorStopped(ctx tree.Context, msg interface{}) {
 	if state == nil || state.pid != stopped.PID {
 		return
 	}
-	pendingMessages := state.TakePending()
+	if g.shuttingDown && state.evicting {
+		if state.hasQueuedDeliveries() {
+			state.evicting = false
+			state.pid = g.spawnPlayerActor(ctx, stopped.UID, nil)
+			g.stopPlayerForShutdown(ctx, stopped.UID, state)
+		} else {
+			delete(g.playerActors, stopped.UID)
+			g.onPlayerShutdownComplete(ctx, stopped.UID, nil)
+		}
+		return
+	}
+	queuedDeliveries := state.takeQueuedDeliveries()
 	state.pid = tree.PID{}
 	state.evicting = false
 	if open, exists := g.pendingOpen[stopped.UID]; exists {
 		delete(g.pendingOpen, stopped.UID)
 		if g.shuttingDown {
 			open.request.Respond(nil, fmt.Errorf("game gateway is shutting down"))
+			ipb.RejectDeliveries(queuedDeliveries, fmt.Errorf("game gateway is shutting down"))
 			delete(g.playerActors, stopped.UID)
 			return
 		}
 		if openSessionCanceled(open) {
 			open.request.Respond(nil, fmt.Errorf("gateway stream closed before player actor was ready"))
-			if len(pendingMessages) > 0 {
-				state.pid = g.spawnPlayerActor(ctx, stopped.UID, pendingMessages)
+			if len(queuedDeliveries) > 0 {
+				state.pid = g.spawnPlayerActor(ctx, stopped.UID, queuedDeliveries)
 			}
 			return
 		}
 		if _, banned := g.bannedUIDs[stopped.UID]; banned {
 			open.request.Respond(nil, fmt.Errorf("uid %d is banned", stopped.UID))
+			if len(queuedDeliveries) > 0 {
+				state.pid = g.spawnPlayerActor(ctx, stopped.UID, queuedDeliveries)
+			}
 			return
 		}
-		state.pid = g.spawnPlayerActor(ctx, stopped.UID, pendingMessages)
+		state.pid = g.spawnPlayerActor(ctx, stopped.UID, queuedDeliveries)
 		opened, err := g.createSession(ctx, open)
 		if err == nil && g.rejectCanceledOpen(ctx, open, opened) {
 			opened = nil
@@ -482,12 +512,13 @@ func (g *GateActor) onPlayerActorStopped(ctx tree.Context, msg interface{}) {
 		return
 	}
 	if g.shuttingDown {
+		ipb.RejectDeliveries(queuedDeliveries, fmt.Errorf("game gateway is shutting down"))
 		delete(g.playerActors, stopped.UID)
 		return
 	}
-	if len(pendingMessages) > 0 {
-		state.pid = g.spawnPlayerActor(ctx, stopped.UID, pendingMessages)
-		tlog.Log.Info("[gate/GateActor.onPlayerActorStopped] 已重建玩家 Actor 并恢复排队消息, pid=%v playerPID=%v count=%v", stopped.UID, state.pid, len(pendingMessages))
+	if len(queuedDeliveries) > 0 {
+		state.pid = g.spawnPlayerActor(ctx, stopped.UID, queuedDeliveries)
+		tlog.Log.Info("[gate/GateActor.onPlayerActorStopped] 已重建玩家 Actor 并恢复排队业务投递, pid=%v playerPID=%v count=%v", stopped.UID, state.pid, len(queuedDeliveries))
 	}
 	if state.pid.ID == 0 {
 		delete(g.playerActors, stopped.UID)
@@ -495,25 +526,21 @@ func (g *GateActor) onPlayerActorStopped(ctx tree.Context, msg interface{}) {
 }
 
 // beginServerShutdown 停止网关接入，并协调玩家角色完成关服流程。
-func (g *GateActor) beginServerShutdown(ctx tree.Context, message *sspb.Event) {
+func (g *GateActor) beginServerShutdown(ctx tree.Context) {
 	if g.shuttingDown {
 		ctx.Response(nil, fmt.Errorf("server shutdown is already in progress"))
 		return
-	}
-	serverClosingEvent := gameevent.NewServerClosing()
-	if gameevent.IsServerClosing(message) {
-		serverClosingEvent = message
 	}
 	g.shuttingDown = true
 	g.shutdownWaiter = ctx.RequestEnvelope()
 	g.shutdownRemaining = 0
 	g.shutdownErr = nil
-	if g.messageRetryWheel != nil {
-		g.messageRetryWheel.Stop()
+	if g.playerRetryWheel != nil {
+		g.playerRetryWheel.Stop()
 	}
-	if g.messageRetryTimer != nil {
-		g.messageRetryTimer.Stop()
-		g.messageRetryTimer = nil
+	if g.playerRetryTimer != nil {
+		g.playerRetryTimer.Stop()
+		g.playerRetryTimer = nil
 	}
 	if g.grpcServer != nil {
 		g.grpcServer.Stop()
@@ -530,27 +557,30 @@ func (g *GateActor) beginServerShutdown(ctx tree.Context, message *sspb.Event) {
 		g.notifySessionClosed(ctx, uid, current.playerPID, current.generation)
 	}
 	for uid, state := range g.playerActors {
-		if state.evicting && state.hasPending() {
-			pending := state.TakePending()
-			playerPID := g.spawnPlayerActor(ctx, uid, pending)
-			state.pid = playerPID
-			state.evicting = false
+		if state.pid.ID == 0 {
+			continue
 		}
-		if state.pid.ID != 0 {
-			if !state.evicting {
-				g.flushPending(state)
-			}
-			ctx.Send(state.pid, gameevent.Clone(serverClosingEvent))
-			g.shutdownRemaining++
-			ctx.RequestCallback(state.pid, &ipb.StopPlayerActor{UID: uid, Shutdown: true}, func(callbackCtx tree.Context, _ interface{}, err error) {
-				g.onPlayerShutdownComplete(callbackCtx, uid, err)
-			})
+		g.shutdownRemaining++
+		if !state.evicting {
+			g.stopPlayerForShutdown(ctx, uid, state)
 		}
 	}
 	if g.shutdownRemaining == 0 {
 		g.finishServerShutdown()
 	}
 	tlog.Log.Info("[gate/GateActor.beginServerShutdown] 已停止网关接入并等待玩家角色完成关服, count=%v", g.shutdownRemaining)
+}
+
+// stopPlayerForShutdown 将关服前已接收的系统消息与最终存盘请求按顺序交给玩家。
+func (g *GateActor) stopPlayerForShutdown(ctx tree.Context, uid uint64, state *playerActorState) {
+	pending := state.takeQueuedDeliveries()
+	stop := &ipb.StopPlayerActor{UID: uid, Shutdown: true, QueuedDeliveries: append(pending, gameevent.NewServerClosing())}
+	ctx.RequestCallback(state.pid, stop, func(callbackCtx tree.Context, _ interface{}, err error) {
+		if err != nil {
+			ipb.RejectDeliveries(pending, err)
+		}
+		g.onPlayerShutdownComplete(callbackCtx, uid, err)
+	})
 }
 
 // onPlayerShutdownComplete 记录玩家角色的关服结果并更新等待数量。
@@ -651,9 +681,9 @@ func (g *GateActor) notifySessionClosed(
 	}
 }
 
-// onPlayerMessageRetryTimer 重试发送待处理的玩家系统消息和 Actor 停止请求。
-func (g *GateActor) onPlayerMessageRetryTimer() {
-	g.messageRetryTimer = nil
+// onPlayerRetryTimer 重投排队的业务投递，并重试停止已可回收的离线玩家 Actor。
+func (g *GateActor) onPlayerRetryTimer() {
+	g.playerRetryTimer = nil
 	if g.shuttingDown {
 		return
 	}
@@ -663,66 +693,62 @@ func (g *GateActor) onPlayerMessageRetryTimer() {
 		}
 		if state.evicting && state.pid.ID != 0 {
 			if !tree.TrySend(state.pid, &ipb.StopPlayerActor{UID: uid}) {
-				tlog.Log.Error("[gate/GateActor.onPlayerMessageRetryTimer] 重试停止离线玩家 Actor 失败, pid=%v playerPID=%v", uid, state.pid)
+				tlog.Log.Error("[gate/GateActor.onPlayerRetryTimer] 重试停止离线玩家 Actor 失败, pid=%v playerPID=%v", uid, state.pid)
 			}
 			continue
 		}
-		if state.hasPending() {
-			g.flushPending(state)
+		if state.hasQueuedDeliveries() {
+			g.resendQueuedDeliveries(state)
 		}
 	}
-	g.schedulePlayerMessageRetry()
+	g.schedulePlayerRetry()
 }
 
-// flushPending 按顺序向玩家 Actor 重发排队消息。
-func (g *GateActor) flushPending(state *playerActorState) {
+// resendQueuedDeliveries 按到达顺序把排队的业务投递交给玩家 Actor，遇到对方队列已满即停止并保留剩余部分。
+func (g *GateActor) resendQueuedDeliveries(state *playerActorState) {
 	if state == nil || state.evicting || state.pid.ID == 0 {
 		return
 	}
-	pending := state.TakePending()
-	for index, message := range pending {
-		if !tree.TrySend(state.pid, message) {
-			for _, remaining := range pending[index:] {
-				if !state.AddPending(remaining) {
-					tlog.Log.Error("[gate/GateActor.flushPending] 玩家系统消息缓存已满, playerPID=%v", state.pid)
-					break
-				}
-			}
+	queued := state.takeQueuedDeliveries()
+	for index, delivery := range queued {
+		if !tree.TrySend(state.pid, delivery) {
+			// 取出的数量不超过上限，原样放回不会溢出。
+			state.queuedDeliveries = queued[index:]
 			return
 		}
 	}
 }
 
-// schedulePlayerMessageRetry 在仍有待处理工作时安排下一次重试。
-func (g *GateActor) schedulePlayerMessageRetry() {
-	if g.messageRetryWheel == nil || g.messageRetryTimer != nil || g.shuttingDown {
+// schedulePlayerRetry 在仍有排队投递或待停止的 Actor 时安排下一次重试。
+func (g *GateActor) schedulePlayerRetry() {
+	if g.playerRetryWheel == nil || g.playerRetryTimer != nil || g.shuttingDown {
 		return
 	}
-	if !g.hasPlayerMessageRetryWork() {
+	if !g.hasPlayerRetryWork() {
 		return
 	}
-	g.messageRetryTimer = g.messageRetryWheel.After(playerMessageRetryTimerType, playerMessageRetryInterval, nil)
-	if g.messageRetryTimer == nil {
-		tlog.Log.Error("[gate/GateActor.schedulePlayerMessageRetry] 创建玩家系统消息重试定时器失败")
+	g.playerRetryTimer = g.playerRetryWheel.After(playerRetryTimerType, playerRetryInterval, nil)
+	if g.playerRetryTimer == nil {
+		tlog.Log.Error("[gate/GateActor.schedulePlayerRetry] 创建玩家系统消息重试定时器失败")
 	}
 }
 
-// hasPlayerMessageRetryWork 检查玩家 Actor 目录中是否还有待重试工作。
-func (g *GateActor) hasPlayerMessageRetryWork() bool {
+// hasPlayerRetryWork 检查是否还有排队投递或待停止的玩家 Actor。
+func (g *GateActor) hasPlayerRetryWork() bool {
 	for _, state := range g.playerActors {
 		if state == nil || state.pid.ID == 0 {
 			continue
 		}
-		if state.evicting || state.hasPending() {
+		if state.evicting || state.hasQueuedDeliveries() {
 			return true
 		}
 	}
 	return false
 }
 
-// hasPending 返回玩家 Actor 是否有尚未发送的消息。
-func (state *playerActorState) hasPending() bool {
-	return state != nil && len(state.pending) > 0
+// hasQueuedDeliveries 返回该玩家是否还有排队等待的业务投递。
+func (state *playerActorState) hasQueuedDeliveries() bool {
+	return state != nil && len(state.queuedDeliveries) > 0
 }
 
 // validateFrame 检查客户端网关帧及其协议负载是否有效。
