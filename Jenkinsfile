@@ -2,7 +2,7 @@ pipeline {
     agent any
     options { disableConcurrentBuilds() }
     parameters {
-        string(name: 'BRANCH', defaultValue: 'main', trim: true, description: '要构建的 Git 分支名称')
+        string(name: 'BRANCH', defaultValue: 'v1008', trim: true, description: '要构建的 Git 分支名称')
     }
     environment { IMAGE = 'xiaoguyun/gogs-all' }
     stages {
