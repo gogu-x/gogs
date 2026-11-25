@@ -22,6 +22,7 @@ type BattleEquipCfg struct {
 	IconKey            string           `bson:"icon_key"`             // 客户端资源图标键
 	InitialLevel       int32            `bson:"initial_level"`        // 首次发放等级
 	InitialRefineLevel int32            `bson:"initial_refine_level"` // 首次发放精炼等级
+	ActiveSkillID      int32            `bson:"active_skill_id"`      // 装备赋予的主动法宝技能，零表示无
 }
 
 // GetCfgID returns the configured field value.
@@ -94,6 +95,15 @@ func (cfg *BattleEquipCfg) GetInitialRefineLevel() int32 {
 		return zero
 	}
 	return cfg.InitialRefineLevel
+}
+
+// GetActiveSkillID returns the configured field value.
+func (cfg *BattleEquipCfg) GetActiveSkillID() int32 {
+	if cfg == nil {
+		var zero int32
+		return zero
+	}
+	return cfg.ActiveSkillID
 }
 
 func loadBattleEquipCfg(dbURI, dbName, confName string) (*CsvConf, error) {

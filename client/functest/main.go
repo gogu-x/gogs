@@ -122,6 +122,10 @@ func runUser(idx int) error {
 		return fmt.Errorf("login ack: %v", msg)
 	}
 
+	if *battleScenario {
+		return c.playBattle()
+	}
+
 	// Chat
 	if err := c.send(&pb_chat.ChatReq{Type: 1, Content: "bench"}); err != nil {
 		return fmt.Errorf("chat send: %w", err)

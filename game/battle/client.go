@@ -2,6 +2,7 @@ package battle
 
 import (
 	"fmt"
+	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"strconv"
 
 	"github.com/gogu-x/gogs/def"
@@ -76,8 +77,15 @@ type State struct {
 
 type record struct {
 	State
-	seen     map[uint64]struct{}
-	playback *playbackWindow // 服务端维护的演出准入窗口，不依赖客户端完成上报。
+	roomRequest   *pb.StartBattleReq // 本场共享战斗的权威入场快照，用于缺号时重同步。
+	snapshotFloor uint64
+	seen          map[uint64]struct{}
+	playback      *playbackWindow // 服务端维护的演出准入窗口，不依赖客户端完成上报。
+}
+
+type completionKey struct {
+	battleID string
+	uid      uint64
 }
 
 type Client struct {
@@ -86,7 +94,7 @@ type Client struct {
 	gameServerID  int
 	gameNodeID    int
 	players       map[uint64]*record
-	completed     map[string]string
+	completed     map[completionKey]Node
 	serverOpened  bool
 	serverClosing bool
 }
@@ -101,7 +109,7 @@ func New(selector NodeSelector, sender Sender, gameServerID, gameNodeID int) *Cl
 	return &Client{
 		selector: selector, sender: sender,
 		gameServerID: gameServerID, gameNodeID: gameNodeID,
-		players: make(map[uint64]*record), completed: make(map[string]string),
+		players: make(map[uint64]*record), completed: make(map[completionKey]Node),
 	}
 }
 
@@ -136,6 +144,14 @@ func (c *Client) HandleMessage(ctx tree.Context, msg interface{}) {
 		c.reset(ctx, m)
 	case *GetState:
 		c.getState(ctx, m)
+	case *pb.BattleInputReq:
+		c.forwardInput(ctx, m)
+	case *pb.BattleInputAck:
+		if r := c.players[m.GetUid()]; r != nil && r.Status == Running && r.BattleID == m.GetBattleId() {
+			c.push(ctx, m.GetUid(), m)
+		}
+	case *pb.BattleAdmissionFailedNtf:
+		c.admissionFailed(ctx, m)
 	case *pb.BattleCreatedNtf:
 		c.created(ctx, m)
 	case *pb.BattleActionNtf:
@@ -166,34 +182,82 @@ func (c *Client) begin(ctx tree.Context, msg *Begin) {
 		return
 	}
 	request := proto.Clone(msg.Request).(*pb.StartBattleReq)
+	request.ServerID = uint32(c.gameServerID)
+	request.SourceNodeId = uint32(c.gameNodeID)
 	uid := request.GetUID()
 	r := c.state(uid)
 	if r.playback.pending(comm.RealNow()) {
 		ctx.Response(r.State, ErrInProgress)
 		return
 	}
-	if r.Status == Creating || r.Status == CreateUnknown || r.Status == Running {
-		ctx.Response(r.State, fmt.Errorf("battle client: uid=%d is %s", uid, r.Status))
-		return
-	}
-	node, err := c.selector.Pick()
-	if err != nil {
-		r.Status = Idle
+	id := request.GetJoinBattleId()
+	if (r.Status == Running || r.Status == CreateUnknown) && id != "" && id == r.BattleID {
+		// 重复加入同一场用作主动同步，不占用第二个单位。
+		err := c.sender.Start(r.Node, request)
 		ctx.Response(r.State, err)
 		return
 	}
-	r.State = State{UID: uid, Status: Creating, Node: node}
+	if r.Status == Creating || r.Status == CreateUnknown || r.Status == Running {
+		ctx.Response(r.State, ErrInProgress)
+		return
+	}
+	var node Node
+	if id != "" {
+		server, nodeID, ok := def.BattleRoomRoute(id)
+		if !ok || request.GetAllowJoin() || len(request.GetInitialMembers()) != 0 {
+			ctx.Response(r.State, ErrInvalidRequest)
+			return
+		}
+		node = Node{ServerID: server, NodeID: nodeID}
+	} else {
+		var err error
+		node, err = c.selector.Pick()
+		if err != nil {
+			r.Status = Idle
+			ctx.Response(r.State, err)
+			return
+		}
+	}
+	// Game 内部调用方提供已确定的同节点队友。先检查全员状态，发送成功后一起登记。
+	seen := map[uint64]bool{uid: true}
+	for _, m := range request.GetInitialMembers() {
+		if m.GetUid() == 0 || m.GetRole() == nil || seen[m.GetUid()] {
+			ctx.Response(r.State, ErrInvalidRequest)
+			return
+		}
+		seen[m.GetUid()] = true
+		other := c.state(m.GetUid())
+		if (other.Status != Idle && other.Status != Finished) || other.playback.pending(comm.RealNow()) {
+			ctx.Response(r.State, ErrInProgress)
+			return
+		}
+		m.ServerId = request.GetServerID()
+		m.NodeId = request.GetSourceNodeId()
+	}
+	r.roomRequest = nil
+	if request.GetAllowJoin() || id != "" {
+		r.roomRequest = request
+	}
+	r.State = State{UID: uid, Status: Creating, Node: node, BattleID: id}
+	r.snapshotFloor = 0
 	r.seen = make(map[uint64]struct{})
 	r.playback = nil
-	request.ServerID = uint32(c.gameServerID)
-	request.SourceNodeId = uint32(c.gameNodeID)
+
 	if err := c.sender.Start(node, request); err != nil {
-		r.Status = Idle
+		r.roomRequest = nil
+		r.State = State{UID: uid, Status: Idle}
 		ctx.Response(r.State, err)
 		return
 	}
 	// NATS 已发布但尚未收到 Created；此时禁止盲目重发，避免生成两场战斗。
 	r.Status = CreateUnknown
+	for _, m := range request.GetInitialMembers() {
+		other := c.state(m.GetUid())
+		*other = record{State: State{UID: m.GetUid(), Status: CreateUnknown, Node: node}, seen: make(map[uint64]struct{})}
+		if request.GetAllowJoin() {
+			other.roomRequest = &pb.StartBattleReq{UID: m.GetUid(), ServerID: m.GetServerId(), SourceNodeId: m.GetNodeId(), BattleType: request.GetBattleType(), MonsterGroupConfigId: request.GetMonsterGroupConfigId(), AttackerRoles: []*pb.Role{m.GetRole()}}
+		}
+	}
 	ctx.Response(r.State, nil)
 }
 
@@ -208,9 +272,14 @@ func (c *Client) created(ctx tree.Context, msg *pb.BattleCreatedNtf) {
 	if r.Status != CreateUnknown && r.Status != Creating && r.Status != Running {
 		return
 	}
+	if msg.GetSnapshotSequence() < r.LastSequence {
+		return
+	}
+	r.snapshotFloor = msg.GetSnapshotSequence()
+	r.LastSequence = msg.GetSnapshotSequence()
 	r.BattleID = msg.BattleId
 	r.Status = Running
-	if r.playback == nil {
+	if r.playback == nil && len(msg.GetControls()) == 0 {
 		r.playback = newPlaybackWindow(msg.GetTickDurationMs())
 	}
 	c.push(ctx, msg.Uid, msg)
@@ -225,11 +294,21 @@ func (c *Client) action(ctx tree.Context, msg *pb.BattleActionNtf) {
 		return
 	}
 	sequence := msg.Event.Sequence
-	if sequence == 0 {
+	if sequence == 0 || sequence <= r.snapshotFloor || (r.roomRequest != nil && sequence <= r.LastSequence) {
 		return
 	}
 	if _, duplicate := r.seen[sequence]; duplicate {
 		return
+	}
+	if req := r.roomRequest; req != nil && sequence > r.LastSequence+1 {
+		// 请求权威快照；后续丢帧时仍可重试。旧快照由序号过滤。
+		syncReq := proto.Clone(req).(*pb.StartBattleReq)
+		syncReq.AllowJoin = false
+		syncReq.InitialMembers = nil
+		syncReq.JoinBattleId = r.BattleID
+		if err := c.sender.Start(r.Node, syncReq); err != nil {
+			tlog.Log.Warn("[战斗/同步] 快照请求失败, pid=%v err=%v", msg.GetUid(), err)
+		}
 	}
 	r.seen[sequence] = struct{}{}
 	r.playback.observe(msg.GetEvent(), comm.RealNow())
@@ -243,25 +322,26 @@ func (c *Client) finished(ctx tree.Context, msg *pb.BattleFinishedNtf) {
 	if msg == nil || msg.Uid == 0 || msg.BattleId == "" {
 		return
 	}
+	key := completionKey{msg.BattleId, msg.Uid}
+	if node, ok := c.completed[key]; ok {
+		_ = c.sender.Confirm(node, &pb.BattleResultConfirmedNtf{BattleId: msg.GetBattleId(), Uid: msg.GetUid()})
+		return
+	}
 	r := c.state(msg.Uid)
 	if r.BattleID != "" && r.BattleID != msg.BattleId {
 		return
 	}
 	// Finished 可恢复丢失的 Created；重复 Finished 只确认，不重复推给客户端或重复结算。
-	if _, alreadyApplied := c.completed[msg.BattleId]; !alreadyApplied {
-		// 先把结算交给网关：投递失败时不记录完成、不向 Battle 确认，由 Battle 重发结束通知，
-		// 避免确认后结算丢失。
-		settlement := c.buildSettlement(msg)
-		if !c.deliverSettlement(ctx, settlement) {
-			return
-		}
-		c.completed[msg.BattleId] = msg.Checksum
-		r.BattleID = msg.BattleId
-		r.Checksum = msg.Checksum
-		r.Status = Finished
-		c.push(ctx, msg.Uid, msg)
+	settlement := c.buildSettlement(msg)
+	if !c.deliverSettlement(ctx, settlement) {
+		return
 	}
-
+	c.completed[key] = r.Node
+	r.roomRequest = nil
+	r.BattleID = msg.BattleId
+	r.Checksum = msg.Checksum
+	r.Status = Finished
+	c.push(ctx, msg.Uid, msg)
 	_ = c.sender.Confirm(r.Node, &pb.BattleResultConfirmedNtf{BattleId: msg.BattleId, Uid: msg.Uid})
 }
 
@@ -269,8 +349,7 @@ func (c *Client) finished(ctx tree.Context, msg *pb.BattleFinishedNtf) {
 // 唤醒临时 PlayerActor 加载、处理并存盘后回收。
 //
 // 使用非阻塞投递，网关队列满时返回 false，由调用方放弃本次确认等待 Battle 重发，
-// 不让全区共用的战斗客户端被网关拖住。当前只有发起人一名参战者；多人结算时需要按参战者
-// 记录已投递状态，避免重发时重复结算已成功的玩家。
+// 不让全区共用的战斗客户端被网关拖住。每个通知归属于一名参战者，按战斗编号和玩家编号去重。
 func (c *Client) deliverSettlement(ctx tree.Context, settlement *Settlement) bool {
 	gatePID, ok := ctx.Lookup(def.GameGate)
 	if !ok {
@@ -286,11 +365,7 @@ func (c *Client) deliverSettlement(ctx tree.Context, settlement *Settlement) boo
 	return true
 }
 
-// buildSettlement 把 battle 的结果通知转成结算输入。
-//
-// 目前参战者只有发起人一个人（同服版本）。跨服队对战时这里要换成真实的参战名单，
-// 并由某个跨服角色负责扇出 —— 但 play 侧的结算逻辑只认 Settlement，不会因为
-// 这件事改动。
+// buildSettlement 将当前收件人的结果投递给其玩家 Actor，每名参战者独立去重和确认。
 func (c *Client) buildSettlement(msg *pb.BattleFinishedNtf) *Settlement {
 	return &Settlement{
 		BattleID:   msg.GetBattleId(),
@@ -321,6 +396,7 @@ func (c *Client) reset(ctx tree.Context, msg *Reset) {
 		return
 	}
 	r.State = State{UID: msg.UID, Status: Idle}
+	r.snapshotFloor = 0
 	r.seen = make(map[uint64]struct{})
 	ctx.Response(r.State, nil)
 }
@@ -368,9 +444,54 @@ func (s *ClusterSelector) Pick() (Node, error) {
 type NATSSender struct{}
 
 func (NATSSender) Start(node Node, req *pb.StartBattleReq) error {
+	if req.GetJoinBattleId() != "" {
+		services, err := cluster.GetAllServices(def.ServiceBattle)
+		if err != nil {
+			return err
+		}
+		registered := false
+		for _, instance := range services {
+			if instance.ServerID == strconv.Itoa(node.ServerID) && instance.NodeID == strconv.Itoa(node.NodeID) {
+				registered = true
+				break
+			}
+		}
+		if !registered {
+			return ErrUnavailable
+		}
+	}
 	return natsrpc.Cast(natsrpc.Battle, def.BattleService, node.ServerID, node.NodeID, req)
 }
 
 func (NATSSender) Confirm(node Node, msg *pb.BattleResultConfirmedNtf) error {
 	return natsrpc.Cast(natsrpc.Battle, def.BattleActorName(msg.BattleId), node.ServerID, node.NodeID, msg)
+}
+
+func (c *Client) forwardInput(ctx tree.Context, req *pb.BattleInputReq) {
+	uid := req.GetUID()
+	if r := c.players[uid]; r != nil && r.Status == Running && r.BattleID == req.GetBattleId() {
+		if err := natsrpc.Cast(natsrpc.Battle, def.BattleActorName(r.BattleID),
+			r.Node.ServerID, r.Node.NodeID, req); err == nil {
+			return
+		}
+	}
+	c.push(ctx, uid, &pb.BattleInputAck{Code: pb_common.ErrCode_INVALID_BATTLE_REQUEST, BattleId: req.GetBattleId(), UnitId: req.GetUnitId(), Sequence: req.GetSequence()})
+}
+
+// admissionFailed 释放创建或加入失败的玩家状态。
+func (c *Client) admissionFailed(ctx tree.Context, msg *pb.BattleAdmissionFailedNtf) {
+	r := c.players[msg.GetUid()]
+	if r == nil || (r.BattleID != "" && r.BattleID != msg.GetBattleId()) {
+		return
+	}
+	if r.Status != CreateUnknown && r.Status != Creating {
+		return
+	}
+	if msg.GetCode() == pb_common.ErrCode_OK {
+		return
+	}
+
+	r.roomRequest = nil
+	r.State = State{UID: msg.GetUid(), Status: Idle}
+	c.push(ctx, msg.GetUid(), msg)
 }

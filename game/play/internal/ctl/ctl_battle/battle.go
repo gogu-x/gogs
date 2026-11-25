@@ -114,6 +114,7 @@ func buildBattleRequest(currentPlayer *player.Player, incoming *pb_battle.StartB
 	towerLayer := towerMgr.GetLayer()
 
 	return &pb_battle.StartBattleReq{
+		AllowJoin: incoming.GetAllowJoin(), JoinBattleId: incoming.GetJoinBattleId(),
 		UID:                  uid,
 		ServerID:             uint32(conf.ServerID),
 		SourceNodeId:         uint32(conf.NodeId),
@@ -194,4 +195,12 @@ func OnBattleFinished(ctx *core.Context, settlement *battle.Settlement) {
 	arg := comm.NewArg()
 	arg.Set("settlement", settlement)
 	ctx.Emit(core.BattleSettled, arg)
+}
+
+// OnBattleInput 使用当前登录玩家身份转交战斗输入。
+func OnBattleInput(ctx *core.Context, req *pb_battle.BattleInputReq) {
+	req.UID = ctx.PlayerID()
+	if !ctx.Cast(def.BattleClient, req) {
+		ctx.CastPlayerMsg(ctx.PlayerID(), &pb_battle.BattleInputAck{Code: pb_common.ErrCode_INVALID_BATTLE_REQUEST, BattleId: req.GetBattleId(), UnitId: req.GetUnitId(), Sequence: req.GetSequence()})
+	}
 }

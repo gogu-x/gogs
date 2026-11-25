@@ -414,6 +414,8 @@ const (
 	BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED BattleEventType = 9
 	// 状态已移除
 	BattleEventType_BATTLE_EVENT_TYPE_STATUS_REMOVED BattleEventType = 10
+	// 中途加入的玩家单位，事件记录实例编号与入场血量。
+	BattleEventType_BATTLE_EVENT_TYPE_UNIT_JOINED BattleEventType = 11
 )
 
 // Enum value maps for BattleEventType.
@@ -430,6 +432,7 @@ var (
 		8:  "BATTLE_EVENT_TYPE_BATTLE_ENDED",
 		9:  "BATTLE_EVENT_TYPE_ACTION_CANCELLED",
 		10: "BATTLE_EVENT_TYPE_STATUS_REMOVED",
+		11: "BATTLE_EVENT_TYPE_UNIT_JOINED",
 	}
 	BattleEventType_value = map[string]int32{
 		"BATTLE_EVENT_TYPE_UNSPECIFIED":      0,
@@ -443,6 +446,7 @@ var (
 		"BATTLE_EVENT_TYPE_BATTLE_ENDED":     8,
 		"BATTLE_EVENT_TYPE_ACTION_CANCELLED": 9,
 		"BATTLE_EVENT_TYPE_STATUS_REMOVED":   10,
+		"BATTLE_EVENT_TYPE_UNIT_JOINED":      11,
 	}
 )
 
@@ -833,6 +837,8 @@ type BattleEvent struct {
 	StatusExpireTick int64 `protobuf:"varint,24,opt,name=status_expire_tick,json=statusExpireTick,proto3" json:"status_expire_tick,omitempty"`
 	// 状态刷新版本，较旧版本的到期任务不再生效
 	StatusVersion uint64 `protobuf:"varint,25,opt,name=status_version,json=statusVersion,proto3" json:"status_version,omitempty"`
+	// 入场事件携带新成员的完整单位快照。
+	JoinedUnit    *BattleUnitResult `protobuf:"bytes,26,opt,name=joined_unit,json=joinedUnit,proto3" json:"joined_unit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1035,6 +1041,13 @@ func (x *BattleEvent) GetStatusVersion() uint64 {
 	return 0
 }
 
+func (x *BattleEvent) GetJoinedUnit() *BattleUnitResult {
+	if x != nil {
+		return x.JoinedUnit
+	}
+	return nil
+}
+
 // 一个单位的最终生命结果
 type BattleUnitResult struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1047,7 +1060,9 @@ type BattleUnitResult struct {
 	// 最大生命值
 	MaxHp int64 `protobuf:"varint,4,opt,name=max_hp,json=maxHp,proto3" json:"max_hp,omitempty"`
 	// 是否存活
-	Alive         bool `protobuf:"varint,5,opt,name=alive,proto3" json:"alive,omitempty"`
+	Alive bool `protobuf:"varint,5,opt,name=alive,proto3" json:"alive,omitempty"`
+	// 玩家控制单位所属 UID，机器人单位为零。
+	OwnerUid      uint64 `protobuf:"varint,6,opt,name=owner_uid,json=ownerUid,proto3" json:"owner_uid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1117,6 +1132,13 @@ func (x *BattleUnitResult) GetAlive() bool {
 	return false
 }
 
+func (x *BattleUnitResult) GetOwnerUid() uint64 {
+	if x != nil {
+		return x.OwnerUid
+	}
+	return 0
+}
+
 var File_cspb_battle_struct_proto protoreflect.FileDescriptor
 
 const file_cspb_battle_struct_proto_rawDesc = "" +
@@ -1141,7 +1163,7 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x06equips\x18\a \x03(\v2\n" +
 	".RoleEquipR\x06equips\x12:\n" +
 	"\x1asoul_jade_effect_affix_ids\x18\t \x03(\x05R\x16soulJadeEffectAffixIds\x121\n" +
-	"\fgrowth_bonus\x18\b \x01(\v2\x0e.GrowthBonusesR\vgrowthBonus\"\xa9\x06\n" +
+	"\fgrowth_bonus\x18\b \x01(\v2\x0e.GrowthBonusesR\vgrowthBonus\"\xdd\x06\n" +
 	"\vBattleEvent\x12\x1a\n" +
 	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\x04R\x06action\x12\x12\n" +
@@ -1172,14 +1194,17 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\aoutcome\x18\x16 \x01(\x0e2\x0e.BattleOutcomeR\aoutcome\x12,\n" +
 	"\x12status_instance_id\x18\x17 \x01(\x04R\x10statusInstanceId\x12,\n" +
 	"\x12status_expire_tick\x18\x18 \x01(\x03R\x10statusExpireTick\x12%\n" +
-	"\x0estatus_version\x18\x19 \x01(\x04R\rstatusVersion\"\x91\x01\n" +
+	"\x0estatus_version\x18\x19 \x01(\x04R\rstatusVersion\x122\n" +
+	"\vjoined_unit\x18\x1a \x01(\v2\x11.BattleUnitResultR\n" +
+	"joinedUnit\"\xae\x01\n" +
 	"\x10BattleUnitResult\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x1f\n" +
 	"\x04team\x18\x02 \x01(\x0e2\v.BattleTeamR\x04team\x12\x0e\n" +
 	"\x02hp\x18\x03 \x01(\x03R\x02hp\x12\x15\n" +
 	"\x06max_hp\x18\x04 \x01(\x03R\x05maxHp\x12\x14\n" +
-	"\x05alive\x18\x05 \x01(\bR\x05alive*\x98\x01\n" +
+	"\x05alive\x18\x05 \x01(\bR\x05alive\x12\x1b\n" +
+	"\towner_uid\x18\x06 \x01(\x04R\bownerUid*\x98\x01\n" +
 	"\n" +
 	"BattleType\x12\x1b\n" +
 	"\x17BATTLE_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
@@ -1220,7 +1245,7 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x13STATUS_TYPE_SILENCE\x10\x02\x12\x13\n" +
 	"\x0fSTATUS_TYPE_DOT\x10\x03\x12\x13\n" +
 	"\x0fSTATUS_TYPE_HOT\x10\x04\x12\"\n" +
-	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\x98\x03\n" +
+	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\xbb\x03\n" +
 	"\x0fBattleEventType\x12!\n" +
 	"\x1dBATTLE_EVENT_TYPE_UNSPECIFIED\x10\x00\x12$\n" +
 	" BATTLE_EVENT_TYPE_ACTION_STARTED\x10\x01\x12 \n" +
@@ -1233,7 +1258,8 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x1eBATTLE_EVENT_TYPE_BATTLE_ENDED\x10\b\x12&\n" +
 	"\"BATTLE_EVENT_TYPE_ACTION_CANCELLED\x10\t\x12$\n" +
 	" BATTLE_EVENT_TYPE_STATUS_REMOVED\x10\n" +
-	"*\xc8\x01\n" +
+	"\x12!\n" +
+	"\x1dBATTLE_EVENT_TYPE_UNIT_JOINED\x10\v*\xc8\x01\n" +
 	"\x11BattleEventReason\x12#\n" +
 	"\x1fBATTLE_EVENT_REASON_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eBATTLE_EVENT_REASON_ACTOR_DEAD\x10\x01\x12\x1f\n" +
@@ -1280,12 +1306,13 @@ var file_cspb_battle_struct_proto_depIdxs = []int32{
 	5,  // 5: BattleEvent.status_type:type_name -> StatusType
 	7,  // 6: BattleEvent.reason:type_name -> BattleEventReason
 	2,  // 7: BattleEvent.outcome:type_name -> BattleOutcome
-	1,  // 8: BattleUnitResult.team:type_name -> BattleTeam
-	9,  // [9:9] is the sub-list for method output_type
-	9,  // [9:9] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	12, // 8: BattleEvent.joined_unit:type_name -> BattleUnitResult
+	1,  // 9: BattleUnitResult.team:type_name -> BattleTeam
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_cspb_battle_struct_proto_init() }

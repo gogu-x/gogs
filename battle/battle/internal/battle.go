@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/gogu-x/gogs/battle/battle/internal/battleconfig"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
+	"github.com/gogu-x/gogs/battle/robot"
 	"github.com/gogu-x/gogs/def"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
+
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/timer"
 	"github.com/gogu-x/tree/tlog"
@@ -26,12 +27,15 @@ const (
 // 注册名 = def.BattleActorName(battleID)，跨进程可被 NATS 按 TaggerName
 // 直达（如 BattleResultConfirmedNtf 确认）。
 type BattleActor struct {
-	p        Params
-	report   Report // 已保存、等待投递或确认的完整战报。
-	attempts int
-	timer    *timer.TimeWheel
-	released bool
-	self     tree.PID
+	members   []Member
+	confirmed map[uint64]bool
+	live      *liveBattle
+	p         Params
+	report    Report // 已保存、等待投递或确认的完整战报。
+	attempts  int
+	timer     *timer.TimeWheel
+	released  bool
+	self      tree.PID
 }
 
 func NewBattleActor(p Params) *BattleActor {
@@ -48,14 +52,26 @@ func (a *BattleActor) OnInit(ctx tree.Context) {
 	tree.Send(a.self, &beginBattle{})
 }
 
-func (a *BattleActor) OnStop(_ tree.Context) { a.stopTimer() }
+func (a *BattleActor) OnStop(_ tree.Context) { a.stopRobots(); a.stopTimer() }
 
 func (a *BattleActor) HandleMessage(ctx tree.Context, msg interface{}) {
 	switch m := msg.(type) {
+	case *robot.Observe:
+		a.observeRobots(ctx, m)
+	case *robot.Command:
+		a.liveInput(ctx, m.Input, true)
+	case *pb.BattleInputReq:
+		a.liveInput(ctx, m, false)
+	case *statusWake:
+		a.liveStatus(ctx)
+	case *pb.StartBattleReq:
+		a.join(ctx, m)
 	case *beginBattle:
 		a.begin(ctx)
 	case *pb.BattleResultConfirmedNtf:
-		a.confirm(ctx, m)
+		if a.p.Battle == nil {
+			a.confirm(ctx, m)
+		}
 	case *retryTick:
 		a.retry(ctx)
 	case *RetireBattle:
@@ -65,7 +81,7 @@ func (a *BattleActor) HandleMessage(ctx tree.Context, msg interface{}) {
 	}
 }
 
-// begin 先完成计算和战报保存，再按创建、过程、结束顺序下发。
+// begin 创建即时战斗，或重投已有战报。
 func (a *BattleActor) begin(ctx tree.Context) {
 	if a.p.Mode == ModeRun && a.p.Battle == nil {
 		compiler := a.p.Compiler
@@ -78,12 +94,21 @@ func (a *BattleActor) begin(ctx tree.Context) {
 		}
 		if err != nil {
 			tlog.Log.Error("[战斗/创建] 读取配置并创建引擎失败, battleID=%v uid=%v err=%v", a.p.BattleID, a.p.UID, err)
+			a.failCreation()
 			a.finish(ctx)
 			return
 		}
 	}
 	if a.p.Mode == ModeRun {
-		a.runBattle(ctx)
+		a.initMembers()
+		for _, member := range a.p.Request.GetInitialMembers() {
+			if err := a.addMember(member, false); err != nil {
+				a.failCreation()
+				a.finish(ctx)
+				return
+			}
+		}
+		a.beginLive()
 		return
 	}
 
@@ -93,6 +118,8 @@ func (a *BattleActor) begin(ctx tree.Context) {
 	r.SourceServerID = a.p.Source.ServerID
 	r.SourceNodeID = a.p.Source.NodeID
 	a.report = r
+	// 重投只面向本次指定的收件人。
+	a.members = []Member{{UID: a.p.UID, Source: a.p.Source}}
 	a.notifyCreated()
 	a.pushActions()
 	a.pushFinished()
@@ -109,6 +136,7 @@ func (a *BattleActor) notifyCreated() {
 	}
 	created := &pb.BattleCreatedNtf{BattleId: a.p.BattleID, Uid: a.p.UID, TickDurationMs: tickDurationMS}
 	// 参战名单在创建时即已确定，随 Created 一起下发，客户端进战斗页就能把双方单位摆好。
+
 	created.Units = a.report.InitialUnits
 	if err := a.p.Notifier.Notify(a.p.Source, created); err != nil {
 		tlog.Log.Warn("battle battle %s: notify Created: %v", a.p.BattleID, err)
@@ -136,32 +164,6 @@ func (a *BattleActor) pushEvents(battleID string, uid uint64, events []*pb.Battl
 			tlog.Log.Warn("battle battle %s: notify Action %d: %v", a.p.BattleID, event.GetSequence(), err)
 		}
 	}
-}
-
-// runBattle 用逻辑时间循环算完整场，保存初始快照后再运行以免取得最终血量。
-func (a *BattleActor) runBattle(ctx tree.Context) {
-	initialUnits := a.p.Battle.UnitResults()
-	result, err := a.p.Battle.Run()
-	if err != nil {
-		tlog.Log.Error("[战斗/执行] 自动战斗结算失败, battleID=%v uid=%v err=%v", a.p.BattleID, a.p.UID, err)
-		a.finish(ctx)
-		return
-	}
-	a.logResult(result)
-
-	now := time.Now().UTC()
-	report := Report{BattleID: result.BattleID, UID: a.p.UID, SourceServerID: a.p.Source.ServerID, SourceNodeID: a.p.Source.NodeID, InitialUnits: initialUnits, Result: result, CreatedAt: now, UpdatedAt: now}
-	if err := a.p.Reports.Save(context.Background(), report); err != nil {
-		tlog.Log.Error("battle battle %s: save report: %v", a.p.BattleID, err)
-		a.finish(ctx)
-		return
-	}
-	a.report = report
-	a.notifyCreated()
-	a.pushActions()
-	// 计算结束后只保留战报，释放引擎的单位、状态和时间轴。
-	a.p.Battle = nil
-	a.pushFinished()
 }
 
 func (a *BattleActor) logEvent(event *pb.BattleEvent) {
@@ -204,9 +206,18 @@ func (a *BattleActor) pushSource() Source {
 // pushFinished 推送 Finished 并（未确认时）安排重试。
 func (a *BattleActor) pushFinished() {
 	result := a.report.Result
-	ntf := &pb.BattleFinishedNtf{BattleId: a.report.BattleID, Uid: a.report.UID, BattleType: result.BattleType, Outcome: result.Outcome, Units: result.Units, Checksum: result.Checksum}
-	if err := a.p.Notifier.Notify(a.pushSource(), ntf); err != nil {
-		tlog.Log.Warn("battle battle %s: notify Finished: %v", a.p.BattleID, err)
+	members := a.members
+	if len(members) == 0 {
+		members = []Member{{UID: a.report.UID, Source: a.pushSource()}}
+	}
+	for _, m := range members {
+		if a.confirmed[m.UID] {
+			continue
+		}
+		ntf := &pb.BattleFinishedNtf{BattleId: a.report.BattleID, Uid: m.UID, BattleType: result.BattleType, Outcome: result.Outcome, Units: result.Units, Checksum: result.Checksum}
+		if err := a.p.Notifier.Notify(m.Source, ntf); err != nil {
+			tlog.Log.Warn("[战斗/pushFinished] 结束通知失败, pid=%v err=%v", m.UID, err)
+		}
 	}
 	a.attempts++
 	if !a.report.Confirmed {
@@ -226,6 +237,18 @@ func (a *BattleActor) retry(ctx tree.Context) {
 func (a *BattleActor) confirm(ctx tree.Context, msg *pb.BattleResultConfirmedNtf) {
 	if msg == nil || msg.BattleId != a.p.BattleID {
 		return
+	}
+	if len(a.members) > 0 {
+		if a.member(msg.GetUid()) == nil {
+			return
+		}
+		if a.confirmed == nil {
+			a.confirmed = make(map[uint64]bool)
+		}
+		a.confirmed[msg.GetUid()] = true
+		if len(a.confirmed) < len(a.members) {
+			return
+		}
 	}
 	if err := a.p.Reports.Confirm(context.Background(), a.p.BattleID); err != nil && !errors.Is(err, ErrReportNotFound) {
 		tlog.Log.Warn("battle battle %s: confirm: %v", a.p.BattleID, err)

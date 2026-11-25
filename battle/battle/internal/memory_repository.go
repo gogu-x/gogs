@@ -41,7 +41,14 @@ func (r *MemoryRepository) ListByPlayer(_ context.Context, uid uint64, limit int
 	defer r.mu.RUnlock()
 	reports := make([]Report, 0)
 	for _, report := range r.reports {
-		if report.UID == uid {
+		found := report.UID == uid
+		for _, member := range report.Members {
+			if member.UID == uid {
+				found = true
+				break
+			}
+		}
+		if found {
 			reports = append(reports, report)
 			if limit > 0 && len(reports) >= limit {
 				break

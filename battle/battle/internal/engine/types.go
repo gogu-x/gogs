@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"github.com/gogu-x/gogs/battle/robot/strategy"
 
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
@@ -59,17 +60,21 @@ type ChargeEffectConfig struct {
 
 // UnitConfig 表示 BattleActor 已从 glconf 还原的运行时单位。
 type UnitConfig struct {
-	InstanceID     string
-	Team           pb.BattleTeam
-	Position       int32
-	MaxHP          int64
-	Attack         int64
-	Defense        int64
-	Speed          int64
-	BasicSkill     SkillConfig
-	ActiveSkills   []SkillConfig
-	InitialStatus  []StatusConfig
-	PassiveCharges []ChargeEffectConfig // 该角色装备魂玉提供的积攒效果。
+	OwnerUID        uint64          // 玩家控制者编号，怪物为零。
+	CastRules       []strategy.Rule // 本单位按配置顺序执行的条件施法规则。
+	RobotFirstDelay int64           // 机器人首次决策距开战的逻辑帧数。
+	RobotSequence   []string        // 机器人按顺序循环使用的技能编号。
+	InstanceID      string
+	Team            pb.BattleTeam
+	Position        int32
+	MaxHP           int64
+	Attack          int64
+	Defense         int64
+	Speed           int64
+	BasicSkill      SkillConfig
+	ActiveSkills    []SkillConfig
+	InitialStatus   []StatusConfig
+	PassiveCharges  []ChargeEffectConfig // 该角色装备魂玉提供的积攒效果。
 }
 
 // Rules 表示 BattleActor 已从 glconf 读取的本场规则。

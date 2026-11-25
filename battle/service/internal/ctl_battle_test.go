@@ -26,7 +26,7 @@ func MainTest(t *testing.T) {
 		nil,
 		[]*glconf.BattleMonsterCfg{{CfgID: 1, MaxHP: 40, Attack: 10, Defense: 2, Speed: 8, BasicSkillID: 1}},
 		[]*glconf.BattleMonsterGroupCfg{{CfgID: 1, Members: []*cspb.TypIDVal{{Typ: "battle_monster", Id: 1, Val: 1}}}},
-		[]*glconf.BattleRuleCfg{{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 100, MaxActions: 20, TickDurationMS: 100, CritMultiplierPermille: 1500}},
+		[]*glconf.BattleRuleCfg{{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 100, MaxActions: 20, TickDurationMS: 1, CritMultiplierPermille: 1500}},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -86,8 +86,8 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	}
 	select {
 	case <-finished:
-		if createdTickDuration != 100 {
-			t.Fatalf("created tick duration = %d, want 100", createdTickDuration)
+		if createdTickDuration != 1 {
+			t.Fatalf("created tick duration = %d, want 1", createdTickDuration)
 		}
 	case <-time.After(30 * time.Second):
 		t.Fatal("battle did not finish")
@@ -107,11 +107,9 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	t.Fatal("战斗登记未清理")
 }
 
-// TestBattleComputesBeforeDelivery 验证先算完并保存，再有序发送完整时间轴。
-func TestBattleComputesBeforeDelivery(t *testing.T) {
+// TestBattleStreamsBeforeFinalReport 验证开场推送快照，过程事件即时发送，结束通知前保存战报。
+func TestBattleStreamsBeforeFinalReport(t *testing.T) {
 	MainTest(t)
-	// 将一帧设为一分钟，旧的真实时间推进方式无法在测试期限内完成。
-	glconf.GetBattleRuleCfg(int32(pb.BattleType_BATTLE_TYPE_TOWER)).TickDurationMS = 60000
 	server := New()
 
 	var mu sync.Mutex
@@ -127,7 +125,7 @@ func TestBattleComputesBeforeDelivery(t *testing.T) {
 	var badSource []string
 	var createdUnits []*pb.BattleUnitResult
 	var finishedBattleType pb.BattleType
-	var reportMissing bool
+	var reportMissing, reportAtCreation bool
 	server.notifier = battle.NotifyFunc(func(source battle.Source, message proto.Message) error {
 		mu.Lock()
 		defer mu.Unlock()
@@ -145,10 +143,11 @@ func TestBattleComputesBeforeDelivery(t *testing.T) {
 			// 参战名单必须随 Created 下发：否则客户端要等某个单位先行动才建出它，
 			// 表现为"进入战斗时对面空无一物"。
 			createdUnits = value.GetUnits()
-			if report, err := server.reports.Get(context.Background(), value.GetBattleId()); err != nil || len(report.Result.Events) == 0 {
-				reportMissing = true
-			}
+			_, err := server.reports.Get(context.Background(), value.GetBattleId())
+			reportAtCreation = err == nil
 		case *pb.BattleFinishedNtf:
+			report, err := server.reports.Get(context.Background(), value.GetBattleId())
+			reportMissing = err != nil || len(report.Result.Events) == 0
 			order = append(order, finishedMarker)
 			finishedBattleType = value.GetBattleType()
 		}
@@ -180,8 +179,8 @@ func TestBattleComputesBeforeDelivery(t *testing.T) {
 	if len(badSource) > 0 {
 		t.Fatalf("推送目标为 0 号节点,消息会被静默丢弃: %v", badSource)
 	}
-	if reportMissing {
-		t.Fatal("创建通知发出前未保存完整战报")
+	if reportAtCreation || reportMissing {
+		t.Fatal("应在开场之后、结束通知之前生成战报")
 	}
 	if len(createdUnits) < 2 {
 		t.Fatalf("Created 未携带参战名单: %d 个单位", len(createdUnits))
@@ -286,4 +285,192 @@ func spawnTestServer(t *testing.T, server *Server, actor tree.Actor) tree.PID {
 		tree.Stop(pid)
 	})
 	return pid
+}
+
+// TestInteractiveRobotAndEquippedSkill 从创建入口验证机器人主动普攻和玩家即时法宝结算。
+func TestInteractiveRobotAndEquippedSkill(t *testing.T) {
+	MainTest(t)
+	const firstDelay = 23 // 测试怪物的首次决策帧。
+	monster := glconf.GetBattleMonsterCfg(1)
+	monster.AIFirstDelayTicks = firstDelay
+	monster.AICastRules = []*cspb.TypIDVal{{Typ: "always", Id: 1}}
+	glconf.GetBattleRuleCfg(int32(pb.BattleType_BATTLE_TYPE_TOWER)).TickDurationMS = 2
+	basic := glconf.GetBattleSkillCfg(1)
+	if err := glconf.SetBattleConfigsForTest(
+		glconf.GetAllBattleRoleCfg(), []*glconf.BattleSkillCfg{basic, {CfgID: 2, TargetRule: basic.TargetRule, WindupTicks: 100, RecoveryTicks: 1, Effects: []*cspb.TypIDVal{{Typ: "battle_damage", Pro: 100000}}}},
+		[]*glconf.BattleEquipCfg{{CfgID: 10, ActiveSkillID: 2}}, glconf.GetAllBattleMonsterCfg(), glconf.GetAllBattleMonsterGroupCfg(), glconf.GetAllBattleRuleCfg(),
+	); err != nil {
+		t.Fatal(err)
+	}
+	server := New()
+	events := make(chan proto.Message, 256)
+	server.notifier = battle.NotifyFunc(func(_ battle.Source, msg proto.Message) error { events <- msg; return nil })
+	manager := spawnTestServer(t, server, &observedServer{Server: server})
+	role := &pb.Role{RoleId: "player", RoleConfigId: 1, Equips: []*pb.RoleEquip{{EquipConfigId: 10}}}
+	value, err := tree.Request(manager, &pb.StartBattleReq{UID: 7, ServerID: 1, SourceNodeId: 2, BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{role}, MonsterGroupConfigId: 1}).AwaitTimeout(time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := value.(*pb.StartBattleAck).GetBattleId()
+	value, err = tree.Request(manager, &activeBattleQuery{battleID: id}).AwaitTimeout(time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid := value.(tree.PID)
+	deadline := time.After(2 * time.Second)
+	var created, sent, accepted bool
+	for {
+		select {
+		case <-deadline:
+			t.Fatal("机器人或法宝结算超时")
+		case msg := <-events:
+			switch event := msg.(type) {
+			case *pb.BattleCreatedNtf:
+				controls := event.GetControls()
+				if len(controls) != 1 || len(controls[0].GetActiveSkills()) != 1 || controls[0].GetActiveSkills()[0] != "2" {
+					t.Fatalf("法宝未随装备生效 %v", controls)
+				}
+				created = true
+			case *pb.BattleActionNtf:
+				if !sent && event.GetEvent().GetType() == pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE && event.GetEvent().GetTargetId() == "player" {
+					if event.GetEvent().GetTick() < firstDelay {
+						t.Fatal("怪物早于配置时间出手")
+					}
+					sent = tree.Send(pid, &pb.BattleInputReq{UID: 7, BattleId: id, UnitId: "player", SkillId: "2", Sequence: 1})
+				}
+			case *pb.BattleInputAck:
+				accepted = event.GetCode() == cspb.ErrCode_OK
+			case *pb.BattleFinishedNtf:
+				if !created || !sent || !accepted || event.GetOutcome() != pb.BattleOutcome_BATTLE_OUTCOME_ATTACKER_WIN {
+					t.Fatalf("交互战斗结果异常 %v", event)
+				}
+				return
+			}
+		}
+	}
+}
+
+// TestSharedBossRoom 验证按名单立即开场、中途加入血量快照、控制权及逐玩家确认。
+func TestSharedBossRoom(t *testing.T) {
+	MainTest(t)
+	// 将怪物第一次决策推迟，让测试能精确控制每一次扣血和加入顺序。
+	glconf.GetBattleMonsterCfg(1).AIFirstDelayTicks = 60000
+	server := New()
+	events := make(chan proto.Message, 128)
+	server.notifier = battle.NotifyFunc(func(source battle.Source, msg proto.Message) error {
+		// 三个玩家来自不同 Game 节点。
+		if routed, ok := msg.(interface{ GetUid() uint64 }); ok && int(routed.GetUid()) != source.NodeID {
+			t.Errorf("回投错节点 %v %v", source, msg)
+		}
+		events <- msg
+		return nil
+	})
+	manager := spawnTestServer(t, server, &observedServer{Server: server})
+	request := func(uid uint64, id string) *pb.StartBattleReq {
+		return &pb.StartBattleReq{UID: uid, ServerID: 1, SourceNodeId: uint32(uid), BattleType: pb.BattleType_BATTLE_TYPE_TOWER, AttackerRoles: []*pb.Role{{RoleId: "role", RoleConfigId: 1}}, MonsterGroupConfigId: 1, JoinBattleId: id}
+	}
+	next := func() proto.Message {
+		t.Helper()
+		select {
+		case msg := <-events:
+			return msg
+		case <-time.After(time.Second):
+			t.Fatal("未收到战斗消息")
+			return nil
+		}
+	}
+	host := request(1, "")
+	host.AllowJoin = true
+	host.InitialMembers = []*pb.InitialBattleMember{{Uid: 2, Role: request(2, "").GetAttackerRoles()[0], ServerId: 1, NodeId: 2}}
+	value, err := tree.Request(manager, host).AwaitTimeout(time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := value.(*pb.StartBattleAck).GetBattleId()
+	controls := map[uint64]string{}
+	for len(controls) < 2 {
+		created, ok := next().(*pb.BattleCreatedNtf)
+		if !ok || len(created.GetControls()) != 1 || len(created.GetUnits()) != 3 {
+			t.Fatal("初始名单或控制权错误", created)
+		}
+		controls[created.GetUid()] = created.GetControls()[0].GetUnitId()
+	}
+	if controls[1] == controls[2] {
+		t.Fatal("角色实例冲突")
+	}
+	v, err := tree.Request(manager, &activeBattleQuery{battleID: id}).AwaitTimeout(time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid := v.(tree.PID)
+	act := func(uid, seq uint64, unit string) {
+		tree.Send(pid, &pb.BattleInputReq{UID: uid, BattleId: id, UnitId: unit, SkillId: "1", Sequence: seq})
+	}
+	act(2, 1, controls[1])
+	if ack := next().(*pb.BattleInputAck); ack.GetCode() == cspb.ErrCode_OK {
+		t.Fatal("队友越权操作成功")
+	}
+	act(1, 1, controls[1])
+	hits := map[uint64]int64{}
+	for len(hits) < 2 {
+		if msg, ok := next().(*pb.BattleActionNtf); ok && msg.GetEvent().GetType() == pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE {
+			hits[msg.GetUid()] = msg.GetEvent().GetHpAfter()
+		}
+	}
+	if hits[1] != hits[2] || hits[1] <= 0 || hits[1] >= 40 {
+		t.Fatalf("两人血量不同 %v", hits)
+	}
+	tree.Send(manager, request(3, id))
+	for controls[3] == "" {
+		created, ok := next().(*pb.BattleCreatedNtf)
+		if !ok {
+			continue
+		}
+		if created.GetUid() != 3 || len(created.GetControls()) != 1 || len(created.GetUnits()) != 4 || created.GetSnapshotSequence() == 0 {
+			t.Fatalf("晚加入快照错误 %v", created)
+		}
+		for _, u := range created.GetUnits() {
+			if u.GetTeam() == pb.BattleTeam_BATTLE_TEAM_DEFENDER && u.GetHp() != hits[1] {
+				t.Fatal("Boss 血量被重置")
+			}
+		}
+		controls[3] = created.GetControls()[0].GetUnitId()
+	}
+	act(2, 1, controls[2])
+	act(3, 1, controls[3])
+	results := map[uint64]string{}
+	for len(results) < 3 {
+		if msg, ok := next().(*pb.BattleFinishedNtf); ok {
+			results[msg.GetUid()] = msg.GetChecksum()
+		}
+	}
+	if results[1] == "" || results[1] != results[2] || results[1] != results[3] {
+		t.Fatalf("结算分歧 %v", results)
+	}
+	for uid := uint64(1); uid <= 3; uid++ {
+		tree.Send(pid, &pb.BattleResultConfirmedNtf{BattleId: id, Uid: uid})
+		if uid < 3 {
+			// 在同场邮箱内设置屏障，确保查询发生在本次确认之后。
+			barrier := make(chan struct{})
+			tree.SendCallback(pid, func(tree.Context, interface{}, error) { close(barrier) }, nil, nil)
+			select {
+			case <-barrier:
+			case <-time.After(time.Second):
+				t.Fatal("提前回收")
+			}
+			report, err := server.reports.Get(context.Background(), id)
+			if err != nil || report.Confirmed {
+				t.Fatal("提前确认整场")
+			}
+		}
+	}
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		reports, _ := server.reports.ListByPlayer(context.Background(), 3, 1)
+		if len(reports) == 1 && reports[0].Confirmed {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("未完成全员确认")
 }

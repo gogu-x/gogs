@@ -36,6 +36,7 @@ func InitRoutes(actor *core.PlayerActor) {
 	core.ForwardPlayerMsg(actor, (*pb_actv.GetActvListReq)(nil), def.ActorActv)
 	core.ForwardPlayerMsg(actor, (*pb_actv.GetProgressReq)(nil), def.ActorActv)
 	core.ForwardPlayerMsg(actor, (*pb_actv.ClaimRewardReq)(nil), def.ActorActv)
+	core.RegisterPlayerMsg(actor, (*pb_battle.BattleInputReq)(nil), ctl_battle.OnBattleInput)
 	core.RegisterPlayerMsg(actor, (*pb_battle.StartBattleReq)(nil), ctl_battle.OnCreateBattle)
 	core.RegisterPlayerMsg(actor, (*pb_common.GetRoleCombatStatsReq)(nil), ctl_battle.OnGetRoleCombatStats)
 	core.RegisterPlayerMsg(actor, (*pb_equipment.GetRoleEquipmentReq)(nil), ctl_equipment.OnGetRoleEquipment)

@@ -120,10 +120,11 @@ func (c *Compiler) Compile(battleID string, seed uint64, request *pb.StartBattle
 	units := make([]engine.UnitConfig, 0, len(scenario.Attackers)+len(scenario.Defenders)+4)
 	attackerPositions := make(map[int32]struct{}, len(scenario.Attackers))
 	for _, role := range scenario.Attackers {
-		unit, err := c.buildRoleUnit(role, pb.BattleTeam_BATTLE_TEAM_ATTACKER)
+		unit, err := c.BuildJoinedRole(role)
 		if err != nil {
 			return engine.Setup{}, err
 		}
+		unit.OwnerUID = request.GetUID()
 		if err := addUnitPosition(attackerPositions, unit); err != nil {
 			return engine.Setup{}, err
 		}
@@ -144,6 +145,9 @@ func (c *Compiler) Compile(battleID string, seed uint64, request *pb.StartBattle
 			opponentPositions[position] = struct{}{}
 			unit, err := c.buildMonsterUnit(member.GetID(), position)
 			if err != nil {
+				return engine.Setup{}, err
+			}
+			if err := configureMonsterAI(member.GetID(), &unit); err != nil {
 				return engine.Setup{}, err
 			}
 			units = append(units, unit)

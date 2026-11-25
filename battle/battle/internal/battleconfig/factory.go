@@ -2,6 +2,7 @@ package battleconfig
 
 import (
 	"fmt"
+	"github.com/gogu-x/gogs/battle/robot/strategy"
 	"strconv"
 
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
@@ -189,4 +190,71 @@ func (c *Compiler) buildStatus(id int32) (engine.StatusConfig, error) {
 		return engine.StatusConfig{}, err
 	}
 	return status, nil
+}
+
+// addEquippedSkills 仅从游戏服确认的已穿戴装备读取法宝主动技能。
+func (c *Compiler) addEquippedSkills(unit *engine.UnitConfig, role *pb.Role) error {
+	seen := map[string]bool{unit.BasicSkill.ID: true}
+	for _, skill := range unit.ActiveSkills {
+		seen[skill.ID] = true
+	}
+	for _, equipped := range role.GetEquips() {
+		equip := glconf.GetBattleEquipCfg(equipped.GetEquipConfigId())
+		if equip == nil {
+			return fmt.Errorf("缺少装备配置 %d", equipped.GetEquipConfigId())
+		}
+		id := equip.GetActiveSkillID()
+		if id == 0 {
+			continue
+		}
+		skill, err := c.buildSkill(id)
+		if err != nil {
+			return err
+		}
+		if !seen[skill.ID] {
+			unit.ActiveSkills = append(unit.ActiveSkills, skill)
+			seen[skill.ID] = true
+		}
+	}
+	return nil
+}
+
+// configureMonsterAI 校验配置的每一步均属于怪物自身技能。
+func configureMonsterAI(monsterID int32, unit *engine.UnitConfig) error {
+	cfg := glconf.GetBattleMonsterCfg(monsterID)
+	if cfg == nil {
+		return fmt.Errorf("缺少怪物配置 %d", monsterID)
+	}
+	if cfg.AIFirstDelayTicks < 0 {
+		return fmt.Errorf("怪物 %d 的首次出手延迟不能为负数", monsterID)
+	}
+	allowed := map[string]bool{unit.BasicSkill.ID: true}
+	for _, skill := range unit.ActiveSkills {
+		allowed[skill.ID] = true
+	}
+	var sequence []string
+	for _, id := range cfg.AISkillSequence {
+		skill := strconv.FormatInt(int64(id), 10)
+		if !allowed[skill] {
+			return fmt.Errorf("怪物 %d 的出招序列包含未携带技能 %d", monsterID, id)
+		}
+		sequence = append(sequence, skill)
+	}
+	rules, err := strategy.Compile(cfg.AICastRules, allowed)
+	if err != nil {
+		return fmt.Errorf("怪物 %d: %w", monsterID, err)
+	}
+	unit.CastRules = rules
+	unit.RobotSequence = sequence
+	unit.RobotFirstDelay = int64(cfg.AIFirstDelayTicks)
+	return nil
+}
+
+// BuildJoinedRole 从 Game 的角色快照编译增援单位，使用与开场相同的装备技能规则。
+func (c *Compiler) BuildJoinedRole(role *pb.Role) (engine.UnitConfig, error) {
+	u, err := c.buildRoleUnit(role, pb.BattleTeam_BATTLE_TEAM_ATTACKER)
+	if err == nil {
+		err = c.addEquippedSkills(&u, role)
+	}
+	return u, err
 }

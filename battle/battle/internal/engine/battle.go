@@ -27,6 +27,7 @@ func (u *unit) resetCharge(kind pb.EffectType) { u.charges[kind] = 0 }
 // Battle 是不依赖外部服务的确定性战斗实例。
 // 全部可变状态都在本结构体上，因此可以按 tick 挂起推进（Advance）而不丢状态。
 type Battle struct {
+	inputs         map[string]*inputState
 	setup          Setup
 	rng            *RNG
 	strategies     Strategies
@@ -57,6 +58,7 @@ func NewBattle(setup Setup) (*Battle, error) {
 		return nil, err
 	}
 	battle := &Battle{setup: setup, rng: NewRNG(setup.Seed), strategies: setup.Strategies}
+	battle.inputs = make(map[string]*inputState)
 	for _, config := range setup.Units {
 		battle.units = append(battle.units, &unit{Config: config, HP: config.MaxHP, Cooldowns: make(map[string]int), charges: make(map[pb.EffectType]int64)})
 	}
@@ -66,7 +68,7 @@ func NewBattle(setup Setup) (*Battle, error) {
 				return nil, err
 			}
 		}
-		battle.schedule(&timelineItem{Tick: battle.attackInterval(actor), Phase: phaseStart, Actor: actor})
+		battle.inputs[actor.Config.InstanceID] = &inputState{actor: actor}
 	}
 	heap.Init(&battle.timeline)
 	return battle, nil
@@ -547,7 +549,7 @@ func (b *Battle) Flush() []*pb.BattleEvent {
 func (b *Battle) UnitResults() []*pb.BattleUnitResult {
 	units := make([]*pb.BattleUnitResult, 0, len(b.units))
 	for _, unit := range b.units {
-		units = append(units, &pb.BattleUnitResult{InstanceId: unit.Config.InstanceID, Team: unit.Config.Team, Hp: unit.HP, MaxHp: unit.Config.MaxHP, Alive: unit.alive()})
+		units = append(units, unit.snapshot())
 	}
 	return units
 }
@@ -579,21 +581,6 @@ func (b *Battle) Finalize() (Result, error) {
 	return result, nil
 }
 
-// Run 执行一场自动战斗，并返回缓存的确定性结果。
-// 它等价于一路 Advance 到底再 Finalize，保留给测试、重投与离线校验使用。
-func (b *Battle) Run() (Result, error) {
-	if b.finished {
-		return b.cached, nil
-	}
-	for {
-		if _, ok := b.NextTick(); !ok {
-			break
-		}
-		b.Advance()
-	}
-	return b.Finalize()
-}
-
 func max(left, right int64) int64 {
 	if left > right {
 		return left
@@ -605,4 +592,9 @@ func min(left, right int64) int64 {
 		return left
 	}
 	return right
+}
+
+// snapshot 返回单位血量、阵营和归属快照，供开场、入场和终局复用。
+func (u *unit) snapshot() *pb.BattleUnitResult {
+	return &pb.BattleUnitResult{OwnerUid: u.Config.OwnerUID, InstanceId: u.Config.InstanceID, Team: u.Config.Team, Hp: u.HP, MaxHp: u.Config.MaxHP, Alive: u.alive()}
 }

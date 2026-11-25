@@ -9,7 +9,7 @@ import (
 func TestTimedStatusRefreshAndRemoval(t *testing.T) {
 	setup := testSetup()
 	setup.Rules.TickDurationMS = 100
-	b, err := NewBattle(setup)
+	b, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestTimedStatusRefreshAndRemoval(t *testing.T) {
 func TestTimedStatusSeparateSourcesAndEarlyRemoval(t *testing.T) {
 	setup := testSetup()
 	setup.Rules.TickDurationMS = 100
-	b, err := NewBattle(setup)
+	b, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}

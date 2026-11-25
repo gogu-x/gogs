@@ -21,6 +21,7 @@ var ErrReportNotFound = errors.New("battle report not found")
 // Report is the durable hand-off between battle execution and result delivery.
 // A Finished notification must never be sent before this document is saved.
 type Report struct {
+	Members        []Member               // 全部参战玩家及其来源节点。
 	BattleID       string                 `bson:"_id" json:"battle_id"`
 	UID            uint64                 `bson:"uid" json:"uid"`
 	SourceServerID int                    `bson:"source_server_id" json:"source_server_id"`

@@ -53,7 +53,7 @@ func TestCompiledBattleIgnoresLaterRequestAndConfigurationMutations(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := emptyBattle.Run(); err != nil {
+	if _, err := exerciseInput(t, emptyBattle); err != nil {
 		t.Fatal(err)
 	}
 	setup, err := compiler.Compile("snapshot-isolation", 7, request)
@@ -72,7 +72,7 @@ func TestCompiledBattleIgnoresLaterRequestAndConfigurationMutations(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected, err := control.Run()
+	expected, err := exerciseInput(t, control)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestCompiledBattleIgnoresLaterRequestAndConfigurationMutations(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	running.Advance()
+
 	role.GrowthBonus = &pb_common.GrowthBonuses{MaxHpPermille: 5000, AttackPermille: 5000, DefensePermille: 5000, SpeedPermille: 5000}
 	role.Equips = nil
 	roleConfig.MaxHP = 9999
@@ -88,7 +88,7 @@ func TestCompiledBattleIgnoresLaterRequestAndConfigurationMutations(t *testing.T
 	roleConfig.Defense = 9999
 	roleConfig.Speed = 9999
 	equipConfig.Modifier[0].Val = 9999
-	actual, err := running.Run()
+	actual, err := exerciseInput(t, running)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,4 +114,15 @@ func TestGrowthRejectsInvalidValuesAndOverflow(t *testing.T) {
 	if _, err := scaleGrowth(math.MaxInt64, 1); err == nil {
 		t.Fatal("overflow was not rejected")
 	}
+}
+
+// exerciseInput 用实际普攻验证已编译快照的结算效果。
+func exerciseInput(t *testing.T, b *engine.Battle) (engine.Result, error) {
+	t.Helper()
+	control := b.Controls()[0]
+	ack := b.ApplyInput(&pb.BattleInputReq{BattleId: b.ID(), UnitId: control.GetUnitId(), SkillId: control.GetBasicSkill(), Sequence: 1}, pb.BattleTeam_BATTLE_TEAM_ATTACKER)
+	if ack.GetCode() != pb_common.ErrCode_OK {
+		t.Fatal(ack)
+	}
+	return b.Finalize()
 }

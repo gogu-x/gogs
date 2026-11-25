@@ -39,7 +39,13 @@ type StartBattleReq struct {
 	// 怪物组配置编号
 	MonsterGroupConfigId int32 `protobuf:"varint,5,opt,name=monster_group_config_id,json=monsterGroupConfigId,proto3" json:"monster_group_config_id,omitempty"`
 	// 来源节点编号，由游戏服填写
-	SourceNodeId  uint32 `protobuf:"varint,6,opt,name=source_node_id,json=sourceNodeId,proto3" json:"source_node_id,omitempty"`
+	SourceNodeId uint32 `protobuf:"varint,6,opt,name=source_node_id,json=sourceNodeId,proto3" json:"source_node_id,omitempty"`
+	// 是否允许开战后增援。
+	AllowJoin bool `protobuf:"varint,10,opt,name=allow_join,json=allowJoin,proto3" json:"allow_join,omitempty"`
+	// 玩法服提供的额外初始成员；客户端填写的名单会被 Game 丢弃。
+	InitialMembers []*InitialBattleMember `protobuf:"bytes,11,rep,name=initial_members,json=initialMembers,proto3" json:"initial_members,omitempty"`
+	// 加入指定开放战斗，由游戏服提供本人的权威角色。
+	JoinBattleId  string `protobuf:"bytes,9,opt,name=join_battle_id,json=joinBattleId,proto3" json:"join_battle_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -137,11 +143,202 @@ func (x *StartBattleReq) GetSourceNodeId() uint32 {
 	return 0
 }
 
+func (x *StartBattleReq) GetAllowJoin() bool {
+	if x != nil {
+		return x.AllowJoin
+	}
+	return false
+}
+
+func (x *StartBattleReq) GetInitialMembers() []*InitialBattleMember {
+	if x != nil {
+		return x.InitialMembers
+	}
+	return nil
+}
+
+func (x *StartBattleReq) GetJoinBattleId() string {
+	if x != nil {
+		return x.JoinBattleId
+	}
+	return ""
+}
+
+// 动作序号在本场、同一单位内单调递增。
+type BattleInputReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UID           uint64                 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32                 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string                 `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	BattleId      string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
+	UnitId        string                 `protobuf:"bytes,2,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
+	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	SkillId       string                 `protobuf:"bytes,4,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	TargetId      string                 `protobuf:"bytes,5,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BattleInputReq) Reset() {
+	*x = BattleInputReq{}
+	mi := &file_cspb_battle_req_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BattleInputReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BattleInputReq) ProtoMessage() {}
+
+func (x *BattleInputReq) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_battle_req_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BattleInputReq.ProtoReflect.Descriptor instead.
+func (*BattleInputReq) Descriptor() ([]byte, []int) {
+	return file_cspb_battle_req_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *BattleInputReq) GetUID() uint64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *BattleInputReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *BattleInputReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *BattleInputReq) GetBattleId() string {
+	if x != nil {
+		return x.BattleId
+	}
+	return ""
+}
+
+func (x *BattleInputReq) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *BattleInputReq) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *BattleInputReq) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
+}
+
+func (x *BattleInputReq) GetTargetId() string {
+	if x != nil {
+		return x.TargetId
+	}
+	return ""
+}
+
+// 已由玩法确定的参战者，与发起方同时入场。
+type InitialBattleMember struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Uid           uint64                 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	Role          *Role                  `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
+	ServerId      uint32                 `protobuf:"varint,3,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	NodeId        uint32                 `protobuf:"varint,4,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InitialBattleMember) Reset() {
+	*x = InitialBattleMember{}
+	mi := &file_cspb_battle_req_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitialBattleMember) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitialBattleMember) ProtoMessage() {}
+
+func (x *InitialBattleMember) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_battle_req_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitialBattleMember.ProtoReflect.Descriptor instead.
+func (*InitialBattleMember) Descriptor() ([]byte, []int) {
+	return file_cspb_battle_req_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *InitialBattleMember) GetUid() uint64 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+func (x *InitialBattleMember) GetRole() *Role {
+	if x != nil {
+		return x.Role
+	}
+	return nil
+}
+
+func (x *InitialBattleMember) GetServerId() uint32 {
+	if x != nil {
+		return x.ServerId
+	}
+	return 0
+}
+
+func (x *InitialBattleMember) GetNodeId() uint32 {
+	if x != nil {
+		return x.NodeId
+	}
+	return 0
+}
+
 var File_cspb_battle_req_proto protoreflect.FileDescriptor
 
 const file_cspb_battle_req_proto_rawDesc = "" +
 	"\n" +
-	"\x15cspb/battle/req.proto\x1a\x18cspb/battle/struct.proto\"\xe4\x02\n" +
+	"\x15cspb/battle/req.proto\x1a\x18cspb/battle/struct.proto\"\x81\x04\n" +
 	"\x0eStartBattleReq\x12\x10\n" +
 	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
 	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
@@ -153,7 +350,26 @@ const file_cspb_battle_req_proto_rawDesc = "" +
 	"\x0eattacker_roles\x18\x03 \x03(\v2\x05.RoleR\rattackerRoles\x12,\n" +
 	"\x0edefender_roles\x18\x04 \x03(\v2\x05.RoleR\rdefenderRoles\x125\n" +
 	"\x17monster_group_config_id\x18\x05 \x01(\x05R\x14monsterGroupConfigId\x12$\n" +
-	"\x0esource_node_id\x18\x06 \x01(\rR\fsourceNodeIdB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
+	"\x0esource_node_id\x18\x06 \x01(\rR\fsourceNodeId\x12\x1d\n" +
+	"\n" +
+	"allow_join\x18\n" +
+	" \x01(\bR\tallowJoin\x12=\n" +
+	"\x0finitial_members\x18\v \x03(\v2\x14.InitialBattleMemberR\x0einitialMembers\x12$\n" +
+	"\x0ejoin_battle_id\x18\t \x01(\tR\fjoinBattleIdJ\x04\b\b\x10\tJ\x04\b\a\x10\bR\vinteractive\"\xe6\x01\n" +
+	"\x0eBattleInputReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x1b\n" +
+	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x17\n" +
+	"\aunit_id\x18\x02 \x01(\tR\x06unitId\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x19\n" +
+	"\bskill_id\x18\x04 \x01(\tR\askillId\x12\x1b\n" +
+	"\ttarget_id\x18\x05 \x01(\tR\btargetId\"x\n" +
+	"\x13InitialBattleMember\x12\x10\n" +
+	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x19\n" +
+	"\x04role\x18\x02 \x01(\v2\x05.RoleR\x04role\x12\x1b\n" +
+	"\tserver_id\x18\x03 \x01(\rR\bserverId\x12\x17\n" +
+	"\anode_id\x18\x04 \x01(\rR\x06nodeIdB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
 
 var (
 	file_cspb_battle_req_proto_rawDescOnce sync.Once
@@ -167,21 +383,25 @@ func file_cspb_battle_req_proto_rawDescGZIP() []byte {
 	return file_cspb_battle_req_proto_rawDescData
 }
 
-var file_cspb_battle_req_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_cspb_battle_req_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_cspb_battle_req_proto_goTypes = []any{
-	(*StartBattleReq)(nil), // 0: StartBattleReq
-	(BattleType)(0),        // 1: BattleType
-	(*Role)(nil),           // 2: Role
+	(*StartBattleReq)(nil),      // 0: StartBattleReq
+	(*BattleInputReq)(nil),      // 1: BattleInputReq
+	(*InitialBattleMember)(nil), // 2: InitialBattleMember
+	(BattleType)(0),             // 3: BattleType
+	(*Role)(nil),                // 4: Role
 }
 var file_cspb_battle_req_proto_depIdxs = []int32{
-	1, // 0: StartBattleReq.battle_type:type_name -> BattleType
-	2, // 1: StartBattleReq.attacker_roles:type_name -> Role
-	2, // 2: StartBattleReq.defender_roles:type_name -> Role
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	3, // 0: StartBattleReq.battle_type:type_name -> BattleType
+	4, // 1: StartBattleReq.attacker_roles:type_name -> Role
+	4, // 2: StartBattleReq.defender_roles:type_name -> Role
+	2, // 3: StartBattleReq.initial_members:type_name -> InitialBattleMember
+	4, // 4: InitialBattleMember.role:type_name -> Role
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_cspb_battle_req_proto_init() }
@@ -196,7 +416,7 @@ func file_cspb_battle_req_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_battle_req_proto_rawDesc), len(file_cspb_battle_req_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

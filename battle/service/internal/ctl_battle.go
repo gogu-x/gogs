@@ -7,7 +7,10 @@ import (
 	"time"
 
 	"github.com/gogu-x/gogs/battle/battle"
+	"github.com/gogu-x/gogs/conf"
+	"github.com/gogu-x/gogs/def"
 	"github.com/gogu-x/gogs/pb/cspb/pb_battle"
+	common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 	"github.com/gogu-x/tree"
 	"github.com/gogu-x/tree/tlog"
 	"github.com/google/uuid"
@@ -23,7 +26,20 @@ func (s *Server) OnCreateBattle(ctx tree.Context, req *pb_battle.StartBattleReq)
 		ctx.Response(nil, fmt.Errorf("battle service: battle type is required"))
 		return
 	}
+	if id := req.GetJoinBattleId(); id != "" {
+		if pid, ok := s.active[id]; ok && ctx.TrySend(pid, req) {
+			return
+		}
+		source := battle.Source{ServerID: int(req.GetServerID()), NodeID: int(req.GetSourceNodeId())}
+		if err := s.notifier.Notify(source, &pb_battle.BattleAdmissionFailedNtf{BattleId: id, Uid: req.GetUID(), Code: common.ErrCode_BATTLE_UNAVAILABLE}); err != nil {
+			tlog.Log.Error("[战斗/入场] 入场失败通知未发送, pid=%v err=%v", req.GetUID(), err)
+		}
+		return
+	}
 	battleID := uuid.NewString()
+	if req.GetAllowJoin() {
+		battleID = def.BattleRoomID(conf.ServerID, conf.NodeId, battleID)
+	}
 	seed, err := newSeed()
 	if err != nil {
 		ctx.Response(nil, err)

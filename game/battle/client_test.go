@@ -245,3 +245,46 @@ func TestSettlementNotConfirmedUntilDelivered(t *testing.T) {
 		t.Fatalf("confirms = %d, want 2", confirms)
 	}
 }
+
+// TestSharedFinishedOncePerPlayer 验证同一 Game 节点上两个参战者分别结算并确认。
+func TestSharedFinishedOncePerPlayer(t *testing.T) {
+	gate := spawnSettlementGate(t)
+	sender := &fakeSender{}
+	pid := tree.SpawnOne(New(fixedSelector{node: Node{ServerID: 1, NodeID: 2}}, sender, 3, 4))
+	t.Cleanup(func() { tree.Stop(pid) })
+	openBattleClient(t, pid)
+	id := "1:2:89d767bf-72c7-4cb3-80d8-9d0920cf7971"
+	req := clientRequest(7)
+	req.InitialMembers = []*pb.InitialBattleMember{{Uid: 8, Role: clientRequest(8).GetAttackerRoles()[0]}}
+	if _, err := tree.Request(pid, &Begin{Request: req}).AwaitTimeout(time.Second); err != nil {
+		t.Fatal(err)
+	}
+	for _, uid := range []uint64{7, 8} {
+		if state := requestState(t, pid, uid); state.Status != CreateUnknown {
+			t.Fatal(state)
+		}
+		tree.Send(pid, &pb.BattleCreatedNtf{Uid: uid, BattleId: id, Controls: []*pb.BattleControl{{UnitId: "owned"}}})
+	}
+	for _, uid := range []uint64{7, 8, 7, 8} {
+		tree.Send(pid, &pb.BattleFinishedNtf{Uid: uid, BattleId: id, Checksum: "shared"})
+	}
+	for _, uid := range []uint64{7, 8} {
+		if state := requestState(t, pid, uid); state.Status != Finished {
+			t.Fatal(state)
+		}
+		select {
+		case d := <-gate.deliveries:
+			if d.UID != uid {
+				t.Fatal(d.UID)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("缺少玩家结算")
+		}
+	}
+	if len(gate.deliveries) != 0 {
+		t.Fatal("重复结算")
+	}
+	if _, confirms := sender.counts(); confirms != 4 {
+		t.Fatal(confirms)
+	}
+}

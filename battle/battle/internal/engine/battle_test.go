@@ -123,7 +123,7 @@ func (testStatuses) Expire(statuses []StatusInstance) []StatusInstance {
 
 func TestBattleDeterministicResult(t *testing.T) {
 	setup := testSetup()
-	first, err := NewBattle(setup)
+	first, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestBattleDeterministicResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := NewBattle(setup)
+	second, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestBattleDeterministicResult(t *testing.T) {
 // 都会被这里捕获。
 func TestBattleAdvanceMatchesRun(t *testing.T) {
 	setup := testSetup()
-	batch, err := NewBattle(setup)
+	batch, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestBattleAdvanceMatchesRun(t *testing.T) {
 	// Finalize 会产生收尾的 BattleEnded 事件，必须能通过 Flush 取到。
 	streamed = append(streamed, batch.Flush()...)
 
-	oneShot, err := NewBattle(setup)
+	oneShot, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func TestSkillUsedCarriesMotionWindow(t *testing.T) {
 	setup.Units[1].BasicSkill.WindupTicks = 3
 	setup.Units[1].BasicSkill.RecoveryTicks = 2
 
-	battle, err := NewBattle(setup)
+	battle, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +264,7 @@ func TestSkillUsedCarriesMotionWindow(t *testing.T) {
 // TestBattleFinalizeIsIdempotent 锁定 Finalize 的幂等语义：重复调用返回同一结果，
 // 且不会重复追加 BattleEnded 事件。
 func TestBattleFinalizeIsIdempotent(t *testing.T) {
-	battle, err := NewBattle(testSetup())
+	battle, err := newTimelineFixture(testSetup())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,13 +284,13 @@ func TestBattleFinalizeIsIdempotent(t *testing.T) {
 func TestBattleRequiresBothTeams(t *testing.T) {
 	setup := testSetup()
 	setup.Units = setup.Units[:1]
-	if _, err := NewBattle(setup); err == nil {
+	if _, err := newTimelineFixture(setup); err == nil {
 		t.Fatal("expected validation error")
 	}
 }
 
 func TestBasicAttackEventMarkedForCollisionPresentation(t *testing.T) {
-	battle, err := NewBattle(testSetup())
+	battle, err := newTimelineFixture(testSetup())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +328,7 @@ func TestTimelineAllowsDifferentUnitsToOverlap(t *testing.T) {
 	setup.Units[1].BasicSkill.WindupTicks = 3
 	setup.Units[1].BasicSkill.RecoveryTicks = 2
 
-	battle, err := NewBattle(setup)
+	battle, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +380,7 @@ func TestMeleeImpactCancelledWhenAttackerDiesDuringWindup(t *testing.T) {
 	setup.Units[1].Speed = 100
 	setup.Units[1].BasicSkill.WindupTicks = 1
 
-	battle, err := NewBattle(setup)
+	battle, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -413,7 +413,7 @@ func TestImpactCancelledWhenSnapshottedTargetDies(t *testing.T) {
 	setup.Units[2].Speed = 100
 	setup.Units[2].BasicSkill.WindupTicks = 4
 
-	battle, err := NewBattle(setup)
+	battle, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +428,7 @@ func TestImpactCancelledWhenSnapshottedTargetDies(t *testing.T) {
 }
 
 func TestLegacyTimingDefaults(t *testing.T) {
-	battle, err := NewBattle(testSetup())
+	battle, err := newTimelineFixture(testSetup())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +451,7 @@ func TestActiveSkillImpactCancelledWhenAttackerDiesDuringWindup(t *testing.T) {
 	setup.Units[1].Speed = 100
 	setup.Units[1].BasicSkill.WindupTicks = 1
 
-	battle, err := NewBattle(setup)
+	battle, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,7 +478,7 @@ func TestAttackSpeedShortensMotionWindow(t *testing.T) {
 	setup.Units[0].Attack = 1
 	setup.Units[1].Attack = 1
 	setup.Units[1].MaxHP = 10000
-	battle, err := NewBattle(setup)
+	battle, err := newTimelineFixture(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -507,4 +507,30 @@ func TestAttackSpeedShortensMotionWindow(t *testing.T) {
 	if count < 2 {
 		t.Fatalf("攻击次数不足: %d", count)
 	}
+}
+
+// newTimelineFixture 为离线时间轴回归测试注入初始动作。
+func newTimelineFixture(setup Setup) (*Battle, error) {
+	b, err := NewBattle(setup)
+	if err != nil {
+		return nil, err
+	}
+	for _, actor := range b.units {
+		b.schedule(&timelineItem{Tick: b.attackInterval(actor), Phase: phaseStart, Actor: actor})
+	}
+	return b, nil
+}
+
+// Run 消费测试时间轴上的全部事件。
+func (b *Battle) Run() (Result, error) {
+	if b.finished {
+		return b.cached, nil
+	}
+	for {
+		if _, ok := b.NextTick(); !ok {
+			break
+		}
+		b.Advance()
+	}
+	return b.Finalize()
 }
