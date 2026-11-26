@@ -22,15 +22,15 @@ type Command struct {
 
 // RobotActor 调度同一场战斗内各单位的独立决策。
 type RobotActor struct {
+	router   tree.Router
 	battleID string
 	target   tree.PID
 	start    time.Time
-	frame    time.Duration
 	units    map[string]*unitAI
 	queue    decisionQueue
 	wheel    *timer.TimeWheel
 	wake     *timer.WheelTimer
-	wakeTick int64
+	wakeMS   int64
 }
 
 type unitAI struct {
@@ -46,9 +46,8 @@ type unitAI struct {
 }
 
 // New 建立与战斗共用时间原点的调度器。
-func New(battleID string, target tree.PID, start time.Time,
-	frame time.Duration) *RobotActor {
-	return &RobotActor{battleID: battleID, target: target, start: start, frame: frame, units: make(map[string]*unitAI)}
+func New(battleID string, target tree.PID, start time.Time) *RobotActor {
+	return &RobotActor{battleID: battleID, target: target, start: start, units: make(map[string]*unitAI)}
 }
 
 // AddUnit 在启动 Actor 前登记单位及其独立策略。
@@ -90,32 +89,14 @@ func ConfiguredRotation(sequence []string) Policy {
 	}
 }
 
-func (r *RobotActor) Name() string            { return "robot-" + r.battleID }
-func (r *RobotActor) OnInit(ctx tree.Context) { r.initTimer(ctx.Self()) }
-func (r *RobotActor) OnStop(tree.Context)     { r.wheel.Stop() }
-func (r *RobotActor) HandleMessage(_ tree.Context, message interface{}) {
-	switch msg := message.(type) {
-	case *pb.BattleInputAck:
-		unit := r.units[msg.GetUnitId()]
-		if msg.GetBattleId() != r.battleID || unit == nil || !unit.waiting || unit.sequence != msg.GetSequence() {
-			return
-		}
-		unit.last = msg
-		unit.waiting = false
-		unit.due = max(msg.GetReadyTick(), msg.GetCurrentTick()+1)
-		heap.Push(&r.queue, unit)
-	case *DecisionView:
-		r.applyView(msg)
-	case *UnitRemoved:
-		id := msg.UnitID
-		if unit := r.units[id]; unit != nil {
-			if unit.index >= 0 {
-				heap.Remove(&r.queue, unit.index)
-			}
-			delete(r.units, id)
-		}
-	default:
-		return
-	}
-	r.arm()
-}
+// Name 返回 Actor 的注册名称。
+func (r *RobotActor) Name() string { return "robot-" + r.battleID }
+
+// OnInit 初始化消息路由及运行所需的资源。
+func (r *RobotActor) OnInit(ctx tree.Context) { r.registerMessages(); r.initTimer(ctx.Self()) }
+
+// OnStop 停止当前 Actor 的调度资源。
+func (r *RobotActor) OnStop(tree.Context) { r.wheel.Stop() }
+
+// HandleMessage 将邮箱消息交给已注册的路由。
+func (r *RobotActor) HandleMessage(ctx tree.Context, msg interface{}) { r.router.Route(ctx, msg) }

@@ -36,16 +36,6 @@ func (s StatusInstance) IsActive() bool {
 	return s.Config.DurationMS > 0 || s.Remaining > 0
 }
 
-// durationTicks 向上取整为逻辑帧，使用除法和余数避免加法溢出。
-func (b *Battle) durationTicks(milliseconds int64) int64 {
-	tickMS := int64(b.setup.Rules.TickDurationMS)
-	ticks := milliseconds / tickMS
-	if milliseconds%tickMS != 0 {
-		ticks++
-	}
-	return ticks
-}
-
 // statusIndex 定位本场唯一状态实例。
 func (u *unit) statusIndex(id uint64) int {
 	for index := range u.Statuses {
@@ -63,13 +53,14 @@ func (b *Battle) applyStatus(
 	if err := config.Validate(); err != nil {
 		return err
 	}
+	old := b.attackInterval(target)
 	instance := StatusInstance{Config: config, Remaining: config.DurationTurns, SourceID: source.Config.InstanceID, SkillID: skillID, Version: 1}
 	if config.DurationMS > 0 {
-		ticks := b.durationTicks(config.DurationMS)
-		if b.tick > math.MaxInt64-ticks {
-			return fmt.Errorf("状态 %s 到期逻辑帧溢出", config.ID)
+		durationMS := config.DurationMS
+		if b.elapsedMS > math.MaxInt64-durationMS {
+			return fmt.Errorf("状态 %s 到期毫秒时间溢出", config.ID)
 		}
-		instance.ExpireTick = b.tick + ticks
+		instance.ExpireMs = b.elapsedMS + durationMS
 		for index, previous := range target.Statuses {
 			if previous.Config.DurationMS > 0 && previous.Config.ID == config.ID && previous.SourceID == instance.SourceID {
 				instance.InstanceID = previous.InstanceID
@@ -77,6 +68,7 @@ func (b *Battle) applyStatus(
 				target.Statuses[index] = instance
 				b.scheduleStatus(target, instance)
 				b.emitStatus(pb.BattleEventType_BATTLE_EVENT_TYPE_STATUS_APPLIED, target, instance)
+				b.syncStatusSpeed(target, old)
 				return nil
 			}
 		}
@@ -98,6 +90,7 @@ func (b *Battle) applyStatus(
 		b.scheduleStatus(target, instance)
 		b.emitStatus(pb.BattleEventType_BATTLE_EVENT_TYPE_STATUS_APPLIED, target, instance)
 	}
+	b.syncStatusSpeed(target, old)
 	return nil
 }
 
@@ -106,21 +99,20 @@ func (b *Battle) scheduleStatus(target *unit, status StatusInstance) {
 	if status.Config.DurationMS == 0 {
 		return
 	}
-	b.schedule(&timelineItem{Tick: status.ExpireTick, Phase: phaseStatusExpire, Actor: target, StatusID: status.InstanceID, StatusVersion: status.Version})
+	b.schedule(&timelineItem{ElapsedMs: status.ExpireMs, Phase: phaseStatusExpire, Actor: target, StatusID: status.InstanceID, StatusVersion: status.Version})
 	b.scheduleStatusTick(target, status)
 }
 
-// scheduleStatusTick 只安排严格早于到期帧的周期效果，到期帧不再跳一次。
+// scheduleStatusTick 只安排严格早于到期时刻的周期效果，到期时刻不再跳一次。
 func (b *Battle) scheduleStatusTick(target *unit, status StatusInstance) {
 	interval := status.Config.IntervalMS
 	if interval <= 0 {
 		return
 	}
-	ticks := b.durationTicks(interval)
-	if ticks >= status.ExpireTick-b.tick {
+	if interval >= status.ExpireMs-b.elapsedMS {
 		return
 	}
-	b.schedule(&timelineItem{Tick: b.tick + ticks, Phase: phaseStatusTick, Actor: target, StatusID: status.InstanceID, StatusVersion: status.Version})
+	b.schedule(&timelineItem{ElapsedMs: b.elapsedMS + interval, Phase: phaseStatusTick, Actor: target, StatusID: status.InstanceID, StatusVersion: status.Version})
 }
 
 // handleStatusTask 忽略已移除或被刷新的任务，不让旧任务误删新状态。
@@ -136,12 +128,12 @@ func (b *Battle) handleStatusTask(item *timelineItem) {
 	}
 	b.action = 0
 	if item.Phase == phaseStatusExpire {
-		if status.ExpireTick == b.tick {
+		if status.ExpireMs == b.elapsedMS {
 			b.removeStatus(target, status.InstanceID)
 		}
 		return
 	}
-	if target.alive() && b.tick < status.ExpireTick {
+	if target.alive() && b.elapsedMS < status.ExpireMs {
 		b.applyPeriodicStatus(target, status)
 		if target.alive() {
 			b.scheduleStatusTick(target, status)
@@ -155,12 +147,14 @@ func (b *Battle) removeStatus(target *unit, instanceID uint64) bool {
 	if index < 0 {
 		return false
 	}
+	old := b.attackInterval(target)
 	status := target.Statuses[index]
 	copy(target.Statuses[index:], target.Statuses[index+1:])
 	last := len(target.Statuses) - 1
 	target.Statuses[last] = StatusInstance{}
 	target.Statuses = target.Statuses[:last]
 	b.emitStatus(pb.BattleEventType_BATTLE_EVENT_TYPE_STATUS_REMOVED, target, status)
+	b.syncStatusSpeed(target, old)
 	return true
 }
 
@@ -177,7 +171,7 @@ func (b *Battle) emitStatus(kind pb.BattleEventType, target *unit, status Status
 // setStatusEvent 附加状态实例、到期时间和版本，不影响原有伤害字段。
 func setStatusEvent(event *pb.BattleEvent, status StatusInstance) {
 	event.StatusInstanceId = status.InstanceID
-	event.StatusExpireTick = status.ExpireTick
+	event.StatusExpireMs = status.ExpireMs
 	event.StatusVersion = status.Version
 }
 

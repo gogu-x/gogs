@@ -6,10 +6,10 @@ import (
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
+// TestTimedStatusRefreshAndRemoval 验证定时状态的刷新与到期移除。
 func TestTimedStatusRefreshAndRemoval(t *testing.T) {
 	setup := testSetup()
-	setup.Rules.TickDurationMS = 100
-	b, err := newTimelineFixture(setup)
+	b, err := NewBattle(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,19 +19,19 @@ func TestTimedStatusRefreshAndRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := target.Statuses[0].InstanceID
-	b.tick = 1
+	b.AdvanceClock(101)
 	if err := b.applyStatus(source, target, "skill", config); err != nil {
 		t.Fatal(err)
 	}
 	if len(target.Statuses) != 1 || target.Statuses[0].InstanceID != id || target.Statuses[0].Version != 2 {
 		t.Fatalf("刷新应复用实例并增加版本: %+v", target.Statuses)
 	}
-	b.Advance()
-	if b.tick != 3 || len(target.Statuses) != 1 {
+	b.AdvanceClock(300)
+	if b.elapsedMS != 300 || len(target.Statuses) != 1 {
 		t.Fatal("旧到期任务误删刷新后的状态")
 	}
-	b.Advance()
-	if b.tick != 4 || len(target.Statuses) != 0 {
+	b.AdvanceClock(401)
+	if b.elapsedMS != 401 || len(target.Statuses) != 0 {
 		t.Fatal("刷新后的状态没有按时移除")
 	}
 	removed := 0
@@ -48,10 +48,10 @@ func TestTimedStatusRefreshAndRemoval(t *testing.T) {
 	}
 }
 
+// TestTimedStatusSeparateSourcesAndEarlyRemoval 验证不同来源的状态独立生效且可以提前移除。
 func TestTimedStatusSeparateSourcesAndEarlyRemoval(t *testing.T) {
 	setup := testSetup()
-	setup.Rules.TickDurationMS = 100
-	b, err := newTimelineFixture(setup)
+	b, err := NewBattle(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,11 +65,11 @@ func TestTimedStatusSeparateSourcesAndEarlyRemoval(t *testing.T) {
 	if len(target.Statuses) != 2 || target.Statuses[0].InstanceID == target.Statuses[1].InstanceID {
 		t.Fatal("不同来源应为独立实例")
 	}
-	if target.Statuses[0].ExpireTick != 3 {
-		t.Fatal("毫秒应向上取整到逻辑帧")
+	if target.Statuses[0].ExpireMs != 201 {
+		t.Fatal("到期时间应精确到毫秒")
 	}
 	b.removeStatus(target, target.Statuses[0].InstanceID)
-	b.Advance()
+	b.AdvanceClock(201)
 	if len(target.Statuses) != 0 {
 		t.Fatal("剩余实例未到期")
 	}
@@ -84,6 +84,7 @@ func TestTimedStatusSeparateSourcesAndEarlyRemoval(t *testing.T) {
 	}
 }
 
+// TestStatusDurationValidation 验证状态持续时间配置的校验规则。
 func TestStatusDurationValidation(t *testing.T) {
 	invalid := []StatusConfig{
 		{}, {DurationMS: -1}, {DurationTurns: -1}, {DurationMS: 100, DurationTurns: 1},

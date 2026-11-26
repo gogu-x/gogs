@@ -7,6 +7,7 @@ import (
 	common "github.com/gogu-x/gogs/pb/cspb/pb_common"
 )
 
+// TestCastPriorityAndTarget 验证机器人施法的优先级和目标选择。
 func TestCastPriorityAndTarget(t *testing.T) {
 	rules, err := Compile([]*common.TypIDVal{
 		{Typ: "ally_hp", Id: 4, Val: 650}, {Typ: "enemy_hp", Id: 3, Val: 400}, {Typ: "enemy_count", Id: 2, Val: 2},
@@ -38,6 +39,7 @@ func TestCastPriorityAndTarget(t *testing.T) {
 	check("11", "")
 }
 
+// TestInvalidRules 验证施法策略拒绝无效配置。
 func TestInvalidRules(t *testing.T) {
 	for _, rule := range []*common.TypIDVal{{Typ: "unknown", Id: 1}, {Typ: "self_hp", Id: 1, Val: 1001}, {Typ: "always", Id: 7}, {Typ: "enemy_count", Id: 1}, nil} {
 		if _, err := Compile([]*common.TypIDVal{rule}, map[string]bool{"1": true}); err == nil {

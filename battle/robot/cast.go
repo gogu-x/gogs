@@ -34,6 +34,7 @@ func (r *RobotActor) observe(units []*unitAI, now int64) {
 	}
 }
 
+// retryDecision 将单位排到下一毫秒重新决策。
 func (r *RobotActor) retryDecision(unit *unitAI, now int64) {
 	unit.due = now + 1
 	heap.Push(&r.queue, unit)
@@ -41,7 +42,7 @@ func (r *RobotActor) retryDecision(unit *unitAI, now int64) {
 
 // applyView 在机器人邮箱内执行策略，已死亡或已经提交过的单位跳过。
 func (r *RobotActor) applyView(view *DecisionView) {
-	now := int64(time.Since(r.start) / r.frame)
+	now := time.Since(r.start).Milliseconds()
 	for _, req := range view.Requests {
 		id := req.GetUnitId()
 		unit := r.units[id]

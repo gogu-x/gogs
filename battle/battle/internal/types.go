@@ -16,4 +16,5 @@ type Notifier interface {
 
 type NotifyFunc func(Source, proto.Message) error
 
+// Notify 调用配置的通知函数向来源节点投递消息。
 func (f NotifyFunc) Notify(source Source, msg proto.Message) error { return f(source, msg) }

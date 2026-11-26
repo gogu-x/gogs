@@ -16,6 +16,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// initRouter 注册战斗管理服务接收的消息及其处理方法。
+func (s *Server) initRouter() {
+	tree.RegisterFunc(&s.router, (*pb_battle.StartBattleReq)(nil), s.OnCreateBattle)
+	tree.RegisterFunc(&s.router, (*battle.ActorStopped)(nil), s.OnActorStopped)
+
+	s.router.SetFallback(func(ctx tree.Context, msg interface{}) {
+		ctx.Response(nil, fmt.Errorf("battle service: unsupported message %T", msg))
+	})
+}
+
 // OnCreateBattle 只校验请求包络、生成 BattleID/Seed 并创建 BattleActor。
 func (s *Server) OnCreateBattle(ctx tree.Context, req *pb_battle.StartBattleReq) {
 	if req == nil || req.GetUID() == 0 || req.GetServerID() == 0 || req.GetSourceNodeId() == 0 {
@@ -79,6 +89,7 @@ func (s *Server) OnActorStopped(_ tree.Context, msg *battle.ActorStopped) {
 	}
 }
 
+// newSeed 为新战斗生成随机种子。
 func newSeed() (uint64, error) {
 	var bytes [8]byte
 	if _, err := rand.Read(bytes[:]); err != nil {

@@ -13,11 +13,13 @@ type Selector interface {
 }
 type SelectorFunc func(engine.TargetQuery) []engine.UnitView
 
+// Select 按目标规则选取符合条件的单位。
 func (f SelectorFunc) Select(q engine.TargetQuery) []engine.UnitView { return f(q) }
 
 // Registry dispatches target rules to independently implemented selector packages.
 type Registry map[pb.TargetRule]Selector
 
+// Select 按目标规则选取符合条件的单位。
 func (r Registry) Select(q engine.TargetQuery) []string {
 	selector := r[q.Rule]
 	if selector == nil {
@@ -31,6 +33,7 @@ func (r Registry) Select(q engine.TargetQuery) []string {
 	return ids
 }
 
+// Default 构造内置策略的注册表。
 func Default() Registry {
 	return Registry{
 		pb.TargetRule_TARGET_RULE_SELF:           self.Selector{},

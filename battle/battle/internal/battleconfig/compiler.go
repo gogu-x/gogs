@@ -22,6 +22,7 @@ type Compiler struct {
 	effectDefinitions skilleffect.Definitions
 }
 
+// New 根据战斗模式注册表创建配置编译器。
 func New(modes mode.Registry) *Compiler {
 	registry := make(mode.Registry, len(modes))
 	for battleType, rule := range modes {
@@ -32,14 +33,15 @@ func New(modes mode.Registry) *Compiler {
 	return &Compiler{modes: registry, roleStats: configuredRoleStatCalculator{}, skills: configuredRoleSkillProgression{}, strategies: defaultStrategies(), effectDefinitions: skilleffect.DefaultDefinitions()}
 }
 
+// defaultStrategies 组装引擎使用的内置战斗策略。
 func defaultStrategies() engine.Strategies {
 	return engine.Strategies{Targets: targeting.Default(), Skills: engine.DefaultSkillExecutor{}, Effects: skilleffect.Default(), Damage: engine.DefaultDamageFormula{}, Statuses: battlestatus.Default()}
 }
 
+// DefaultStrategies 返回引擎的默认战斗策略。
 func DefaultStrategies() engine.Strategies { return defaultStrategies() }
 
-// WithStrategies returns a compiler that uses the supplied battle policies.
-// Nil policies inherit their default implementations.
+// WithStrategies 使用指定策略覆盖默认实现，未指定的策略沿用默认值。
 func (c *Compiler) WithStrategies(strategies engine.Strategies) *Compiler {
 	if c == nil {
 		return nil
@@ -65,8 +67,7 @@ func (c *Compiler) WithStrategies(strategies engine.Strategies) *Compiler {
 	return &copy
 }
 
-// WithEffectDefinitions extends config effect type decoding. Existing
-// definitions are copied, so registering a new type does not mutate peers.
+// WithEffectDefinition 复制效果定义并在新编译器中注册指定效果。
 func (c *Compiler) WithEffectDefinition(name string, definition skilleffect.Definition) *Compiler {
 	if c == nil {
 		return nil
@@ -80,8 +81,10 @@ func (c *Compiler) WithEffectDefinition(name string, definition skilleffect.Defi
 	return &copy
 }
 
+// NewDefault 使用内置战斗模式创建配置编译器。
 func NewDefault() *Compiler { return New(mode.DefaultRegistry()) }
 
+// NewWithRoleStats 创建使用指定角色属性算法的编译器。
 func NewWithRoleStats(modes mode.Registry, calculator RoleStatCalculator) *Compiler {
 	c := New(modes)
 	if calculator != nil {
@@ -90,6 +93,7 @@ func NewWithRoleStats(modes mode.Registry, calculator RoleStatCalculator) *Compi
 	return c
 }
 
+// NewWithProgression 创建使用指定属性与技能成长算法的编译器。
 func NewWithProgression(modes mode.Registry, roleStats RoleStatCalculator, skills RoleSkillProgression) *Compiler {
 	c := NewWithRoleStats(modes, roleStats)
 	if skills != nil {
@@ -98,6 +102,7 @@ func NewWithProgression(modes mode.Registry, roleStats RoleStatCalculator, skill
 	return c
 }
 
+// Compile 将创建请求和配置编译为本场战斗的初始数据。
 func (c *Compiler) Compile(battleID string, seed uint64, request *pb.StartBattleReq) (engine.Setup, error) {
 	if request == nil {
 		return engine.Setup{}, fmt.Errorf("battle request is required")
@@ -166,21 +171,21 @@ func (c *Compiler) Compile(battleID string, seed uint64, request *pb.StartBattle
 	}
 
 	return engine.Setup{BattleID: battleID, BattleType: request.GetBattleType(), Seed: seed, Rules: engine.Rules{
-		ATBThreshold: battleRule.ATBThreshold, MaxActions: int(battleRule.MaxActions), TickDurationMS: battleRule.TickDurationMS,
+		ATBThreshold: battleRule.ATBThreshold, MaxDurationMS: int64(battleRule.MaxDurationMS),
 		DamageVariancePermille: battleRule.DamageVariancePermille, CritChancePermille: battleRule.CritChancePermille,
 		CritMultiplierPermille: battleRule.CritMultiplierPermille,
 	}, Units: units, Strategies: c.strategies}, nil
 }
 
-// BuildRoleUnit compiles one role for legacy package-level helpers and focused
-// tooling. New integrations should call Compile so all validation is applied.
+// BuildRoleUnit 单独编译角色单位，创建整场战斗时通过 Compile 完成完整校验。
 func (c *Compiler) BuildRoleUnit(role *pb.Role, team pb.BattleTeam) (engine.UnitConfig, error) {
 	return c.buildRoleUnit(role, team)
 }
 
-// BuildSkill compiles one configured skill.
+// BuildSkill 单独编译指定配置编号的技能。
 func (c *Compiler) BuildSkill(id int32) (engine.SkillConfig, error) { return c.buildSkill(id) }
 
+// addUnitPosition 登记单位站位并检查是否重复。
 func addUnitPosition(positions map[int32]struct{}, unit engine.UnitConfig) error {
 	if _, exists := positions[unit.Position]; exists {
 		return fmt.Errorf("duplicate configured attacker position=%d", unit.Position)

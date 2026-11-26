@@ -20,6 +20,7 @@ type Rule interface {
 
 type Registry map[pb.BattleType]Rule
 
+// DefaultRegistry 构造内置战斗模式规则表。
 func DefaultRegistry() Registry {
 	pve := pveRule{}
 	return Registry{
@@ -33,6 +34,7 @@ func DefaultRegistry() Registry {
 
 type pveRule struct{}
 
+// Resolve 校验进攻方与怪物组并解析挑战场景。
 func (pveRule) Resolve(request *pb.StartBattleReq) (Scenario, error) {
 	if len(request.GetAttackerRoles()) == 0 {
 		return Scenario{}, fmt.Errorf("battle type=%d requires attacker roles", request.GetBattleType())
@@ -48,6 +50,7 @@ func (pveRule) Resolve(request *pb.StartBattleReq) (Scenario, error) {
 
 type pvpRule struct{}
 
+// Resolve 校验对战双方的角色并解析玩家对战场景。
 func (pvpRule) Resolve(request *pb.StartBattleReq) (Scenario, error) {
 	if len(request.GetAttackerRoles()) != 1 || len(request.GetDefenderRoles()) != 1 {
 		return Scenario{}, fmt.Errorf("pvp requires exactly one attacker role and one defender role")

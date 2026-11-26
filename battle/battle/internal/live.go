@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/gogu-x/gogs/battle/battle/internal/engine"
 	"github.com/gogu-x/gogs/battle/robot"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	common "github.com/gogu-x/gogs/pb/cspb/pb_common"
@@ -14,20 +13,19 @@ import (
 
 // liveBattle 保存单场即时战斗的时钟、玩家控制信息和 AI 调度入口，由 BattleActor 串行维护。
 type liveBattle struct {
-	start      time.Time     // 第零帧的起点，战斗与机器人使用同一时间基准。
-	frame      time.Duration // 每个逻辑帧对应的实际时长。
-	robotPID   tree.PID      // 本场防守单位共用的机器人 Actor，零值表示没有运行中的机器人。
-	statusTick int64         // 最近安排唤醒的逻辑帧；-1 表示尚未安排或已开始处理该唤醒。
+	start       time.Time // 开战时刻的起点，战斗与机器人使用同一时间基准。
+	robotPID    tree.PID  // 本场防守单位共用的机器人 Actor，零值表示没有运行中的机器人。
+	statusDueMS int64     // 最近安排唤醒的毫秒时间；-1 表示尚未安排或已开始处理该唤醒。
 }
 
 // beginLive 在引擎创建后记录初始快照，分配单位控制权，再通知 Game 开战。
 func (a *BattleActor) beginLive() {
 	b := a.p.Battle
 	now := time.Now()
-	live := &liveBattle{start: now, frame: time.Duration(b.TickDurationMS()) * time.Millisecond, statusTick: -1}
+	live := &liveBattle{start: now, statusDueMS: -1}
 	a.live = live
 	units := b.UnitResults()
-	a.report = Report{BattleID: a.p.BattleID, UID: a.p.UID, SourceServerID: a.p.Source.ServerID, SourceNodeID: a.p.Source.NodeID, InitialUnits: units, CreatedAt: now.UTC(), Result: engine.Result{TickDurationMS: b.TickDurationMS()}}
+	a.report = Report{BattleID: a.p.BattleID, UID: a.p.UID, SourceServerID: a.p.Source.ServerID, SourceNodeID: a.p.Source.NodeID, InitialUnits: units, CreatedAt: now.UTC()}
 	// 进攻方由玩家客户端出手；防守单位分别登记策略和首击延迟，登记完成后统一启动机器人。
 	var ai *robot.RobotActor
 	for i, control := range b.Controls() {
@@ -35,7 +33,7 @@ func (a *BattleActor) beginLive() {
 			continue
 		}
 		if ai == nil {
-			ai = robot.New(a.p.BattleID, a.self, now, live.frame)
+			ai = robot.New(a.p.BattleID, a.self, now)
 		}
 		id := control.GetUnitId()
 		ai.AddUnit(control, b.UnitPosition(id),
@@ -62,14 +60,14 @@ func (a *BattleActor) stopRobots() {
 	}
 }
 
-// advanceLive 将引擎推进到服务端当前帧，先结算已到期的状态效果。
+// advanceLive 将引擎推进到服务端当前战斗时间，先结算已到期的状态效果。
 // 返回 false 时本场已结束或没有可用引擎，调用方应停止处理当前消息。
 func (a *BattleActor) advanceLive(ctx tree.Context) bool {
 	if a.live == nil || a.p.Battle == nil {
 		return false
 	}
 	b := a.p.Battle
-	now := int64(time.Since(a.live.start) / a.live.frame)
+	now := time.Since(a.live.start).Milliseconds()
 	a.pushLiveEvents(b.AdvanceClock(now))
 	if b.InputDone() {
 		a.completeLive(ctx)
@@ -83,14 +81,14 @@ func (a *BattleActor) liveStatus(ctx tree.Context) {
 	if a.live == nil {
 		return
 	}
-	a.live.statusTick = -1
+	a.live.statusDueMS = -1
 	if a.advanceLive(ctx) {
 		a.scheduleStatus()
 	}
 }
 
 // liveInput 接收玩家或机器人提交的动作。先推进状态，再由引擎按来源阵营校验并结算，
-// 使本帧已经到期的控制效果或致死伤害能影响这次出手。
+// 使当前时刻已经到期的控制效果或致死伤害能影响这次出手。
 func (a *BattleActor) liveInput(ctx tree.Context, req *pb.BattleInputReq, fromRobot bool) {
 	if req == nil || req.GetBattleId() != a.p.BattleID {
 		return
@@ -172,6 +170,7 @@ func (a *BattleActor) pushLiveEvents(events []*pb.BattleEvent) {
 	for _, m := range a.members {
 		a.pushMemberEvents(m, events)
 	}
+	a.offerTowerDrop(events)
 }
 
 // observeRobots 为同批到期的 AI 单位提供当前血量和各自的可用技能。

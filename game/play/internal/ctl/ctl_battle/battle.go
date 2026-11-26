@@ -204,3 +204,12 @@ func OnBattleInput(ctx *core.Context, req *pb_battle.BattleInputReq) {
 		ctx.CastPlayerMsg(ctx.PlayerID(), &pb_battle.BattleInputAck{Code: pb_common.ErrCode_INVALID_BATTLE_REQUEST, BattleId: req.GetBattleId(), UnitId: req.GetUnitId(), Sequence: req.GetSequence()})
 	}
 }
+
+// OnClaimBattleGrant 使用当前角色身份转交领取请求，仅允许客户端指定服务端发放编号。
+func OnClaimBattleGrant(ctx *core.Context, req *pb_battle.ClaimBattleGrantReq) {
+	uid := ctx.PlayerID()
+	req.UID = uid
+	if !ctx.Cast(def.BattleClient, req) {
+		ctx.CastPlayerMsg(uid, &pb_battle.ClaimBattleGrantAck{BattleId: req.GetBattleId(), UnitId: req.GetUnitId(), GrantId: req.GetGrantId(), Code: pb_common.ErrCode_INVALID_BATTLE_REQUEST})
+	}
+}

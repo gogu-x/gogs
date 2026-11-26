@@ -183,8 +183,8 @@ func TestPrecomputedResultKeepsPlaybackAdmission(t *testing.T) {
 	if _, err := tree.Request(pid, &Begin{Request: clientRequest(7)}).AwaitTimeout(time.Second); err != nil {
 		t.Fatal(err)
 	}
-	tree.Send(pid, &pb.BattleCreatedNtf{BattleId: "fast", Uid: 7, TickDurationMs: 60000})
-	tree.Send(pid, &pb.BattleActionNtf{BattleId: "fast", Uid: 7, Event: &pb.BattleEvent{Sequence: 1, Tick: 10, EndTick: 20}})
+	tree.Send(pid, &pb.BattleCreatedNtf{BattleId: "fast", Uid: 7})
+	tree.Send(pid, &pb.BattleActionNtf{BattleId: "fast", Uid: 7, Event: &pb.BattleEvent{Sequence: 1, ElapsedMs: 600000, EndMs: 1200000}})
 	tree.Send(pid, &pb.BattleFinishedNtf{BattleId: "fast", Uid: 7})
 	if state := requestState(t, pid, 7); state.Status != Finished {
 		t.Fatalf("计算结果未立即处理: %+v", state)

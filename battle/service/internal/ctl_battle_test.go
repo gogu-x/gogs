@@ -17,16 +17,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// MainTest 初始化服务测试所需的日志和战斗配置。
 func MainTest(t *testing.T) {
 	t.Helper()
 	tlog.NewLog(conf.LogPath, 0)
 	err := glconf.SetBattleConfigsForTest(
 		[]*glconf.BattleRoleCfg{{CfgID: 1, MaxHP: 100, Attack: 20, Defense: 5, Speed: 10, DefaultPosition: 1, BasicSkillID: 1}},
-		[]*glconf.BattleSkillCfg{{CfgID: 1, TargetRule: int32(pb.TargetRule_TARGET_RULE_ENEMY_SINGLE), WindupTicks: 3, RecoveryTicks: 3, Effects: []*cspb.TypIDVal{{Typ: "battle_damage", Pro: 1000}}}},
+		[]*glconf.BattleSkillCfg{{CfgID: 1, TargetRule: int32(pb.TargetRule_TARGET_RULE_ENEMY_SINGLE), Effects: []*cspb.TypIDVal{{Typ: "battle_damage", Pro: 1000}}}},
 		nil,
 		[]*glconf.BattleMonsterCfg{{CfgID: 1, MaxHP: 40, Attack: 10, Defense: 2, Speed: 8, BasicSkillID: 1}},
 		[]*glconf.BattleMonsterGroupCfg{{CfgID: 1, Members: []*cspb.TypIDVal{{Typ: "battle_monster", Id: 1, Val: 1}}}},
-		[]*glconf.BattleRuleCfg{{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 100, MaxActions: 20, TickDurationMS: 1, CritMultiplierPermille: 1500}},
+		[]*glconf.BattleRuleCfg{{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 100, CritMultiplierPermille: 1500}},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -39,24 +40,13 @@ type activeBattleQuery struct{ battleID string }
 // observedServer 保证测试不从其他协程直接读取管理器状态。
 type observedServer struct{ *Server }
 
-func (s *observedServer) HandleMessage(ctx tree.Context, message interface{}) {
-	if query, ok := message.(*activeBattleQuery); ok {
-		ctx.Response(s.active[query.battleID], nil)
-		return
-	}
-	s.Server.HandleMessage(ctx, message)
-}
-
+// TestCreateBattleSpawnsAndTracksActor 验证管理器创建战斗并跟踪实例的生命周期。
 func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	MainTest(t)
 	server := New()
 	finished := make(chan struct{}, 1)
-	var createdTickDuration int32
 	server.notifier = battle.NotifyFunc(func(_ battle.Source, message proto.Message) error {
-		switch value := message.(type) {
-		case *pb.BattleCreatedNtf:
-			createdTickDuration = value.GetTickDurationMs()
-		case *pb.BattleFinishedNtf:
+		if _, ok := message.(*pb.BattleFinishedNtf); ok {
 			select {
 			case finished <- struct{}{}:
 			default:
@@ -86,9 +76,6 @@ func TestCreateBattleSpawnsAndTracksActor(t *testing.T) {
 	}
 	select {
 	case <-finished:
-		if createdTickDuration != 1 {
-			t.Fatalf("created tick duration = %d, want 1", createdTickDuration)
-		}
 	case <-time.After(30 * time.Second):
 		t.Fatal("battle did not finish")
 	}
@@ -114,8 +101,8 @@ func TestBattleStreamsBeforeFinalReport(t *testing.T) {
 
 	var mu sync.Mutex
 	type arrival struct {
-		tick     int64
-		sequence uint64
+		elapsedMS int64
+		sequence  uint64
 	}
 	// 投递顺序：Action 记 Sequence，Finished 记哨兵。用顺序而非时间戳判断先后，
 	// 因为同一毫秒内两次 Notify 的时间戳可能相等。
@@ -137,7 +124,7 @@ func TestBattleStreamsBeforeFinalReport(t *testing.T) {
 		switch value := message.(type) {
 		case *pb.BattleActionNtf:
 			event := value.GetEvent()
-			actions = append(actions, arrival{tick: event.GetTick(), sequence: event.GetSequence()})
+			actions = append(actions, arrival{elapsedMS: event.GetElapsedMs(), sequence: event.GetSequence()})
 			order = append(order, event.GetSequence())
 		case *pb.BattleCreatedNtf:
 			// 参战名单必须随 Created 下发：否则客户端要等某个单位先行动才建出它，
@@ -201,8 +188,8 @@ func TestBattleStreamsBeforeFinalReport(t *testing.T) {
 		if actions[i].sequence <= actions[i-1].sequence {
 			t.Fatalf("Sequence 非递增: %d -> %d", actions[i-1].sequence, actions[i].sequence)
 		}
-		if actions[i].tick < actions[i-1].tick {
-			t.Fatalf("tick 回退: %d -> %d", actions[i-1].tick, actions[i].tick)
+		if actions[i].elapsedMS < actions[i-1].elapsedMS {
+			t.Fatalf("elapsedMS 回退: %d -> %d", actions[i-1].elapsedMS, actions[i].elapsedMS)
 		}
 	}
 	// Finished 必须恰好投递一次,且严格在所有 Action 之后。
@@ -220,7 +207,7 @@ func TestBattleStreamsBeforeFinalReport(t *testing.T) {
 	if finishedCount != 1 {
 		t.Fatalf("Finished 投递次数 = %d,期望 1", finishedCount)
 	}
-	if actions[len(actions)-1].tick <= actions[0].tick {
+	if actions[len(actions)-1].elapsedMS <= actions[0].elapsedMS {
 		t.Fatal("快速计算丢失了逻辑时间跨度")
 	}
 }
@@ -290,14 +277,13 @@ func spawnTestServer(t *testing.T, server *Server, actor tree.Actor) tree.PID {
 // TestInteractiveRobotAndEquippedSkill 从创建入口验证机器人主动普攻和玩家即时法宝结算。
 func TestInteractiveRobotAndEquippedSkill(t *testing.T) {
 	MainTest(t)
-	const firstDelay = 23 // 测试怪物的首次决策帧。
+	const firstDelay = 23 // 测试怪物的首次决策时间。
 	monster := glconf.GetBattleMonsterCfg(1)
-	monster.AIFirstDelayTicks = firstDelay
+	monster.AIFirstDelayMS = firstDelay
 	monster.AICastRules = []*cspb.TypIDVal{{Typ: "always", Id: 1}}
-	glconf.GetBattleRuleCfg(int32(pb.BattleType_BATTLE_TYPE_TOWER)).TickDurationMS = 2
 	basic := glconf.GetBattleSkillCfg(1)
 	if err := glconf.SetBattleConfigsForTest(
-		glconf.GetAllBattleRoleCfg(), []*glconf.BattleSkillCfg{basic, {CfgID: 2, TargetRule: basic.TargetRule, WindupTicks: 100, RecoveryTicks: 1, Effects: []*cspb.TypIDVal{{Typ: "battle_damage", Pro: 100000}}}},
+		glconf.GetAllBattleRoleCfg(), []*glconf.BattleSkillCfg{basic, {CfgID: 2, TargetRule: basic.TargetRule, Effects: []*cspb.TypIDVal{{Typ: "battle_damage", Pro: 100000}}}},
 		[]*glconf.BattleEquipCfg{{CfgID: 10, ActiveSkillID: 2}}, glconf.GetAllBattleMonsterCfg(), glconf.GetAllBattleMonsterGroupCfg(), glconf.GetAllBattleRuleCfg(),
 	); err != nil {
 		t.Fatal(err)
@@ -333,7 +319,7 @@ func TestInteractiveRobotAndEquippedSkill(t *testing.T) {
 				created = true
 			case *pb.BattleActionNtf:
 				if !sent && event.GetEvent().GetType() == pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE && event.GetEvent().GetTargetId() == "player" {
-					if event.GetEvent().GetTick() < firstDelay {
+					if event.GetEvent().GetElapsedMs() < firstDelay {
 						t.Fatal("怪物早于配置时间出手")
 					}
 					sent = tree.Send(pid, &pb.BattleInputReq{UID: 7, BattleId: id, UnitId: "player", SkillId: "2", Sequence: 1})
@@ -354,7 +340,7 @@ func TestInteractiveRobotAndEquippedSkill(t *testing.T) {
 func TestSharedBossRoom(t *testing.T) {
 	MainTest(t)
 	// 将怪物第一次决策推迟，让测试能精确控制每一次扣血和加入顺序。
-	glconf.GetBattleMonsterCfg(1).AIFirstDelayTicks = 60000
+	glconf.GetBattleMonsterCfg(1).AIFirstDelayMS = 60000
 	server := New()
 	events := make(chan proto.Message, 128)
 	server.notifier = battle.NotifyFunc(func(source battle.Source, msg proto.Message) error {

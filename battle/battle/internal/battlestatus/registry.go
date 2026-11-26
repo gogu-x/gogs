@@ -10,6 +10,7 @@ import (
 // Registry routes each status kind to its own lifecycle policy.
 type Registry map[pb.StatusType]engine.StatusPolicy
 
+// Default 构造内置策略的注册表。
 func Default() Registry {
 	return Registry{
 		pb.StatusType_STATUS_TYPE_DOT: dot.Handler{},
@@ -17,6 +18,7 @@ func Default() Registry {
 	}
 }
 
+// Apply 根据配置添加或更新目标状态。
 func (r Registry) Apply(statuses []engine.StatusInstance, config engine.StatusConfig) ([]engine.StatusInstance, error) {
 	if policy := r[config.Kind]; policy != nil {
 		return policy.Apply(statuses, config)
@@ -24,6 +26,7 @@ func (r Registry) Apply(statuses []engine.StatusInstance, config engine.StatusCo
 	return append(statuses, engine.StatusInstance{Config: config, Remaining: config.DurationTurns}), nil
 }
 
+// Tick 计算一次周期状态触发的结果。
 func (r Registry) Tick(status engine.StatusInstance) engine.StatusTickResult {
 	if policy := r[status.Config.Kind]; policy != nil {
 		return policy.Tick(status)

@@ -6,16 +6,16 @@ import (
 	"encoding/json"
 )
 
+// resultChecksum 根据战斗结果计算用于回放比对的校验值。
 func resultChecksum(result Result) (string, error) {
 	payload, err := json.Marshal(struct {
-		BattleID       string `json:"battle_id"`
-		BattleType     int32  `json:"battle_type"`
-		Outcome        int32  `json:"outcome"`
-		Tick           int64  `json:"tick"`
-		TickDurationMS int32  `json:"tick_duration_ms"`
-		Units          any    `json:"units"`
-		Events         any    `json:"events"`
-	}{result.BattleID, int32(result.BattleType), int32(result.Outcome), result.Tick, result.TickDurationMS, result.Units, result.Events})
+		BattleID   string `json:"battle_id"`
+		BattleType int32  `json:"battle_type"`
+		Outcome    int32  `json:"outcome"`
+		ElapsedMs  int64  `json:"elapsed_ms"`
+		Units      any    `json:"units"`
+		Events     any    `json:"events"`
+	}{result.BattleID, int32(result.BattleType), int32(result.Outcome), result.ElapsedMs, result.Units, result.Events})
 	if err != nil {
 		return "", err
 	}

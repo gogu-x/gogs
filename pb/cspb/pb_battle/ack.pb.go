@@ -84,15 +84,13 @@ type BattleCreatedNtf struct {
 	BattleId string `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
 	// 玩家编号
 	Uid uint64 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	// 逻辑帧时长，单位为毫秒
-	TickDurationMs int32 `protobuf:"varint,3,opt,name=tick_duration_ms,json=tickDurationMs,proto3" json:"tick_duration_ms,omitempty"`
 	// 参战单位名单。战斗创建时即已确定，随创建通知一并下发，
 	// 客户端可在进入战斗页的第一时间就把双方单位摆好，而不是等某个单位先行动
 	Units    []*BattleUnitResult `protobuf:"bytes,4,rep,name=units,proto3" json:"units,omitempty"`
 	Controls []*BattleControl    `protobuf:"bytes,5,rep,name=controls,proto3" json:"controls,omitempty"`
-	// 快照已包含的最后事件序号和当前帧。
+	// 快照已包含的最后事件序号和当前战斗毫秒。
 	SnapshotSequence uint64 `protobuf:"varint,6,opt,name=snapshot_sequence,json=snapshotSequence,proto3" json:"snapshot_sequence,omitempty"`
-	CurrentTick      int64  `protobuf:"varint,7,opt,name=current_tick,json=currentTick,proto3" json:"current_tick,omitempty"`
+	CurrentMs        int64  `protobuf:"varint,7,opt,name=current_ms,json=currentMs,proto3" json:"current_ms,omitempty"`
 	// 中途加入或重同步时仍然生效的状态。
 	Statuses      []*BattleStatusView `protobuf:"bytes,8,rep,name=statuses,proto3" json:"statuses,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -143,13 +141,6 @@ func (x *BattleCreatedNtf) GetUid() uint64 {
 	return 0
 }
 
-func (x *BattleCreatedNtf) GetTickDurationMs() int32 {
-	if x != nil {
-		return x.TickDurationMs
-	}
-	return 0
-}
-
 func (x *BattleCreatedNtf) GetUnits() []*BattleUnitResult {
 	if x != nil {
 		return x.Units
@@ -171,9 +162,9 @@ func (x *BattleCreatedNtf) GetSnapshotSequence() uint64 {
 	return 0
 }
 
-func (x *BattleCreatedNtf) GetCurrentTick() int64 {
+func (x *BattleCreatedNtf) GetCurrentMs() int64 {
 	if x != nil {
-		return x.CurrentTick
+		return x.CurrentMs
 	}
 	return 0
 }
@@ -396,83 +387,6 @@ func (x *BattleResultConfirmedNtf) GetUid() uint64 {
 	return 0
 }
 
-// 可控单位及其可用技能。普攻与主动技能均即时结算。
-type BattleControl struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	UnitId            string                 `protobuf:"bytes,1,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
-	BasicSkill        string                 `protobuf:"bytes,2,opt,name=basic_skill,json=basicSkill,proto3" json:"basic_skill,omitempty"`
-	ActiveSkills      []string               `protobuf:"bytes,3,rep,name=active_skills,json=activeSkills,proto3" json:"active_skills,omitempty"`
-	LastInputSequence uint64                 `protobuf:"varint,5,opt,name=last_input_sequence,json=lastInputSequence,proto3" json:"last_input_sequence,omitempty"`
-	NextReadyTick     int64                  `protobuf:"varint,6,opt,name=next_ready_tick,json=nextReadyTick,proto3" json:"next_ready_tick,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *BattleControl) Reset() {
-	*x = BattleControl{}
-	mi := &file_cspb_battle_ack_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BattleControl) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BattleControl) ProtoMessage() {}
-
-func (x *BattleControl) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_ack_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BattleControl.ProtoReflect.Descriptor instead.
-func (*BattleControl) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_ack_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *BattleControl) GetUnitId() string {
-	if x != nil {
-		return x.UnitId
-	}
-	return ""
-}
-
-func (x *BattleControl) GetBasicSkill() string {
-	if x != nil {
-		return x.BasicSkill
-	}
-	return ""
-}
-
-func (x *BattleControl) GetActiveSkills() []string {
-	if x != nil {
-		return x.ActiveSkills
-	}
-	return nil
-}
-
-func (x *BattleControl) GetLastInputSequence() uint64 {
-	if x != nil {
-		return x.LastInputSequence
-	}
-	return 0
-}
-
-func (x *BattleControl) GetNextReadyTick() int64 {
-	if x != nil {
-		return x.NextReadyTick
-	}
-	return 0
-}
-
 // 每次玩家输入的权威回执。
 type BattleInputAck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -481,16 +395,16 @@ type BattleInputAck struct {
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`
 	Code          pb_common.ErrCode      `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
 	Action        uint64                 `protobuf:"varint,5,opt,name=action,proto3" json:"action,omitempty"`
-	ReadyTick     int64                  `protobuf:"varint,6,opt,name=ready_tick,json=readyTick,proto3" json:"ready_tick,omitempty"`
+	ReadyMs       int64                  `protobuf:"varint,6,opt,name=ready_ms,json=readyMs,proto3" json:"ready_ms,omitempty"`
 	Uid           uint64                 `protobuf:"varint,8,opt,name=uid,proto3" json:"uid,omitempty"`
-	CurrentTick   int64                  `protobuf:"varint,9,opt,name=current_tick,json=currentTick,proto3" json:"current_tick,omitempty"`
+	CurrentMs     int64                  `protobuf:"varint,9,opt,name=current_ms,json=currentMs,proto3" json:"current_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BattleInputAck) Reset() {
 	*x = BattleInputAck{}
-	mi := &file_cspb_battle_ack_proto_msgTypes[6]
+	mi := &file_cspb_battle_ack_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -502,7 +416,7 @@ func (x *BattleInputAck) String() string {
 func (*BattleInputAck) ProtoMessage() {}
 
 func (x *BattleInputAck) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_ack_proto_msgTypes[6]
+	mi := &file_cspb_battle_ack_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -515,7 +429,7 @@ func (x *BattleInputAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleInputAck.ProtoReflect.Descriptor instead.
 func (*BattleInputAck) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_ack_proto_rawDescGZIP(), []int{6}
+	return file_cspb_battle_ack_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *BattleInputAck) GetBattleId() string {
@@ -553,9 +467,9 @@ func (x *BattleInputAck) GetAction() uint64 {
 	return 0
 }
 
-func (x *BattleInputAck) GetReadyTick() int64 {
+func (x *BattleInputAck) GetReadyMs() int64 {
 	if x != nil {
-		return x.ReadyTick
+		return x.ReadyMs
 	}
 	return 0
 }
@@ -567,9 +481,9 @@ func (x *BattleInputAck) GetUid() uint64 {
 	return 0
 }
 
-func (x *BattleInputAck) GetCurrentTick() int64 {
+func (x *BattleInputAck) GetCurrentMs() int64 {
 	if x != nil {
-		return x.CurrentTick
+		return x.CurrentMs
 	}
 	return 0
 }
@@ -586,7 +500,7 @@ type BattleAdmissionFailedNtf struct {
 
 func (x *BattleAdmissionFailedNtf) Reset() {
 	*x = BattleAdmissionFailedNtf{}
-	mi := &file_cspb_battle_ack_proto_msgTypes[7]
+	mi := &file_cspb_battle_ack_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -598,7 +512,7 @@ func (x *BattleAdmissionFailedNtf) String() string {
 func (*BattleAdmissionFailedNtf) ProtoMessage() {}
 
 func (x *BattleAdmissionFailedNtf) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_ack_proto_msgTypes[7]
+	mi := &file_cspb_battle_ack_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +525,7 @@ func (x *BattleAdmissionFailedNtf) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleAdmissionFailedNtf.ProtoReflect.Descriptor instead.
 func (*BattleAdmissionFailedNtf) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_ack_proto_rawDescGZIP(), []int{7}
+	return file_cspb_battle_ack_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *BattleAdmissionFailedNtf) GetBattleId() string {
@@ -642,7 +556,7 @@ type BattleStatusView struct {
 	StatusId       string                 `protobuf:"bytes,2,opt,name=status_id,json=statusId,proto3" json:"status_id,omitempty"`
 	InstanceId     uint64                 `protobuf:"varint,3,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
 	Version        uint64                 `protobuf:"varint,4,opt,name=version,proto3" json:"version,omitempty"`
-	ExpireTick     int64                  `protobuf:"varint,5,opt,name=expire_tick,json=expireTick,proto3" json:"expire_tick,omitempty"`
+	ExpireMs       int64                  `protobuf:"varint,5,opt,name=expire_ms,json=expireMs,proto3" json:"expire_ms,omitempty"`
 	RemainingTurns int32                  `protobuf:"varint,6,opt,name=remaining_turns,json=remainingTurns,proto3" json:"remaining_turns,omitempty"`
 	SourceId       string                 `protobuf:"bytes,7,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -651,7 +565,7 @@ type BattleStatusView struct {
 
 func (x *BattleStatusView) Reset() {
 	*x = BattleStatusView{}
-	mi := &file_cspb_battle_ack_proto_msgTypes[8]
+	mi := &file_cspb_battle_ack_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -663,7 +577,7 @@ func (x *BattleStatusView) String() string {
 func (*BattleStatusView) ProtoMessage() {}
 
 func (x *BattleStatusView) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_ack_proto_msgTypes[8]
+	mi := &file_cspb_battle_ack_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -676,7 +590,7 @@ func (x *BattleStatusView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleStatusView.ProtoReflect.Descriptor instead.
 func (*BattleStatusView) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_ack_proto_rawDescGZIP(), []int{8}
+	return file_cspb_battle_ack_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *BattleStatusView) GetUnitId() string {
@@ -707,9 +621,9 @@ func (x *BattleStatusView) GetVersion() uint64 {
 	return 0
 }
 
-func (x *BattleStatusView) GetExpireTick() int64 {
+func (x *BattleStatusView) GetExpireMs() int64 {
 	if x != nil {
-		return x.ExpireTick
+		return x.ExpireMs
 	}
 	return 0
 }
@@ -728,6 +642,75 @@ func (x *BattleStatusView) GetSourceId() string {
 	return ""
 }
 
+// 领取结果；成功时按增益事件更新战斗画面。
+type ClaimBattleGrantAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BattleId      string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
+	UnitId        string                 `protobuf:"bytes,2,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
+	GrantId       string                 `protobuf:"bytes,3,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	Code          pb_common.ErrCode      `protobuf:"varint,4,opt,name=code,proto3,enum=ErrCode" json:"code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClaimBattleGrantAck) Reset() {
+	*x = ClaimBattleGrantAck{}
+	mi := &file_cspb_battle_ack_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClaimBattleGrantAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClaimBattleGrantAck) ProtoMessage() {}
+
+func (x *ClaimBattleGrantAck) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_battle_ack_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClaimBattleGrantAck.ProtoReflect.Descriptor instead.
+func (*ClaimBattleGrantAck) Descriptor() ([]byte, []int) {
+	return file_cspb_battle_ack_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ClaimBattleGrantAck) GetBattleId() string {
+	if x != nil {
+		return x.BattleId
+	}
+	return ""
+}
+
+func (x *ClaimBattleGrantAck) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *ClaimBattleGrantAck) GetGrantId() string {
+	if x != nil {
+		return x.GrantId
+	}
+	return ""
+}
+
+func (x *ClaimBattleGrantAck) GetCode() pb_common.ErrCode {
+	if x != nil {
+		return x.Code
+	}
+	return pb_common.ErrCode(0)
+}
+
 var File_cspb_battle_ack_proto protoreflect.FileDescriptor
 
 const file_cspb_battle_ack_proto_rawDesc = "" +
@@ -735,16 +718,16 @@ const file_cspb_battle_ack_proto_rawDesc = "" +
 	"\x15cspb/battle/ack.proto\x1a\x18cspb/battle/struct.proto\x1a\x17cspb/common/error.proto\"K\n" +
 	"\x0eStartBattleAck\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x1c\n" +
-	"\x04code\x18\x03 \x01(\x0e2\b.ErrCodeR\x04code\"\xbf\x02\n" +
+	"\x04code\x18\x03 \x01(\x0e2\b.ErrCodeR\x04code\"\xa9\x02\n" +
 	"\x10BattleCreatedNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12(\n" +
-	"\x10tick_duration_ms\x18\x03 \x01(\x05R\x0etickDurationMs\x12'\n" +
+	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12'\n" +
 	"\x05units\x18\x04 \x03(\v2\x11.BattleUnitResultR\x05units\x12*\n" +
 	"\bcontrols\x18\x05 \x03(\v2\x0e.BattleControlR\bcontrols\x12+\n" +
-	"\x11snapshot_sequence\x18\x06 \x01(\x04R\x10snapshotSequence\x12!\n" +
-	"\fcurrent_tick\x18\a \x01(\x03R\vcurrentTick\x12-\n" +
-	"\bstatuses\x18\b \x03(\v2\x11.BattleStatusViewR\bstatuses\"d\n" +
+	"\x11snapshot_sequence\x18\x06 \x01(\x04R\x10snapshotSequence\x12\x1d\n" +
+	"\n" +
+	"current_ms\x18\a \x01(\x03R\tcurrentMs\x12-\n" +
+	"\bstatuses\x18\b \x03(\v2\x11.BattleStatusViewR\bstatusesJ\x04\b\x03\x10\x04R\x10tick_duration_ms\"d\n" +
 	"\x0fBattleActionNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12\"\n" +
@@ -759,39 +742,35 @@ const file_cspb_battle_ack_proto_rawDesc = "" +
 	"battleType\"I\n" +
 	"\x18BattleResultConfirmedNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
-	"\x03uid\x18\x02 \x01(\x04R\x03uid\"\xd8\x01\n" +
-	"\rBattleControl\x12\x17\n" +
-	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12\x1f\n" +
-	"\vbasic_skill\x18\x02 \x01(\tR\n" +
-	"basicSkill\x12#\n" +
-	"\ractive_skills\x18\x03 \x03(\tR\factiveSkills\x12.\n" +
-	"\x13last_input_sequence\x18\x05 \x01(\x04R\x11lastInputSequence\x12&\n" +
-	"\x0fnext_ready_tick\x18\x06 \x01(\x03R\rnextReadyTickJ\x04\b\x04\x10\x05R\n" +
-	"ready_tick\"\xec\x01\n" +
+	"\x03uid\x18\x02 \x01(\x04R\x03uid\"\xe4\x01\n" +
 	"\x0eBattleInputAck\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x17\n" +
 	"\aunit_id\x18\x02 \x01(\tR\x06unitId\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x1c\n" +
 	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeR\x04code\x12\x16\n" +
-	"\x06action\x18\x05 \x01(\x04R\x06action\x12\x1d\n" +
+	"\x06action\x18\x05 \x01(\x04R\x06action\x12\x19\n" +
+	"\bready_ms\x18\x06 \x01(\x03R\areadyMs\x12\x10\n" +
+	"\x03uid\x18\b \x01(\x04R\x03uid\x12\x1d\n" +
 	"\n" +
-	"ready_tick\x18\x06 \x01(\x03R\treadyTick\x12\x10\n" +
-	"\x03uid\x18\b \x01(\x04R\x03uid\x12!\n" +
-	"\fcurrent_tick\x18\t \x01(\x03R\vcurrentTick\"g\n" +
+	"current_ms\x18\t \x01(\x03R\tcurrentMs\"g\n" +
 	"\x18BattleAdmissionFailedNtf\x12\x1b\n" +
 	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\x04R\x03uid\x12\x1c\n" +
-	"\x04code\x18\x03 \x01(\x0e2\b.ErrCodeR\x04code\"\xea\x01\n" +
+	"\x04code\x18\x03 \x01(\x0e2\b.ErrCodeR\x04code\"\xe6\x01\n" +
 	"\x10BattleStatusView\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12\x1b\n" +
 	"\tstatus_id\x18\x02 \x01(\tR\bstatusId\x12\x1f\n" +
 	"\vinstance_id\x18\x03 \x01(\x04R\n" +
 	"instanceId\x12\x18\n" +
-	"\aversion\x18\x04 \x01(\x04R\aversion\x12\x1f\n" +
-	"\vexpire_tick\x18\x05 \x01(\x03R\n" +
-	"expireTick\x12'\n" +
+	"\aversion\x18\x04 \x01(\x04R\aversion\x12\x1b\n" +
+	"\texpire_ms\x18\x05 \x01(\x03R\bexpireMs\x12'\n" +
 	"\x0fremaining_turns\x18\x06 \x01(\x05R\x0eremainingTurns\x12\x1b\n" +
-	"\tsource_id\x18\a \x01(\tR\bsourceIdB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
+	"\tsource_id\x18\a \x01(\tR\bsourceId\"\x84\x01\n" +
+	"\x13ClaimBattleGrantAck\x12\x1b\n" +
+	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x17\n" +
+	"\aunit_id\x18\x02 \x01(\tR\x06unitId\x12\x19\n" +
+	"\bgrant_id\x18\x03 \x01(\tR\agrantId\x12\x1c\n" +
+	"\x04code\x18\x04 \x01(\x0e2\b.ErrCodeR\x04codeB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
 
 var (
 	file_cspb_battle_ack_proto_rawDescOnce sync.Once
@@ -812,32 +791,34 @@ var file_cspb_battle_ack_proto_goTypes = []any{
 	(*BattleActionNtf)(nil),          // 2: BattleActionNtf
 	(*BattleFinishedNtf)(nil),        // 3: BattleFinishedNtf
 	(*BattleResultConfirmedNtf)(nil), // 4: BattleResultConfirmedNtf
-	(*BattleControl)(nil),            // 5: BattleControl
-	(*BattleInputAck)(nil),           // 6: BattleInputAck
-	(*BattleAdmissionFailedNtf)(nil), // 7: BattleAdmissionFailedNtf
-	(*BattleStatusView)(nil),         // 8: BattleStatusView
+	(*BattleInputAck)(nil),           // 5: BattleInputAck
+	(*BattleAdmissionFailedNtf)(nil), // 6: BattleAdmissionFailedNtf
+	(*BattleStatusView)(nil),         // 7: BattleStatusView
+	(*ClaimBattleGrantAck)(nil),      // 8: ClaimBattleGrantAck
 	(pb_common.ErrCode)(0),           // 9: ErrCode
 	(*BattleUnitResult)(nil),         // 10: BattleUnitResult
-	(*BattleEvent)(nil),              // 11: BattleEvent
-	(BattleOutcome)(0),               // 12: BattleOutcome
-	(BattleType)(0),                  // 13: BattleType
+	(*BattleControl)(nil),            // 11: BattleControl
+	(*BattleEvent)(nil),              // 12: BattleEvent
+	(BattleOutcome)(0),               // 13: BattleOutcome
+	(BattleType)(0),                  // 14: BattleType
 }
 var file_cspb_battle_ack_proto_depIdxs = []int32{
 	9,  // 0: StartBattleAck.code:type_name -> ErrCode
 	10, // 1: BattleCreatedNtf.units:type_name -> BattleUnitResult
-	5,  // 2: BattleCreatedNtf.controls:type_name -> BattleControl
-	8,  // 3: BattleCreatedNtf.statuses:type_name -> BattleStatusView
-	11, // 4: BattleActionNtf.event:type_name -> BattleEvent
-	12, // 5: BattleFinishedNtf.outcome:type_name -> BattleOutcome
+	11, // 2: BattleCreatedNtf.controls:type_name -> BattleControl
+	7,  // 3: BattleCreatedNtf.statuses:type_name -> BattleStatusView
+	12, // 4: BattleActionNtf.event:type_name -> BattleEvent
+	13, // 5: BattleFinishedNtf.outcome:type_name -> BattleOutcome
 	10, // 6: BattleFinishedNtf.units:type_name -> BattleUnitResult
-	13, // 7: BattleFinishedNtf.battle_type:type_name -> BattleType
+	14, // 7: BattleFinishedNtf.battle_type:type_name -> BattleType
 	9,  // 8: BattleInputAck.code:type_name -> ErrCode
 	9,  // 9: BattleAdmissionFailedNtf.code:type_name -> ErrCode
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	9,  // 10: ClaimBattleGrantAck.code:type_name -> ErrCode
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_cspb_battle_ack_proto_init() }

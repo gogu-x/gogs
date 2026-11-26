@@ -58,6 +58,7 @@ func compareProducts(a, b, c, d int64) int {
 	return 1
 }
 
+// lower 比较生命比例并选出生命比例较低的单位。
 func lower(current, candidate *pb.BattleUnitResult) *pb.BattleUnitResult {
 	if current == nil {
 		return candidate
@@ -69,6 +70,7 @@ func lower(current, candidate *pb.BattleUnitResult) *pb.BattleUnitResult {
 	return current
 }
 
+// below 判断单位当前生命比例是否低于或等于指定千分比。
 func below(unit *pb.BattleUnitResult, threshold int64) bool {
 	return unit != nil && compareProducts(unit.GetHp(), 1000, unit.GetMaxHp(), threshold) <= 0
 }

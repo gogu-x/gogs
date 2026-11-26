@@ -9,6 +9,7 @@ import (
 type activeStatus = StatusInstance
 
 type unit struct {
+	grants    []*pb.BattleGrant // 按入账顺序保存，供去重及快照使用。
 	Config    UnitConfig
 	HP        int64
 	Cooldowns map[string]int
@@ -16,16 +17,20 @@ type unit struct {
 	charges   map[pb.EffectType]int64
 }
 
+// alive 根据当前生命值判断单位是否存活。
 func (u *unit) alive() bool { return u.HP > 0 }
 
+// getCharge 读取指定效果的积攒值。
 func (u *unit) getCharge(kind pb.EffectType) int64 { return u.charges[kind] }
 
+// setCharge 更新指定效果的积攒值。
 func (u *unit) setCharge(kind pb.EffectType, value int64) { u.charges[kind] = value }
 
+// resetCharge 清空指定效果的积攒值。
 func (u *unit) resetCharge(kind pb.EffectType) { u.charges[kind] = 0 }
 
 // Battle 是不依赖外部服务的确定性战斗实例。
-// 全部可变状态都在本结构体上，因此可以按 tick 挂起推进（Advance）而不丢状态。
+// 全部可变状态都在本结构体上，因此可以按输入及到期状态推进而不丢状态。
 type Battle struct {
 	inputs         map[string]*inputState
 	setup          Setup
@@ -33,24 +38,28 @@ type Battle struct {
 	strategies     Strategies
 	units          []*unit
 	timeline       timelineQueue
-	tick           int64
+	elapsedMS      int64
 	action         uint64
-	nextAction     uint64
 	nextStatus     uint64 // 状态实例编号，整场战斗内单调递增。
 	startedActions int
-	activeActions  int
-	events         []*pb.BattleEvent
-	emitted        int              // events 中已返回给调用方的游标
-	finalOutcome   pb.BattleOutcome // 终局判定结果（outcome() 方法已占用该名字）
-	terminal       bool             // 是否已判定出终局
-	done           bool             // 终止条件已满足，不再推进
-	finished       bool
-	cached         Result
+
+	events       []*pb.BattleEvent
+	emitted      int              // events 中已返回给调用方的游标
+	finalOutcome pb.BattleOutcome // 终局判定结果（outcome() 方法已占用该名字）
+
+	done     bool // 终止条件已满足，不再推进
+	finished bool
+	cached   Result
 }
+
+// defaultDurationMS 为旧配置未指定时长的战斗提供三分钟上限。
+const defaultDurationMS int64 = 180000
 
 // NewBattle 使用 BattleActor 传入的运行时数据创建战斗。
 func NewBattle(setup Setup) (*Battle, error) {
-	setup.normalize()
+	if setup.Rules.MaxDurationMS == 0 {
+		setup.Rules.MaxDurationMS = defaultDurationMS
+	}
 	if err := setup.validate(); err != nil {
 		return nil, err
 	}
@@ -77,9 +86,6 @@ func NewBattle(setup Setup) (*Battle, error) {
 // ID 返回 Manager 生成的战斗 ID。
 func (b *Battle) ID() string { return b.setup.BattleID }
 
-// TickDurationMS 返回客户端播放时间轴使用的权威 tick 时长。
-func (b *Battle) TickDurationMS() int32 { return b.setup.Rules.TickDurationMS }
-
 // eventInfo 承载战斗事件的结构化效果、状态和原因信息。
 type eventInfo struct {
 	EffectType  pb.EffectType
@@ -90,12 +96,13 @@ type eventInfo struct {
 	Outcome     pb.BattleOutcome
 }
 
+// emit 记录本场战斗产生的事件。
 func (b *Battle) emit(
 	kind pb.BattleEventType, actor, target, skill, status string,
 	amount, before, after int64, info eventInfo, targetIDs []string,
 ) *pb.BattleEvent {
 	event := &pb.BattleEvent{
-		Sequence: uint64(len(b.events) + 1), Action: b.action, Tick: b.tick, Type: kind,
+		Sequence: uint64(len(b.events) + 1), Action: b.action, ElapsedMs: b.elapsedMS, Type: kind,
 		ActorId: actor, TargetId: target, SkillId: skill, StatusId: status,
 		Amount: amount, HpBefore: before, HpAfter: after,
 		EffectType: info.EffectType, StatusType: info.StatusType, Critical: info.Critical,
@@ -106,6 +113,7 @@ func (b *Battle) emit(
 	return event
 }
 
+// teamAlive 判断指定阵营是否还有存活单位。
 func (b *Battle) teamAlive(team pb.BattleTeam) bool {
 	for _, unit := range b.units {
 		if unit.Config.Team == team && unit.alive() {
@@ -115,6 +123,7 @@ func (b *Battle) teamAlive(team pb.BattleTeam) bool {
 	return false
 }
 
+// outcome 根据双方存活情况判断战斗是否结束及胜负。
 func (b *Battle) outcome() (pb.BattleOutcome, bool) {
 	attackerAlive := b.teamAlive(pb.BattleTeam_BATTLE_TEAM_ATTACKER)
 	defenderAlive := b.teamAlive(pb.BattleTeam_BATTLE_TEAM_DEFENDER)
@@ -130,41 +139,42 @@ func (b *Battle) outcome() (pb.BattleOutcome, bool) {
 	}
 }
 
+// attackInterval 根据单位速度计算两次攻击之间的间隔。
 func (b *Battle) attackInterval(actor *unit) int64 {
 	speed := b.unitSpeed(actor)
-	return max(1, (b.setup.Rules.ATBThreshold+speed-1)/speed)
+	return max(1, 1+(b.setup.Rules.ATBThreshold-1)/speed)
 }
 
-// actionWindow 在行动间隔短于动作窗口时等比压缩前后摇，保留至少一个 tick 的前摇与后摇。
-func actionWindow(windup, recovery, interval int64) (int64, int64) {
-	total := windup + recovery
-	if windup <= 0 || recovery <= 0 || total <= interval {
-		return windup, recovery
-	}
-	window := max(2, interval)
-	windup = max(1, min(window-1, windup*window/total))
-	return windup, window - windup
-}
-
+// unitView 构造策略读取的单位状态视图。
 func (b *Battle) unitView(u *unit) UnitView {
 	return UnitView{ID: u.Config.InstanceID, Team: u.Config.Team, Position: u.Config.Position, HP: u.HP, MaxHP: u.Config.MaxHP,
 		Attack: b.unitAttack(u), Defense: b.unitDefense(u), Alive: u.alive()}
 }
 
+// unitAttack 计算单位当前的攻击力。
 func (b *Battle) unitAttack(u *unit) int64 {
 	return max(0, u.Config.Attack+b.unitModifier(u).AttackFlat)
 }
+
+// unitDefense 计算单位当前的防御力。
 func (b *Battle) unitDefense(u *unit) int64 {
 	return max(0, u.Config.Defense+b.unitModifier(u).DefenseFlat)
 }
+
+// unitSpeed 计算单位当前的速度。
 func (b *Battle) unitSpeed(u *unit) int64 { return max(1, u.Config.Speed+b.unitModifier(u).SpeedFlat) }
+
+// unitModifier 获取单位状态带来的属性修正。
 func (b *Battle) unitModifier(u *unit) AttributeModifier {
 	return b.strategies.Statuses.Modifier(u.Statuses)
 }
+
+// hasStatus 检查单位是否持有指定状态。
 func (b *Battle) hasStatus(u *unit, kind pb.StatusType) bool {
 	return b.strategies.Statuses.Has(u.Statuses, kind)
 }
 
+// tickCooldowns 推进单位的技能冷却。
 func (b *Battle) tickCooldowns(actor *unit) {
 	for id, turns := range actor.Cooldowns {
 		if turns <= 1 {
@@ -175,6 +185,7 @@ func (b *Battle) tickCooldowns(actor *unit) {
 	}
 }
 
+// tickPeriodic 结算单位的周期状态效果。
 func (b *Battle) tickPeriodic(actor *unit) {
 	for _, status := range actor.Statuses {
 		if !actor.alive() {
@@ -186,7 +197,12 @@ func (b *Battle) tickPeriodic(actor *unit) {
 	}
 }
 
+// expireStatuses 更新并清理到期状态。
 func (b *Battle) expireStatuses(actor *unit) {
+	if len(actor.Statuses) == 0 {
+		return
+	}
+	old := b.attackInterval(actor)
 	previous := append([]StatusInstance(nil), actor.Statuses...)
 	actor.Statuses = b.strategies.Statuses.Expire(actor.Statuses)
 	for _, status := range previous {
@@ -194,19 +210,10 @@ func (b *Battle) expireStatuses(actor *unit) {
 			b.emitStatus(pb.BattleEventType_BATTLE_EVENT_TYPE_STATUS_REMOVED, actor, status)
 		}
 	}
+	b.syncStatusSpeed(actor, old)
 }
 
-func (b *Battle) chooseSkill(actor *unit) SkillConfig {
-	if !b.hasStatus(actor, pb.StatusType_STATUS_TYPE_SILENCE) {
-		for _, skill := range actor.Config.ActiveSkills {
-			if actor.Cooldowns[skill.ID] == 0 && !isSupportSkill(skill) {
-				return skill
-			}
-		}
-	}
-	return actor.Config.BasicSkill
-}
-
+// targets 按技能目标规则选取目标单位。
 func (b *Battle) targets(actor *unit, rule pb.TargetRule) []*unit {
 	views := make([]UnitView, 0, len(b.units))
 	byID := make(map[string]*unit, len(b.units))
@@ -224,6 +231,7 @@ func (b *Battle) targets(actor *unit, rule pb.TargetRule) []*unit {
 	return selected
 }
 
+// targetIDs 提取目标单位的编号。
 func targetIDs(targets []*unit) []string {
 	ids := make([]string, 0, len(targets))
 	for _, target := range targets {
@@ -232,6 +240,7 @@ func targetIDs(targets []*unit) []string {
 	return ids
 }
 
+// firstTarget 取出首个目标供动作事件使用。
 func firstTarget(ids []string) string {
 	if len(ids) == 0 {
 		return ""
@@ -239,61 +248,8 @@ func firstTarget(ids []string) string {
 	return ids[0]
 }
 
-func (b *Battle) startAction(actor *unit) {
-	b.nextAction++
-	b.startedActions++
-	b.action = b.nextAction
-	b.tickCooldowns(actor)
-	skill := b.chooseSkill(actor)
-	stunned := b.hasStatus(actor, pb.StatusType_STATUS_TYPE_STUN)
-	var targets []*unit
-	if !stunned {
-		targets = b.targets(actor, skill.TargetRule)
-	}
-	ids := targetIDs(targets)
-	action := &scheduledAction{ID: b.action, Actor: actor, Skill: skill, Targets: targets, TargetIDs: ids, StartTick: b.tick, Basic: skill.ID == actor.Config.BasicSkill.ID}
-	b.emitActionEvent(action, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED)
-	b.tickPeriodic(actor)
-
-	if !actor.alive() {
-		b.emit(
-			pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED,
-			actor.Config.InstanceID, "", skill.ID, "",
-			0, actor.HP, actor.HP,
-			eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_ACTOR_DEAD}, ids,
-		)
-		action.ImpactTick, action.EndTick = b.tick, b.tick
-	} else if stunned {
-		b.emit(
-			pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_SKIPPED,
-			actor.Config.InstanceID, "", skill.ID, "",
-			0, actor.HP, actor.HP,
-			eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_STUNNED}, ids,
-		)
-		action.ImpactTick, action.EndTick = b.tick, b.tick+skill.RecoveryTicks
-	} else {
-		// 治疗与友方增益在同一次出手内独立生效，不替换攻击或推进额外回合。
-		b.triggerSupportSkills(actor)
-		// 先算出动作窗口，再随 SKILL_USED 一起下发：客户端收到这一条事件就能确定
-		// windup/impact/recovery 并立即起播，不必等待动作结束时的 ACTION_ENDED。
-		windup, recovery := actionWindow(skill.WindupTicks, skill.RecoveryTicks, b.attackInterval(actor))
-		action.ImpactTick = b.tick + windup
-		action.EndTick = action.ImpactTick + recovery
-		b.emitSkillUsed(action)
-		b.schedule(&timelineItem{Tick: action.ImpactTick, Phase: phaseImpact, Actor: actor, Action: action})
-		if skill.Cooldown > 0 && !action.Basic {
-			actor.Cooldowns[skill.ID] = skill.Cooldown
-		}
-	}
-	b.activeActions++
-	b.schedule(&timelineItem{Tick: action.EndTick, Phase: phaseEnd, Actor: actor, Action: action})
-	if actor.alive() {
-		nextReady := max(action.EndTick, action.StartTick+b.attackInterval(actor))
-		b.schedule(&timelineItem{Tick: nextReady, Phase: phaseStart, Actor: actor})
-	}
-}
-
-func (b *Battle) impactAction(action *scheduledAction) {
+// impactAction 在命中时校验参战单位并结算技能效果。
+func (b *Battle) impactAction(action *battleAction) {
 	actor := action.Actor
 	if !actor.alive() {
 		b.emit(
@@ -354,6 +310,7 @@ func (b *Battle) impactAction(action *scheduledAction) {
 	}
 }
 
+// applyResolution 将已计算的技能效果应用到战斗状态。
 func (b *Battle) applyResolution(
 	actor, target *unit, skill SkillConfig, resolution EffectResolution,
 ) int64 {
@@ -411,6 +368,7 @@ func (b *Battle) applyCharges(actor *unit, skill SkillConfig, successfulHits int
 	}
 }
 
+// applyCharge 更新单位的效果积攒值并处理触发。
 func (b *Battle) applyCharge(actor *unit, skill SkillConfig, charge ChargeEffectConfig, successfulHits int) {
 	kind, threshold, gain := charge.Kind, charge.Threshold, charge.Gain
 	current := actor.getCharge(kind)
@@ -471,71 +429,43 @@ func (b *Battle) triggerCharge(
 
 type effectTarget struct{ unit *unit }
 
-func (t effectTarget) ID() string                         { return t.unit.Config.InstanceID }
-func (t effectTarget) HP() int64                          { return t.unit.HP }
-func (t effectTarget) MaxHP() int64                       { return t.unit.Config.MaxHP }
-func (t effectTarget) SetHP(value int64)                  { t.unit.HP = value }
-func (t effectTarget) Statuses() []StatusInstance         { return t.unit.Statuses }
+// ID 返回单位实例编号。
+func (t effectTarget) ID() string { return t.unit.Config.InstanceID }
+
+// HP 返回单位当前生命值。
+func (t effectTarget) HP() int64 { return t.unit.HP }
+
+// MaxHP 返回单位生命上限。
+func (t effectTarget) MaxHP() int64 { return t.unit.Config.MaxHP }
+
+// SetHP 设置单位当前生命值。
+func (t effectTarget) SetHP(value int64) { t.unit.HP = value }
+
+// Statuses 返回单位当前的状态列表。
+func (t effectTarget) Statuses() []StatusInstance { return t.unit.Statuses }
+
+// SetStatuses 更新单位的状态列表。
 func (t effectTarget) SetStatuses(value []StatusInstance) { t.unit.Statuses = value }
 
-func (b *Battle) endAction(action *scheduledAction) {
+// endAction 处理动作结束及后续调度。
+func (b *Battle) endAction(action *battleAction) {
 	b.expireStatuses(action.Actor)
 	b.emitActionEvent(action, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED)
-	b.activeActions--
 }
 
-// NextTick 返回下一个将产生事件的 tick。ok 为 false 表示战斗已结束
-// （时间轴已耗尽，或终止条件已满足）。
-func (b *Battle) NextTick() (int64, bool) {
-	if b.done || b.finished || b.timeline.Len() == 0 {
+// NextDueMS 返回最近的状态任务或战斗截止时刻。
+func (b *Battle) NextDueMS() (int64, bool) {
+	if b.done || b.finished {
 		return 0, false
 	}
-	return b.timeline[0].Tick, true
+	deadline := b.setup.Rules.MaxDurationMS
+	if b.timeline.Len() == 0 {
+		return deadline, true
+	}
+	return min(deadline, b.timeline[0].ElapsedMs), true
 }
 
-// Advance 把模拟推进到当前堆顶 tick（含该 tick 上的全部 phase），返回这批新产生的事件。
-// 单次调用不会跨越 tick 边界，因此调用方可以按自己的节奏（例如真实墙钟时间）逐批推送。
-// 返回的切片与内部事件切片共享底层数组，调用方须在下一次 Advance 之前消费掉。
-func (b *Battle) Advance() []*pb.BattleEvent {
-	if b.done || b.finished || b.timeline.Len() == 0 {
-		return nil
-	}
-	start := b.emitted
-	target := b.timeline[0].Tick
-	for b.timeline.Len() > 0 && b.timeline[0].Tick == target {
-		item := heap.Pop(&b.timeline).(*timelineItem)
-		b.tick = item.Tick
-		switch item.Phase {
-		case phaseStatusExpire:
-			b.handleStatusTask(item)
-		case phaseStatusTick:
-			b.handleStatusTask(item)
-		case phaseStart:
-			if b.terminal || b.startedActions >= b.setup.Rules.MaxActions || !item.Actor.alive() {
-				// 与一次性 Run 的循环保持一致：跳过本轮的终局重算与终止检查。
-				continue
-			}
-			b.startAction(item.Actor)
-		case phaseImpact:
-			b.action = item.Action.ID
-			b.impactAction(item.Action)
-		case phaseEnd:
-			b.action = item.Action.ID
-			b.endAction(item.Action)
-		}
-		if value, done := b.outcome(); done {
-			b.finalOutcome, b.terminal = value, true
-		}
-		if b.activeActions == 0 && (b.terminal || b.startedActions >= b.setup.Rules.MaxActions) {
-			b.done = true
-			break
-		}
-	}
-	b.emitted = len(b.events)
-	return b.events[start:]
-}
-
-// Flush 返回自上次 Advance/Flush 之后新产生的事件（例如 Finalize 产生的 BattleEnded），
+// Flush 返回自上次读取事件 之后新产生的事件（例如 Finalize 产生的 BattleEnded），
 // 并把游标推到末尾。
 func (b *Battle) Flush() []*pb.BattleEvent {
 	start := b.emitted
@@ -559,7 +489,7 @@ func (b *Battle) Finalize() (Result, error) {
 	if b.finished {
 		return b.cached, nil
 	}
-	if !b.terminal {
+	if !b.done {
 		if value, done := b.outcome(); done {
 			b.finalOutcome = value
 		}
@@ -571,7 +501,7 @@ func (b *Battle) Finalize() (Result, error) {
 		0, 0, 0,
 		eventInfo{Outcome: b.finalOutcome}, nil,
 	)
-	result := Result{BattleID: b.setup.BattleID, BattleType: b.setup.BattleType, Outcome: b.finalOutcome, Tick: b.tick, TickDurationMS: b.setup.Rules.TickDurationMS, Units: b.UnitResults(), Events: append([]*pb.BattleEvent(nil), b.events...)}
+	result := Result{BattleID: b.setup.BattleID, BattleType: b.setup.BattleType, Outcome: b.finalOutcome, ElapsedMs: b.elapsedMS, Units: b.UnitResults(), Events: append([]*pb.BattleEvent(nil), b.events...)}
 	checksum, err := resultChecksum(result)
 	if err != nil {
 		return Result{}, err
@@ -581,12 +511,15 @@ func (b *Battle) Finalize() (Result, error) {
 	return result, nil
 }
 
+// max 返回两个数中的较大值。
 func max(left, right int64) int64 {
 	if left > right {
 		return left
 	}
 	return right
 }
+
+// min 返回两个数中的较小值。
 func min(left, right int64) int64 {
 	if left < right {
 		return left
@@ -596,5 +529,12 @@ func min(left, right int64) int64 {
 
 // snapshot 返回单位血量、阵营和归属快照，供开场、入场和终局复用。
 func (u *unit) snapshot() *pb.BattleUnitResult {
+	snapshot := u.healthSnapshot()
+	snapshot.ReceivedGrants = append([]*pb.BattleGrant(nil), u.grants...)
+	return snapshot
+}
+
+// healthSnapshot 提取当前单位血量，单次增益事件只需携带此次新增记录。
+func (u *unit) healthSnapshot() *pb.BattleUnitResult {
 	return &pb.BattleUnitResult{OwnerUid: u.Config.OwnerUID, InstanceId: u.Config.InstanceID, Team: u.Config.Team, Hp: u.HP, MaxHp: u.Config.MaxHP, Alive: u.alive()}
 }

@@ -44,7 +44,6 @@ func (c *client) playBattle() error {
 	var control *pb.BattleControl
 	var battleID string
 	var sequence uint64
-	var frame time.Duration
 	var fire <-chan time.Time
 	var useBasic bool
 	for {
@@ -86,23 +85,22 @@ func (c *client) playBattle() error {
 				}
 				control = msg.GetControls()[0]
 				battleID = msg.GetBattleId()
-				frame = time.Duration(msg.GetTickDurationMs()) * time.Millisecond
 				sequence = max(sequence, control.GetLastInputSequence())
 				if *users == 1 {
-					log.Printf("战斗 %s 当前帧 %d", battleID, msg.GetCurrentTick())
+					log.Printf("战斗 %s 当前战斗时间 %d", battleID, msg.GetCurrentMs())
 				}
-				fire = time.After(time.Duration(max(0, control.GetNextReadyTick()-msg.GetCurrentTick())) * frame)
+				fire = time.After(time.Duration(max(0, control.GetNextReadyMs()-msg.GetCurrentMs())) * time.Millisecond)
 			case *pb.BattleActionNtf:
 				if *users == 1 && msg.GetBattleId() == battleID {
 					event := msg.GetEvent()
-					log.Printf("帧 %d %s 单位=%s 技能=%s 目标=%s 数值=%d", event.GetTick(), event.GetType(), event.GetActorId(), event.GetSkillId(), event.GetTargetId(), event.GetAmount())
+					log.Printf("战斗毫秒 %d %s 单位=%s 技能=%s 目标=%s 数值=%d", event.GetElapsedMs(), event.GetType(), event.GetActorId(), event.GetSkillId(), event.GetTargetId(), event.GetAmount())
 				}
 			case *pb.BattleInputAck:
 				if msg.GetBattleId() != battleID || msg.GetSequence() != sequence {
 					continue
 				}
 				useBasic = msg.GetCode() != pb_common.ErrCode_OK
-				fire = time.After(time.Duration(max(1, msg.GetReadyTick()-msg.GetCurrentTick())) * frame)
+				fire = time.After(time.Duration(max(1, msg.GetReadyMs()-msg.GetCurrentMs())) * time.Millisecond)
 			case *pb.BattleFinishedNtf:
 				if msg.GetBattleId() == battleID {
 					return nil

@@ -34,18 +34,13 @@ type EffectConfig struct {
 	Status              *StatusConfig
 }
 
-// DefaultTickDurationMS 是旧规则未配置 tick 时长时使用的兼容默认值。
-const DefaultTickDurationMS int32 = 100
-
 // SkillConfig 表示运行时技能配置。
 type SkillConfig struct {
-	ID            string
-	Cooldown      int
-	TargetRule    pb.TargetRule
-	Effects       []EffectConfig
-	Charges       []ChargeEffectConfig // 本技能每次有效命中对出手单位积攒值的贡献。
-	WindupTicks   int64
-	RecoveryTicks int64
+	ID         string
+	Cooldown   int
+	TargetRule pb.TargetRule
+	Effects    []EffectConfig
+	Charges    []ChargeEffectConfig // 本技能每次有效命中对出手单位积攒值的贡献。
 }
 
 // ChargeEffectConfig 表示一次有效命中对出手单位积攒值的贡献和满值效果。
@@ -62,7 +57,7 @@ type ChargeEffectConfig struct {
 type UnitConfig struct {
 	OwnerUID        uint64          // 玩家控制者编号，怪物为零。
 	CastRules       []strategy.Rule // 本单位按配置顺序执行的条件施法规则。
-	RobotFirstDelay int64           // 机器人首次决策距开战的逻辑帧数。
+	RobotFirstDelay int64           // 机器人首次决策距开战的毫秒数。
 	RobotSequence   []string        // 机器人按顺序循环使用的技能编号。
 	InstanceID      string
 	Team            pb.BattleTeam
@@ -80,8 +75,7 @@ type UnitConfig struct {
 // Rules 表示 BattleActor 已从 glconf 读取的本场规则。
 type Rules struct {
 	ATBThreshold           int64
-	MaxActions             int
-	TickDurationMS         int32
+	MaxDurationMS          int64 // 从开场起算的战斗时长上限（毫秒）。
 	DamageVariancePermille int64
 	CritChancePermille     int64
 	CritMultiplierPermille int64
@@ -101,22 +95,16 @@ type Setup struct {
 
 // Result 是确定性战斗的运行结果。
 type Result struct {
-	BattleID       string                 `json:"battle_id"`
-	BattleType     pb.BattleType          `json:"battle_type"`
-	Outcome        pb.BattleOutcome       `json:"outcome"`
-	Tick           int64                  `json:"tick"`
-	TickDurationMS int32                  `json:"tick_duration_ms"`
-	Units          []*pb.BattleUnitResult `json:"units"`
-	Events         []*pb.BattleEvent      `json:"events"`
-	Checksum       string                 `json:"checksum"`
+	BattleID   string                 `json:"battle_id"`
+	BattleType pb.BattleType          `json:"battle_type"`
+	Outcome    pb.BattleOutcome       `json:"outcome"`
+	ElapsedMs  int64                  `json:"elapsed_ms"`
+	Units      []*pb.BattleUnitResult `json:"units"`
+	Events     []*pb.BattleEvent      `json:"events"`
+	Checksum   string                 `json:"checksum"`
 }
 
-func (s *Setup) normalize() {
-	if s.Rules.TickDurationMS <= 0 {
-		s.Rules.TickDurationMS = DefaultTickDurationMS
-	}
-}
-
+// validate 校验战斗初始化参数。
 func (s Setup) validate() error {
 	if s.BattleID == "" {
 		return invalid("battle_id", "required")
@@ -124,8 +112,8 @@ func (s Setup) validate() error {
 	if s.Rules.ATBThreshold <= 0 {
 		return invalid("atb_threshold", "must be positive")
 	}
-	if s.Rules.MaxActions <= 0 {
-		return invalid("max_actions", "must be positive")
+	if s.Rules.MaxDurationMS < 0 {
+		return invalid("max_duration_ms", "cannot be negative")
 	}
 	if len(s.Units) < 2 {
 		return invalid("units", "at least two units required")
@@ -176,9 +164,6 @@ func (s Setup) validate() error {
 					}
 				}
 			}
-			if skill.WindupTicks < 0 || skill.RecoveryTicks < 0 {
-				return invalid("unit.skill.timing", "windup and recovery ticks cannot be negative")
-			}
 			if len(skill.Charges) > 0 {
 				hasDamage := false
 				for _, effect := range skill.Effects {
@@ -214,6 +199,7 @@ func (s Setup) validate() error {
 	return nil
 }
 
+// validateChargeEffect 校验积攒效果的类型、阈值及增量。
 func validateChargeEffect(charge ChargeEffectConfig) error {
 	if charge.Kind != pb.EffectType_EFFECT_TYPE_ICE_BURST && charge.Kind != pb.EffectType_EFFECT_TYPE_THUNDER {
 		return invalid("unit.charge.kind", "must be ice burst or thunder")
@@ -234,4 +220,5 @@ func validateChargeEffect(charge ChargeEffectConfig) error {
 	return nil
 }
 
+// invalid 构造包含字段名和失败原因的校验错误。
 func invalid(field, reason string) error { return fmt.Errorf("invalid %s: %s", field, reason) }

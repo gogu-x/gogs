@@ -3,11 +3,10 @@ package internal
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/gogu-x/gogs/battle/battle/internal/battleconfig"
 	"github.com/gogu-x/gogs/battle/battle/internal/engine"
-	"github.com/gogu-x/gogs/battle/robot"
+
 	"github.com/gogu-x/gogs/def"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 
@@ -27,6 +26,9 @@ const (
 // 注册名 = def.BattleActorName(battleID)，跨进程可被 NATS 按 TaggerName
 // 直达（如 BattleResultConfirmedNtf 确认）。
 type BattleActor struct {
+	offers    map[string][]*pb.BattleGrant // 单位尚未领取的候选，保留发放顺序。
+	roles     map[string]*pb.Role          // 参战角色最近一次权威编译输入。
+	router    tree.Router
 	members   []Member
 	confirmed map[uint64]bool
 	live      *liveBattle
@@ -38,47 +40,32 @@ type BattleActor struct {
 	self      tree.PID
 }
 
+// NewBattleActor 按创建参数构造单场战斗的 Actor。
 func NewBattleActor(p Params) *BattleActor {
 	return &BattleActor{p: p}
 }
 
-func (a *BattleActor) Name() string     { return def.BattleActorName(a.p.BattleID) }
+// Name 返回 Actor 的注册名称。
+func (a *BattleActor) Name() string { return def.BattleActorName(a.p.BattleID) }
+
+// MailboxSize 返回战斗消息邮箱的容量。
 func (a *BattleActor) MailboxSize() int { return battleMailboxSize }
 
+// OnInit 初始化消息路由及运行所需的资源。
 func (a *BattleActor) OnInit(ctx tree.Context) {
 	a.self = ctx.Self()
+	a.registerMessages()
 	a.initTimer()
 	// SpawnOne 等待初始化结束；计算放入邮箱，避免阻塞管理器创建其他战斗。
 	tree.Send(a.self, &beginBattle{})
 }
 
+// OnStop 停止当前 Actor 的调度资源。
 func (a *BattleActor) OnStop(_ tree.Context) { a.stopRobots(); a.stopTimer() }
 
+// HandleMessage 将邮箱消息交给已注册的路由。
 func (a *BattleActor) HandleMessage(ctx tree.Context, msg interface{}) {
-	switch m := msg.(type) {
-	case *robot.Observe:
-		a.observeRobots(ctx, m)
-	case *robot.Command:
-		a.liveInput(ctx, m.Input, true)
-	case *pb.BattleInputReq:
-		a.liveInput(ctx, m, false)
-	case *statusWake:
-		a.liveStatus(ctx)
-	case *pb.StartBattleReq:
-		a.join(ctx, m)
-	case *beginBattle:
-		a.begin(ctx)
-	case *pb.BattleResultConfirmedNtf:
-		if a.p.Battle == nil {
-			a.confirm(ctx, m)
-		}
-	case *retryTick:
-		a.retry(ctx)
-	case *RetireBattle:
-		a.finish(ctx)
-	default:
-		ctx.Response(nil, fmt.Errorf("battle battle %s: unsupported message %T", a.p.BattleID, msg))
-	}
+	a.router.Route(ctx, msg)
 }
 
 // begin 创建即时战斗，或重投已有战报。
@@ -129,12 +116,9 @@ func (a *BattleActor) begin(ctx tree.Context) {
 	}
 }
 
+// notifyCreated 根据战报向玩法服发送战斗创建通知。
 func (a *BattleActor) notifyCreated() {
-	tickDurationMS := a.report.Result.GetTickDurationMS()
-	if tickDurationMS <= 0 {
-		tickDurationMS = engine.DefaultTickDurationMS
-	}
-	created := &pb.BattleCreatedNtf{BattleId: a.p.BattleID, Uid: a.p.UID, TickDurationMs: tickDurationMS}
+	created := &pb.BattleCreatedNtf{BattleId: a.p.BattleID, Uid: a.p.UID}
 	// 参战名单在创建时即已确定，随 Created 一起下发，客户端进战斗页就能把双方单位摆好。
 
 	created.Units = a.report.InitialUnits
@@ -166,22 +150,24 @@ func (a *BattleActor) pushEvents(battleID string, uid uint64, events []*pb.Battl
 	}
 }
 
+// logEvent 记录单条战斗事件。
 func (a *BattleActor) logEvent(event *pb.BattleEvent) {
 	if tlog.Log == nil {
 		return
 	}
 	tlog.Log.Info(
-		"[战斗/过程] battleID=%v seq=%v action=%v tick=%v type=%v actor=%v target=%v skill=%v status=%v amount=%v hp=%v->%v effect=%v statusType=%v critical=%v basic=%v reason=%v outcome=%v",
-		a.p.BattleID, event.GetSequence(), event.GetAction(), event.GetTick(), event.GetType(),
+		"[战斗/过程] battleID=%v seq=%v action=%v elapsedMS=%v type=%v actor=%v target=%v skill=%v status=%v amount=%v hp=%v->%v effect=%v statusType=%v critical=%v basic=%v reason=%v outcome=%v",
+		a.p.BattleID, event.GetSequence(), event.GetAction(), event.GetElapsedMs(), event.GetType(),
 		event.GetActorId(), event.GetTargetId(), event.GetSkillId(), event.GetStatusId(),
 		event.GetAmount(), event.GetHpBefore(), event.GetHpAfter(), event.GetEffectType(),
 		event.GetStatusType(), event.GetCritical(), event.GetBasicAttack(), event.GetReason(), event.GetOutcome(),
 	)
 	if event.GetType() == pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE && event.GetHpBefore() > 0 && event.GetHpAfter() == 0 {
-		tlog.Log.Info("[战斗/死亡] battleID=%v unit=%v killer=%v skill=%v action=%v tick=%v", a.p.BattleID, event.GetTargetId(), event.GetActorId(), event.GetSkillId(), event.GetAction(), event.GetTick())
+		tlog.Log.Info("[战斗/死亡] battleID=%v unit=%v killer=%v skill=%v action=%v elapsedMS=%v", a.p.BattleID, event.GetTargetId(), event.GetActorId(), event.GetSkillId(), event.GetAction(), event.GetElapsedMs())
 	}
 }
 
+// logResult 记录战斗结算结果。
 func (a *BattleActor) logResult(result engine.Result) {
 	if tlog.Log == nil {
 		return
@@ -192,7 +178,7 @@ func (a *BattleActor) logResult(result engine.Result) {
 		}
 		tlog.Log.Info("[战斗/单位] battleID=%v unit=%v team=%v hp=%v/%v alive=%v", result.BattleID, unit.GetInstanceId(), unit.GetTeam(), unit.GetHp(), unit.GetMaxHp(), unit.GetAlive())
 	}
-	tlog.Log.Info("[战斗/结算] 自动战斗完成, battleID=%v uid=%v outcome=%v tick=%v events=%v checksum=%v", result.BattleID, a.p.UID, result.Outcome, result.Tick, len(result.Events), result.Checksum)
+	tlog.Log.Info("[战斗/结算] 自动战斗完成, battleID=%v uid=%v outcome=%v elapsedMS=%v events=%v checksum=%v", result.BattleID, a.p.UID, result.Outcome, result.ElapsedMs, len(result.Events), result.Checksum)
 }
 
 // pushSource 返回战报的投递目标，未指定时使用创建请求的来源节点。
@@ -225,6 +211,7 @@ func (a *BattleActor) pushFinished() {
 	}
 }
 
+// retry 检查战报确认状态并处理重投。
 func (a *BattleActor) retry(ctx tree.Context) {
 	if a.attempts >= a.p.RetryAttempts {
 		a.finish(ctx)
@@ -269,8 +256,10 @@ func (a *BattleActor) finish(ctx tree.Context) {
 	ctx.Stop()
 }
 
+// managerPID 返回管理本场战斗的服务地址。
 func (a *BattleActor) managerPID() tree.PID { return a.p.ManagerPID }
 
+// stopTimer 停止本场战斗的定时器。
 func (a *BattleActor) stopTimer() {
 	if a.timer != nil {
 		a.timer.Stop()

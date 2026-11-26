@@ -30,13 +30,14 @@ type RoleSkillProgression interface {
 
 type configuredRoleSkillProgression struct{}
 
+// Apply 保留配置中编译好的技能属性。
 func (configuredRoleSkillProgression) Apply(_ *pb.RoleSkill, skill engine.SkillConfig) (engine.SkillConfig, error) {
 	return skill, nil
 }
 
 type configuredRoleStatCalculator struct{}
 
-// CalculateRoleAttributes shares authoritative attribute compilation with read-only previews.
+// CalculateRoleAttributes 根据角色及装备数据计算参战属性。
 func (c *Compiler) CalculateRoleAttributes(role *pb.Role) (RoleAttributes, error) {
 	if c == nil {
 		return RoleAttributes{}, fmt.Errorf("battle config compiler is not initialized")
@@ -51,6 +52,7 @@ func (c *Compiler) CalculateRoleAttributes(role *pb.Role) (RoleAttributes, error
 	return c.applyRoleEquips(role, config)
 }
 
+// Calculate 叠加装备属性后应用角色成长系数。
 func (configuredRoleStatCalculator) Calculate(roleState *pb.Role, role *glconf.BattleRoleCfg, equips []*glconf.BattleEquipCfg) (RoleAttributes, error) {
 	attributes := RoleAttributes{MaxHP: role.MaxHP, Attack: role.Attack, Defense: role.Defense, Speed: role.Speed}
 	for _, equip := range equips {
@@ -80,6 +82,7 @@ func (configuredRoleStatCalculator) Calculate(roleState *pb.Role, role *glconf.B
 	return attributes, nil
 }
 
+// scaleGrowth 按千分比计算成长属性并检查数值范围。
 func scaleGrowth(base int64, permille int32) (int64, error) {
 	if permille < 0 {
 		return 0, fmt.Errorf("growth modifier out of range: %d", permille)

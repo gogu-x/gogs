@@ -72,7 +72,7 @@ func battleLoadoutPlayer(t *testing.T) *player.Player {
 	}
 	if err := glconf.SetBattleConfigsForTest(
 		[]*glconf.BattleRoleCfg{{CfgID: 1, MaxHP: 1000, Attack: 1000, Defense: 1000, Speed: 1000, DefaultPosition: 1, BasicSkillID: 1}},
-		[]*glconf.BattleSkillCfg{{CfgID: 1, TargetRule: int32(pb.TargetRule_TARGET_RULE_ENEMY_SINGLE), WindupTicks: 1, RecoveryTicks: 1, Effects: []*pb_common.TypIDVal{{Typ: "battle_damage", Pro: 1000}}}},
+		[]*glconf.BattleSkillCfg{{CfgID: 1, TargetRule: int32(pb.TargetRule_TARGET_RULE_ENEMY_SINGLE), Effects: []*pb_common.TypIDVal{{Typ: "battle_damage", Pro: 1000}}}},
 		[]*glconf.BattleEquipCfg{
 			{CfgID: 77, Slot: 17, Modifier: []*pb_common.TypIDVal{{Typ: "battle_attribute", Id: 1, Val: 20}, {Typ: "battle_attribute", Id: 2, Val: 100}, {Typ: "battle_attribute", Id: 3, Val: 200}, {Typ: "battle_attribute", Id: 4, Val: 300}}},
 			{CfgID: 91, Slot: 17, Modifier: []*pb_common.TypIDVal{{Typ: "battle_attribute", Id: 1, Val: 200}, {Typ: "battle_attribute", Id: 2, Val: 200}, {Typ: "battle_attribute", Id: 3, Val: 300}, {Typ: "battle_attribute", Id: 4, Val: 400}}},
@@ -80,7 +80,7 @@ func battleLoadoutPlayer(t *testing.T) *player.Player {
 		},
 		[]*glconf.BattleMonsterCfg{{CfgID: 1, MaxHP: 1000, Attack: 100, Defense: 100, Speed: 100, BasicSkillID: 1}},
 		[]*glconf.BattleMonsterGroupCfg{{CfgID: 1, Members: []*pb_common.TypIDVal{{Typ: "battle_monster", Id: 1, Val: 1}}}},
-		[]*glconf.BattleRuleCfg{{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 1000, MaxActions: 20, CritMultiplierPermille: 1500}},
+		[]*glconf.BattleRuleCfg{{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 1000, CritMultiplierPermille: 1500}},
 	); err != nil {
 		t.Fatal(err)
 	}

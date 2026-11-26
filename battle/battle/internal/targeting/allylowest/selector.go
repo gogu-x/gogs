@@ -8,6 +8,7 @@ import (
 
 type Selector struct{}
 
+// Select 选取生命值最低的友方目标。
 func (Selector) Select(query engine.TargetQuery) []engine.UnitView {
 	selected := make([]engine.UnitView, 0)
 	for _, unit := range query.Units {

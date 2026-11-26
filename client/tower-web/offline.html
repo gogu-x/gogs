@@ -1,0 +1,5 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>照夜塔 · 即时爬塔</title><link rel="stylesheet" href="style.css">
+<main><header><div><small>剑阁 / 离线试玩</small><h1>照夜塔</h1></div><a href="index.html">联机战斗</a><span id="floor"></span></header>
+<section class="arena"><canvas aria-label="月下山门战场"></canvas><div class="overlay"><div><small>守关试炼</small><h2 id="place"></h2></div><button id="start"></button></div><button id="drop" hidden></button></section>
+<section class="hud"><div class="player"><small>我方剑修</small><h3>执剑人</h3><progress id="hp"></progress><output id="life"></output><div id="gear" role="status"></div></div><div><small>锁定敌方</small><div id="targets"></div></div></section>
+<button id="auto" aria-pressed="false" disabled>开启自动</button><div id="actions"></div><footer><span id="log" role="status"></span></footer></main><script src="scene.js"></script><script src="game.js"></script></html>

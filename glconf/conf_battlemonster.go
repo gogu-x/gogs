@@ -14,17 +14,17 @@ var csvBattleMonsterCfg atomic.Value
 
 // BattleMonsterCfg 表示 BattleMonsterCfg 配置记录。
 type BattleMonsterCfg struct {
-	CfgID             int32            `bson:"id"`                   // 怪物配置 ID
-	MaxHP             int64            `bson:"max_hp"`               // 基础最大生命
-	Attack            int64            `bson:"attack"`               // 基础攻击
-	Defense           int64            `bson:"defense"`              // 基础防御
-	Speed             int64            `bson:"speed"`                // 基础速度
-	BasicSkillID      int32            `bson:"basic_skill_id"`       // 普攻技能 ID
-	ActiveSkillIDs    []int32          `bson:"active_skill_ids"`     // 主动技能 ID
-	InitialStatusIDs  []int32          `bson:"initial_status_ids"`   // 初始状态 ID
-	AISkillSequence   []int32          `bson:"ai_skill_sequence"`    // 机器人循环出招顺序，填写普攻或已携带的主动技能编号
-	AIFirstDelayTicks int32            `bson:"ai_first_delay_ticks"` // 机器人首次出手延迟（逻辑帧），0 表示开场即可行动
-	AICastRules       []*cspb.TypIDVal `bson:"ai_cast_rules"`        // 施法规则按顺序匹配：Typ 条件，ID 技能，Val 血量千分比或敌人数
+	CfgID            int32            `bson:"id"`                 // 怪物配置 ID
+	MaxHP            int64            `bson:"max_hp"`             // 基础最大生命
+	Attack           int64            `bson:"attack"`             // 基础攻击
+	Defense          int64            `bson:"defense"`            // 基础防御
+	Speed            int64            `bson:"speed"`              // 基础速度
+	BasicSkillID     int32            `bson:"basic_skill_id"`     // 普攻技能 ID
+	ActiveSkillIDs   []int32          `bson:"active_skill_ids"`   // 主动技能 ID
+	InitialStatusIDs []int32          `bson:"initial_status_ids"` // 初始状态 ID
+	AISkillSequence  []int32          `bson:"ai_skill_sequence"`  // 机器人循环出招顺序，填写普攻或已携带的主动技能编号
+	AIFirstDelayMS   int32            `bson:"ai_first_delay_ms"`  // 机器人首次出手延迟（逻辑毫秒），0 表示开场即可行动
+	AICastRules      []*cspb.TypIDVal `bson:"ai_cast_rules"`      // 施法规则按顺序匹配：Typ 条件，ID 技能，Val 血量千分比或敌人数
 }
 
 func loadBattleMonsterCfg(dbURI, dbName, confName string) (*CsvConf, error) {

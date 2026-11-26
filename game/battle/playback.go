@@ -8,37 +8,31 @@ import (
 
 // playbackWindow 将逻辑时间映射为下一场战斗的最早准入时间。
 type playbackWindow struct {
-	tickDuration time.Duration // 单个逻辑帧时长。
-	firstTick    int64         // 首个事件的逻辑帧，保持首个动作立即播放的约定。
-	anchor       time.Time     // 首个事件接收时间。
-	readyAt      time.Time     // 当前已知事件覆盖的结束时间。
+	firstMS int64     // 首个事件的毫秒时间，保持首个动作立即播放的约定。
+	anchor  time.Time // 首个事件接收时间。
+	readyAt time.Time // 当前已知事件覆盖的结束时间。
 }
 
-// newPlaybackWindow 创建演出窗口，未配置时沿用协议的默认逻辑帧时长。
-func newPlaybackWindow(tickDurationMS int32) *playbackWindow {
-	if tickDurationMS <= 0 {
-		tickDurationMS = 100
-	}
-	return &playbackWindow{tickDuration: time.Duration(tickDurationMS) * time.Millisecond}
-}
+// newPlaybackWindow 创建演出窗口，使用战斗经过毫秒计算事件间隔。
+func newPlaybackWindow() *playbackWindow { return &playbackWindow{} }
 
 // observe 记录最终逻辑时间和动作窗口，计算期间不等待真实时间。
 func (p *playbackWindow) observe(event *pb.BattleEvent, now time.Time) {
 	if p == nil || event == nil {
 		return
 	}
-	tick := event.GetTick()
+	elapsedMS := event.GetElapsedMs()
 	if p.anchor.IsZero() {
 		p.anchor = now
-		p.firstTick = tick
+		p.firstMS = elapsedMS
 	}
-	if end := event.GetEndTick(); end > tick {
-		tick = end
+	if end := event.GetEndMs(); end > elapsedMS {
+		elapsedMS = end
 	}
-	if tick < p.firstTick {
+	if elapsedMS < p.firstMS {
 		return
 	}
-	readyAt := p.anchor.Add(time.Duration(tick-p.firstTick) * p.tickDuration)
+	readyAt := p.anchor.Add(time.Duration(elapsedMS-p.firstMS) * time.Millisecond)
 	if readyAt.After(p.readyAt) {
 		p.readyAt = readyAt
 	}

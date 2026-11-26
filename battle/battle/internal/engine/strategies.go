@@ -46,7 +46,7 @@ type StatusInstance struct {
 	InstanceID uint64       // 本场战斗内唯一实例编号。
 	SourceID   string       // 施加者实例编号。
 	SkillID    string       // 来源技能编号。
-	ExpireTick int64        // 到期逻辑帧，回合模式为零。
+	ExpireMs   int64        // 到期毫秒时间，回合模式为零。
 	Version    uint64       // 刷新版本。
 }
 type StatusTickResult struct {
@@ -133,6 +133,7 @@ type Strategies struct {
 	Statuses StatusHandler
 }
 
+// validate 检查引擎需要的策略是否全部配置。
 func (s Strategies) validate() error {
 	if s.Targets == nil {
 		return fmt.Errorf("battle strategy is not configured: target selector")

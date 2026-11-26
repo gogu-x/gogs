@@ -8,20 +8,23 @@ import (
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
+// testSetup 构建可重复使用的双阵营测试数据。
 func testSetup() Setup {
 	basic := SkillConfig{ID: "basic", TargetRule: pb.TargetRule_TARGET_RULE_ENEMY_SINGLE, Effects: []EffectConfig{{Kind: pb.EffectType_EFFECT_TYPE_DAMAGE, CoefficientPermille: 1000}}}
-	return Setup{BattleID: "battle-1", Seed: 42, Rules: Rules{ATBThreshold: 1000, MaxActions: 20, CritMultiplierPermille: 1500}, Units: []UnitConfig{
+	return Setup{BattleID: "battle-1", Seed: 42, Rules: Rules{ATBThreshold: 1000, CritMultiplierPermille: 1500}, Units: []UnitConfig{
 		{InstanceID: "a", Team: pb.BattleTeam_BATTLE_TEAM_ATTACKER, MaxHP: 100, Attack: 30, Defense: 10, Speed: 100, BasicSkill: basic},
 		{InstanceID: "d", Team: pb.BattleTeam_BATTLE_TEAM_DEFENDER, MaxHP: 100, Attack: 20, Defense: 10, Speed: 50, BasicSkill: basic},
 	}, Strategies: testStrategies()}
 }
 
+// testStrategies 组装引擎测试使用的策略实现。
 func testStrategies() Strategies {
 	return Strategies{Targets: testTargets{}, Skills: testSkills{}, Effects: testEffects{}, Damage: testDamage{}, Statuses: testStatuses{}}
 }
 
 type testTargets struct{}
 
+// Select 按目标规则选取符合条件的单位。
 func (testTargets) Select(query TargetQuery) []string {
 	candidates := make([]UnitView, 0, len(query.Units))
 	for _, unit := range query.Units {
@@ -55,6 +58,7 @@ func (testTargets) Select(query TargetQuery) []string {
 
 type testSkills struct{}
 
+// Execute 逐项结算测试技能的效果。
 func (testSkills) Execute(context SkillExecutionContext) ([]EffectResolution, error) {
 	results := make([]EffectResolution, 0, len(context.Skill.Effects))
 	for _, effect := range context.Skill.Effects {
@@ -69,11 +73,13 @@ func (testSkills) Execute(context SkillExecutionContext) ([]EffectResolution, er
 
 type testEffects struct{}
 
+// Resolve 根据技能效果计算结算结果。
 func (testEffects) Resolve(context EffectContext) (EffectResolution, error) {
 	result := context.Damage.Calculate(DamageInput{Attack: context.Actor.Attack, Defense: context.Target.Defense, CoefficientPermille: context.Effect.CoefficientPermille, Flat: context.Effect.Flat}, context.RNG)
 	return EffectResolution{Kind: pb.EffectType_EFFECT_TYPE_DAMAGE, Amount: result.Amount}, nil
 }
 
+// Apply 将结算结果应用到目标。
 func (testEffects) Apply(context EffectApplyContext, result EffectResolution) error {
 	before := context.Target.HP()
 	amount := min(result.Amount, before)
@@ -87,6 +93,7 @@ func (testEffects) Apply(context EffectApplyContext, result EffectResolution) er
 
 type testDamage struct{}
 
+// Calculate 根据攻防差值和技能系数计算测试伤害。
 func (testDamage) Calculate(input DamageInput, _ *RNG) DamageResult {
 	amount := (input.Attack-input.Defense)*input.CoefficientPermille/1000 + input.Flat
 	if amount < 1 {
@@ -97,6 +104,7 @@ func (testDamage) Calculate(input DamageInput, _ *RNG) DamageResult {
 
 type testStatuses struct{}
 
+// Has 判断指定类型的状态是否仍然有效。
 func (testStatuses) Has(statuses []StatusInstance, kind pb.StatusType) bool {
 	for _, status := range statuses {
 		if status.Remaining > 0 && status.Config.Kind == kind {
@@ -105,11 +113,19 @@ func (testStatuses) Has(statuses []StatusInstance, kind pb.StatusType) bool {
 	}
 	return false
 }
+
+// Modifier 汇总有效状态的属性修正。
 func (testStatuses) Modifier([]StatusInstance) AttributeModifier { return AttributeModifier{} }
+
+// Apply 根据配置添加或更新目标状态。
 func (testStatuses) Apply(statuses []StatusInstance, config StatusConfig) ([]StatusInstance, error) {
 	return append(statuses, StatusInstance{Config: config, Remaining: config.DurationTurns}), nil
 }
+
+// Tick 计算一次周期状态触发的结果。
 func (testStatuses) Tick(StatusInstance) StatusTickResult { return StatusTickResult{} }
+
+// Expire 更新状态剩余回合并移除已失效的状态。
 func (testStatuses) Expire(statuses []StatusInstance) []StatusInstance {
 	kept := statuses[:0]
 	for _, status := range statuses {
@@ -121,21 +137,23 @@ func (testStatuses) Expire(statuses []StatusInstance) []StatusInstance {
 	return kept
 }
 
+// TestBattleDeterministicResult 验证相同输入和种子产生相同战斗结果。
 func TestBattleDeterministicResult(t *testing.T) {
 	setup := testSetup()
-	first, err := newTimelineFixture(setup)
+	setup.Units[1].MaxHP = 1
+	first, err := NewBattle(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstResult, err := first.Run()
+	firstResult, err := finishWithBasicAttack(t, first)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := newTimelineFixture(setup)
+	second, err := NewBattle(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondResult, err := second.Run()
+	secondResult, err := finishWithBasicAttack(t, second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,127 +166,16 @@ func TestBattleDeterministicResult(t *testing.T) {
 	}
 }
 
-// TestBattleAdvanceMatchesRun 是流式推送改造的等价性守卫：按 tick 分批推进（NextTick/Advance/Flush）
-// 必须与一次性 Run 产生完全相同的事件流与校验和。任何 tick 相位、事件顺序或终止时机的漂移
-// 都会被这里捕获。
-func TestBattleAdvanceMatchesRun(t *testing.T) {
-	setup := testSetup()
-	batch, err := newTimelineFixture(setup)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var streamed []*pb.BattleEvent
-	batches := 0
-	for {
-		next, ok := batch.NextTick()
-		if !ok {
-			break
-		}
-		if next <= 0 {
-			t.Fatalf("NextTick 返回了非正 tick: %d", next)
-		}
-		// Advance 只返回当前 tick 的事件，不得越界到后续 tick。
-		events := batch.Advance()
-		for _, event := range events {
-			if event.Tick != next {
-				t.Fatalf("Advance 越过了 tick 边界: 期望 %d, 实际 %d", next, event.Tick)
-			}
-		}
-		streamed = append(streamed, events...)
-		batches++
-	}
-	batchResult, err := batch.Finalize()
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Finalize 会产生收尾的 BattleEnded 事件，必须能通过 Flush 取到。
-	streamed = append(streamed, batch.Flush()...)
-
-	oneShot, err := newTimelineFixture(setup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	oneShotResult, err := oneShot.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if batchResult.Checksum != oneShotResult.Checksum {
-		t.Fatalf("checksum 不一致: advance=%s run=%s", batchResult.Checksum, oneShotResult.Checksum)
-	}
-	if !reflect.DeepEqual(batchResult.Events, oneShotResult.Events) {
-		t.Fatalf("结果事件流不一致:\nadvance=%#v\nrun=%#v", batchResult.Events, oneShotResult.Events)
-	}
-	if !reflect.DeepEqual(streamed, oneShotResult.Events) {
-		t.Fatalf("分批推送的事件与完整事件流不一致:\nstreamed=%#v\nrun=%#v", streamed, oneShotResult.Events)
-	}
-	if batches < 2 {
-		t.Fatalf("期望产生多个 tick 批次,实际只有 %d 个", batches)
-	}
-	t.Logf("按 tick 分批: batches=%d events=%d", batches, len(streamed))
-}
-
-// TestSkillUsedCarriesMotionWindow 锁定客户端契约：SKILL_USED 事件必须自带
-// start/impact/end 三个 tick，且与随后真正到达的 DAMAGE / ACTION_ENDED 完全一致。
-// 客户端据此可以在收到单条事件时立刻起播攻击动作，不必等待动作结束的 ACTION_ENDED。
-func TestSkillUsedCarriesMotionWindow(t *testing.T) {
-	setup := testSetup()
-	setup.Rules.MaxActions = 4
-	setup.Units[0].Speed = 100
-	setup.Units[1].Speed = 100
-	setup.Units[0].BasicSkill.WindupTicks = 3
-	setup.Units[0].BasicSkill.RecoveryTicks = 2
-	setup.Units[1].BasicSkill.WindupTicks = 3
-	setup.Units[1].BasicSkill.RecoveryTicks = 2
-
-	battle, err := newTimelineFixture(setup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result, err := battle.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	checked := 0
-	for _, event := range result.Events {
-		if event.Type != pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED {
-			continue
-		}
-		if event.StartTick <= 0 || event.ImpactTick <= 0 || event.EndTick <= 0 {
-			t.Fatalf("action %d 的 SKILL_USED 未携带完整窗口: %#v", event.Action, event)
-		}
-		if event.StartTick != event.Tick {
-			t.Fatalf("action %d: start_tick=%d 与 tick=%d 不一致", event.Action, event.StartTick, event.Tick)
-		}
-		if !(event.StartTick < event.ImpactTick && event.ImpactTick < event.EndTick) {
-			t.Fatalf("action %d: 窗口顺序非法 %d/%d/%d", event.Action, event.StartTick, event.ImpactTick, event.EndTick)
-		}
-		if end := eventOfType(result.Events, event.Action, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED); end == nil {
-			t.Fatalf("action %d: 缺少 ACTION_ENDED", event.Action)
-		} else if end.Tick != event.EndTick {
-			t.Fatalf("action %d: end.Tick=%d 与 end_tick=%d 不一致", event.Action, end.Tick, event.EndTick)
-		}
-		// 被取消的动作没有 DAMAGE，但窗口本身仍须指向 impact tick。
-		if damage := eventOfType(result.Events, event.Action, pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE); damage != nil && damage.Tick != event.ImpactTick {
-			t.Fatalf("action %d: damage.Tick=%d 与 impact_tick=%d 不一致", event.Action, damage.Tick, event.ImpactTick)
-		}
-		checked++
-	}
-	if checked == 0 {
-		t.Fatal("没有任何 SKILL_USED 事件被检查")
-	}
-}
-
 // TestBattleFinalizeIsIdempotent 锁定 Finalize 的幂等语义：重复调用返回同一结果，
 // 且不会重复追加 BattleEnded 事件。
 func TestBattleFinalizeIsIdempotent(t *testing.T) {
-	battle, err := newTimelineFixture(testSetup())
+	setup := testSetup()
+	setup.Units[1].MaxHP = 1
+	battle, err := NewBattle(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := battle.Run()
+	first, err := finishWithBasicAttack(t, battle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,20 +188,24 @@ func TestBattleFinalizeIsIdempotent(t *testing.T) {
 	}
 }
 
+// TestBattleRequiresBothTeams 验证缺少任一方阵营时无法创建战斗。
 func TestBattleRequiresBothTeams(t *testing.T) {
 	setup := testSetup()
 	setup.Units = setup.Units[:1]
-	if _, err := newTimelineFixture(setup); err == nil {
+	if _, err := NewBattle(setup); err == nil {
 		t.Fatal("expected validation error")
 	}
 }
 
+// TestBasicAttackEventMarkedForCollisionPresentation 验证普攻事件包含碰撞表现所需的标记。
 func TestBasicAttackEventMarkedForCollisionPresentation(t *testing.T) {
-	battle, err := newTimelineFixture(testSetup())
+	setup := testSetup()
+	setup.Units[1].MaxHP = 1
+	battle, err := NewBattle(setup)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := battle.Run()
+	result, err := finishWithBasicAttack(t, battle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,228 +220,12 @@ func TestBasicAttackEventMarkedForCollisionPresentation(t *testing.T) {
 	t.Fatal("battle emitted no skill-used event")
 }
 
-func eventOfType(events []*pb.BattleEvent, action uint64, kind pb.BattleEventType) *pb.BattleEvent {
-	for _, event := range events {
-		if event.GetAction() == action && event.GetType() == kind {
-			return event
-		}
-	}
-	return nil
-}
-
-func TestTimelineAllowsDifferentUnitsToOverlap(t *testing.T) {
-	setup := testSetup()
-	setup.Rules.MaxActions = 4
-	setup.Units[0].Speed = 100
-	setup.Units[1].Speed = 100
-	setup.Units[0].BasicSkill.WindupTicks = 3
-	setup.Units[0].BasicSkill.RecoveryTicks = 2
-	setup.Units[1].BasicSkill.WindupTicks = 3
-	setup.Units[1].BasicSkill.RecoveryTicks = 2
-
-	battle, err := newTimelineFixture(setup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result, err := battle.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	firstStart := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED)
-	secondStart := eventOfType(result.Events, 2, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED)
-	firstDamage := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE)
-	secondDamage := eventOfType(result.Events, 2, pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE)
-	firstEnd := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED)
-	if firstStart == nil || secondStart == nil || firstDamage == nil || secondDamage == nil || firstEnd == nil {
-		t.Fatalf("missing phased events: %#v", result.Events)
-	}
-	if firstStart.Tick != secondStart.Tick || secondStart.Tick >= firstEnd.Tick {
-		t.Fatalf("actions did not overlap: first=%d..%d second=%d", firstStart.Tick, firstEnd.Tick, secondStart.Tick)
-	}
-	if firstDamage.Tick != firstStart.Tick+3 || firstEnd.Tick != firstDamage.Tick+2 {
-		t.Fatalf("unexpected phases: start=%d impact=%d end=%d", firstStart.Tick, firstDamage.Tick, firstEnd.Tick)
-	}
-	if secondDamage.Tick != firstDamage.Tick || secondDamage.Sequence <= firstDamage.Sequence {
-		t.Fatalf("same-tick impact order is unstable: first=%#v second=%#v", firstDamage, secondDamage)
-	}
-	if len(firstStart.TargetIds) != 1 || firstStart.TargetIds[0] == "" {
-		t.Fatalf("ActionStarted target_ids = %#v", firstStart.TargetIds)
-	}
-
-	lastEndByActor := map[string]int64{}
-	for _, event := range result.Events {
-		switch event.Type {
-		case pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED:
-			if end, exists := lastEndByActor[event.ActorId]; exists && event.Tick < end {
-				t.Fatalf("actor %s restarted at %d before end %d", event.ActorId, event.Tick, end)
-			}
-		case pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED:
-			lastEndByActor[event.ActorId] = event.Tick
-		}
-	}
-}
-
-func TestMeleeImpactCancelledWhenAttackerDiesDuringWindup(t *testing.T) {
-	setup := testSetup()
-	setup.Rules.MaxActions = 2
-	setup.Units[0].MaxHP = 20
-	setup.Units[0].Speed = 100
-	setup.Units[0].BasicSkill.WindupTicks = 5
-	setup.Units[1].Attack = 100
-	setup.Units[1].Speed = 100
-	setup.Units[1].BasicSkill.WindupTicks = 1
-
-	battle, err := newTimelineFixture(setup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result, err := battle.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cancelled := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED)
-	if cancelled == nil || cancelled.GetReason() != pb.BattleEventReason_BATTLE_EVENT_REASON_ACTOR_DEAD || cancelled.Tick != 15 {
-		t.Fatalf("attacker cancellation = %#v", cancelled)
-	}
-	if damage := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE); damage != nil {
-		t.Fatalf("dead melee attacker still dealt damage: %#v", damage)
-	}
-}
-
-func TestImpactCancelledWhenSnapshottedTargetDies(t *testing.T) {
-	setup := testSetup()
-	setup.Rules.MaxActions = 3
-	setup.Units[0].Attack = 200
-	setup.Units[0].Speed = 100
-	setup.Units[0].BasicSkill.WindupTicks = 1
-	second := setup.Units[0]
-	second.InstanceID = "b"
-	second.Position = 2
-	second.Attack = 30
-	second.BasicSkill.WindupTicks = 3
-	setup.Units = append([]UnitConfig{setup.Units[0], second}, setup.Units[1])
-	setup.Units[2].Position = 3
-	setup.Units[2].Speed = 100
-	setup.Units[2].BasicSkill.WindupTicks = 4
-
-	battle, err := newTimelineFixture(setup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result, err := battle.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cancelled := eventOfType(result.Events, 2, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED)
-	if cancelled == nil || cancelled.GetReason() != pb.BattleEventReason_BATTLE_EVENT_REASON_TARGET_DEAD || cancelled.TargetId != "d" {
-		t.Fatalf("target cancellation = %#v", cancelled)
-	}
-}
-
-func TestLegacyTimingDefaults(t *testing.T) {
-	battle, err := newTimelineFixture(testSetup())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if battle.TickDurationMS() != DefaultTickDurationMS {
-		t.Fatalf("tick duration = %d, want %d", battle.TickDurationMS(), DefaultTickDurationMS)
-	}
-}
-
-func TestActiveSkillImpactCancelledWhenAttackerDiesDuringWindup(t *testing.T) {
-	setup := testSetup()
-	setup.Rules.MaxActions = 2
-	setup.Units[0].MaxHP = 20
-	setup.Units[0].Speed = 100
-	active := setup.Units[0].BasicSkill
-	active.ID = "active"
-	active.WindupTicks = 5
-	active.Cooldown = 2
-	setup.Units[0].ActiveSkills = []SkillConfig{active}
-	setup.Units[1].Attack = 100
-	setup.Units[1].Speed = 100
-	setup.Units[1].BasicSkill.WindupTicks = 1
-
-	battle, err := newTimelineFixture(setup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result, err := battle.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cancelled := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_CANCELLED)
-	if cancelled == nil || cancelled.GetReason() != pb.BattleEventReason_BATTLE_EVENT_REASON_ACTOR_DEAD || cancelled.SkillId != "active" {
-		t.Fatalf("active skill cancellation = %#v", cancelled)
-	}
-	if damage := eventOfType(result.Events, 1, pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE); damage != nil {
-		t.Fatalf("dead active-skill attacker still dealt damage: %#v", damage)
-	}
-}
-
-// TestAttackSpeedShortensMotionWindow 验证高速度缩短行动间隔及对应动作窗口。
-func TestAttackSpeedShortensMotionWindow(t *testing.T) {
-	setup := testSetup()
-	setup.Rules.MaxActions = 8
-	setup.Units[0].Speed = 500
-	setup.Units[0].BasicSkill.WindupTicks = 3
-	setup.Units[0].BasicSkill.RecoveryTicks = 3
-	setup.Units[0].Attack = 1
-	setup.Units[1].Attack = 1
-	setup.Units[1].MaxHP = 10000
-	battle, err := newTimelineFixture(setup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result, err := battle.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var previous *pb.BattleEvent
-	count := 0
-	for _, event := range result.Events {
-		if event.GetType() != pb.BattleEventType_BATTLE_EVENT_TYPE_SKILL_USED || event.GetActorId() != setup.Units[0].InstanceID {
-			continue
-		}
-		if event.GetImpactTick() <= event.GetStartTick() || event.GetEndTick() <= event.GetImpactTick() {
-			t.Fatalf("动作窗口非法: %v", event)
-		}
-		if event.GetEndTick()-event.GetStartTick() != 2 {
-			t.Fatalf("动作窗口未压缩: %v", event)
-		}
-		if previous != nil && event.GetStartTick()-previous.GetStartTick() != 2 {
-			t.Fatalf("攻速未生效: %v -> %v", previous, event)
-		}
-		previous = event
-		count++
-	}
-	if count < 2 {
-		t.Fatalf("攻击次数不足: %d", count)
-	}
-}
-
-// newTimelineFixture 为离线时间轴回归测试注入初始动作。
-func newTimelineFixture(setup Setup) (*Battle, error) {
-	b, err := NewBattle(setup)
-	if err != nil {
-		return nil, err
-	}
-	for _, actor := range b.units {
-		b.schedule(&timelineItem{Tick: b.attackInterval(actor), Phase: phaseStart, Actor: actor})
-	}
-	return b, nil
-}
-
-// Run 消费测试时间轴上的全部事件。
-func (b *Battle) Run() (Result, error) {
-	if b.finished {
-		return b.cached, nil
-	}
-	for {
-		if _, ok := b.NextTick(); !ok {
-			break
-		}
-		b.Advance()
+// finishWithBasicAttack 通过玩家输入击败低血量目标，再读取正式结算结果。
+func finishWithBasicAttack(t *testing.T, b *Battle) (Result, error) {
+	t.Helper()
+	ack := b.ApplyInput(&pb.BattleInputReq{BattleId: b.ID(), UnitId: "a", SkillId: "basic", Sequence: 1}, pb.BattleTeam_BATTLE_TEAM_ATTACKER)
+	if ack.Action == 0 || !b.InputDone() {
+		t.Fatalf("普攻未结束战斗: %v", ack)
 	}
 	return b.Finalize()
 }

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/gogu-x/gogs/battle/battle/internal/battleconfig"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
@@ -17,6 +18,7 @@ type Member struct {
 	UnitIDs []string // 本场可控的单位实例编号。
 }
 
+// member 按玩家编号查找参战成员。
 func (a *BattleActor) member(uid uint64) *Member {
 	for i := range a.members {
 		if a.members[i].UID == uid {
@@ -26,14 +28,19 @@ func (a *BattleActor) member(uid uint64) *Member {
 	return nil
 }
 
+// initMembers 根据创建请求登记参战成员和可控制单位。
 func (a *BattleActor) initMembers() {
+	a.offers = make(map[string][]*pb.BattleGrant)
+	a.roles = make(map[string]*pb.Role)
 	member := Member{UID: a.p.UID, Source: a.p.Source}
 	for _, role := range a.p.Request.GetAttackerRoles() {
+		a.roles[role.GetRoleId()] = proto.Clone(role).(*pb.Role)
 		member.UnitIDs = append(member.UnitIDs, role.GetRoleId())
 	}
 	a.members = []Member{member}
 }
 
+// notifyAdmissionFailure 向成员所在玩法服通知入场失败原因。
 func (a *BattleActor) notifyAdmissionFailure(source Source, uid uint64, code common.ErrCode) {
 	msg := &pb.BattleAdmissionFailedNtf{BattleId: a.p.BattleID, Uid: uid, Code: code}
 	if err := a.p.Notifier.Notify(source, msg); err != nil {
@@ -92,15 +99,16 @@ func (a *BattleActor) join(ctx tree.Context, req *pb.StartBattleReq) {
 // sendSnapshot 下发当前全场血量，但只交付收件人自己的操作权限。
 func (a *BattleActor) sendSnapshot(m Member, baseline bool) {
 	b := a.p.Battle
-	msg := &pb.BattleCreatedNtf{BattleId: a.p.BattleID, Uid: m.UID, TickDurationMs: b.TickDurationMS(), Units: b.UnitResults()}
-	cursor, tick := b.SnapshotCursor()
-	msg.CurrentTick = tick
+	msg := &pb.BattleCreatedNtf{BattleId: a.p.BattleID, Uid: m.UID, Units: b.UnitResults()}
+	cursor, elapsedMS := b.SnapshotCursor()
+	msg.CurrentMs = elapsedMS
 	if baseline {
 		msg.SnapshotSequence = cursor
 		msg.Statuses = b.StatusSnapshot()
 	}
 	for _, control := range b.Controls() {
 		if m.owns(control.GetUnitId()) {
+			control.AvailableGrants = append([]*pb.BattleGrant(nil), a.offers[control.GetUnitId()]...)
 			msg.Controls = append(msg.Controls, control)
 		}
 	}
@@ -109,6 +117,7 @@ func (a *BattleActor) sendSnapshot(m Member, baseline bool) {
 	}
 }
 
+// owns 检查该成员是否拥有指定单位。
 func (m Member) owns(id string) bool {
 	for _, owned := range m.UnitIDs {
 		if owned == id {
@@ -118,6 +127,7 @@ func (m Member) owns(id string) bool {
 	return false
 }
 
+// pushMemberEvents 按顺序向成员投递战斗事件。
 func (a *BattleActor) pushMemberEvents(m Member, events []*pb.BattleEvent) {
 	for _, event := range events {
 		msg := &pb.BattleActionNtf{BattleId: a.p.BattleID, Uid: m.UID, Event: event}
@@ -146,6 +156,7 @@ func (a *BattleActor) addMember(m *pb.InitialBattleMember, started bool) error {
 	if err := a.p.Battle.AddAttacker(config, started); err != nil {
 		return err
 	}
+	a.roles[config.InstanceID] = proto.Clone(m.GetRole()).(*pb.Role)
 	a.members = append(a.members, Member{UID: uid, Source: Source{ServerID: int(m.GetServerId()), NodeID: int(m.GetNodeId())}, UnitIDs: []string{config.InstanceID}})
 	return nil
 }

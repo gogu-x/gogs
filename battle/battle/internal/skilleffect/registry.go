@@ -21,6 +21,7 @@ type Handler interface {
 // HandlerFunc 将结算函数适配为效果处理器。
 type HandlerFunc func(engine.EffectContext) (engine.EffectResolution, error)
 
+// Resolve 根据技能效果计算结算结果。
 func (f HandlerFunc) Resolve(context engine.EffectContext) (engine.EffectResolution, error) {
 	return f(context)
 }
@@ -31,6 +32,7 @@ type HandlerFuncs struct {
 	ApplyFunc   func(engine.EffectApplyContext, engine.EffectResolution) error // 效果应用函数。
 }
 
+// Resolve 根据技能效果计算结算结果。
 func (f HandlerFuncs) Resolve(context engine.EffectContext) (engine.EffectResolution, error) {
 	if f.ResolveFunc == nil {
 		return engine.EffectResolution{}, fmt.Errorf("effect resolve function is not configured")
@@ -38,6 +40,7 @@ func (f HandlerFuncs) Resolve(context engine.EffectContext) (engine.EffectResolu
 	return f.ResolveFunc(context)
 }
 
+// Apply 将结算结果应用到目标。
 func (f HandlerFuncs) Apply(context engine.EffectApplyContext, result engine.EffectResolution) error {
 	if f.ApplyFunc == nil {
 		return fmt.Errorf("effect apply function is not configured")
@@ -48,6 +51,7 @@ func (f HandlerFuncs) Apply(context engine.EffectApplyContext, result engine.Eff
 // Registry 根据效果类型分发处理器，避免在引擎中添加效果分支。
 type Registry map[pb.EffectType]Handler
 
+// Resolve 根据技能效果计算结算结果。
 func (r Registry) Resolve(context engine.EffectContext) (engine.EffectResolution, error) {
 	handler := r[context.Effect.Kind]
 	if handler == nil {
@@ -56,6 +60,7 @@ func (r Registry) Resolve(context engine.EffectContext) (engine.EffectResolution
 	return handler.Resolve(context)
 }
 
+// Apply 将结算结果应用到目标。
 func (r Registry) Apply(context engine.EffectApplyContext, resolution engine.EffectResolution) error {
 	handler := r[resolution.Kind]
 	if handler == nil {

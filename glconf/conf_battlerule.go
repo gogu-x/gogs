@@ -14,12 +14,11 @@ var csvBattleRuleCfg atomic.Value
 // BattleRuleCfg 表示 BattleRuleCfg 配置记录。
 type BattleRuleCfg struct {
 	BattleType             int32 `bson:"id"`                       // 战斗类型
-	ATBThreshold           int64 `bson:"atb_threshold"`            // 行动条阈值
-	MaxActions             int32 `bson:"max_actions"`              // 最大行动次数
+	ATBThreshold           int64 `bson:"atb_threshold"`            // 攻击间隔系数（毫秒乘速度）
+	MaxDurationMS          int32 `bson:"max_duration_ms"`          // 战斗时长上限（毫秒）
 	DamageVariancePermille int64 `bson:"damage_variance_permille"` // 伤害浮动（千分比）
 	CritChancePermille     int64 `bson:"crit_chance_permille"`     // 暴击概率（千分比）
 	CritMultiplierPermille int64 `bson:"crit_multiplier_permille"` // 暴击倍率（千分比）
-	TickDurationMS         int32 `bson:"tick_duration_ms"`         // 每 tick 毫秒数
 }
 
 func loadBattleRuleCfg(dbURI, dbName, confName string) (*CsvConf, error) {

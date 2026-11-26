@@ -41,17 +41,17 @@ const liveStatusTimer = timer.TimerType(2)
 // statusWake 通知 BattleActor 处理当前已到期的状态，多个状态可以共用一次唤醒。
 type statusWake struct{}
 
-// scheduleStatus 按引擎队首状态事件的逻辑帧安排下一次唤醒。
+// scheduleStatus 按引擎队首状态事件的毫秒时间安排下一次唤醒。
 func (a *BattleActor) scheduleStatus() {
-	next, ok := a.p.Battle.NextTick()
-	if !ok || next == a.live.statusTick {
+	next, ok := a.p.Battle.NextDueMS()
+	if !ok || next == a.live.statusDueMS {
 		return
 	}
 	// 队首时间有变，例如新施加的中毒会先于护盾到期。替换旧唤醒，状态事件仍由引擎保存。
 	a.timer.Cancel(liveStatusTimer)
-	a.live.statusTick = next
+	a.live.statusDueMS = next
 	// 从开战时刻换算绝对到期时间，避免每次重新调度时把已过去的时间再等一遍。
-	delay := time.Until(a.live.start.Add(time.Duration(next) * a.live.frame))
+	delay := time.Until(a.live.start.Add(time.Duration(next) * time.Millisecond))
 	a.timer.After(liveStatusTimer, max(time.Millisecond, delay), nil)
 }
 

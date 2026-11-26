@@ -416,6 +416,8 @@ const (
 	BattleEventType_BATTLE_EVENT_TYPE_STATUS_REMOVED BattleEventType = 10
 	// 中途加入的玩家单位，事件记录实例编号与入场血量。
 	BattleEventType_BATTLE_EVENT_TYPE_UNIT_JOINED BattleEventType = 11
+	// 战中增益已入账，携带最新单位与控制信息。
+	BattleEventType_BATTLE_EVENT_TYPE_GRANT_APPLIED BattleEventType = 12
 )
 
 // Enum value maps for BattleEventType.
@@ -433,6 +435,7 @@ var (
 		9:  "BATTLE_EVENT_TYPE_ACTION_CANCELLED",
 		10: "BATTLE_EVENT_TYPE_STATUS_REMOVED",
 		11: "BATTLE_EVENT_TYPE_UNIT_JOINED",
+		12: "BATTLE_EVENT_TYPE_GRANT_APPLIED",
 	}
 	BattleEventType_value = map[string]int32{
 		"BATTLE_EVENT_TYPE_UNSPECIFIED":      0,
@@ -447,6 +450,7 @@ var (
 		"BATTLE_EVENT_TYPE_ACTION_CANCELLED": 9,
 		"BATTLE_EVENT_TYPE_STATUS_REMOVED":   10,
 		"BATTLE_EVENT_TYPE_UNIT_JOINED":      11,
+		"BATTLE_EVENT_TYPE_GRANT_APPLIED":    12,
 	}
 )
 
@@ -791,8 +795,8 @@ type BattleEvent struct {
 	Sequence uint64 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
 	// 行动序号
 	Action uint64 `protobuf:"varint,2,opt,name=action,proto3" json:"action,omitempty"`
-	// 事件发生的逻辑帧
-	Tick int64 `protobuf:"varint,3,opt,name=tick,proto3" json:"tick,omitempty"`
+	// 事件发生的战斗经过毫秒
+	ElapsedMs int64 `protobuf:"varint,3,opt,name=elapsed_ms,json=elapsedMs,proto3" json:"elapsed_ms,omitempty"`
 	// 战斗事件类型
 	Type BattleEventType `protobuf:"varint,4,opt,name=type,proto3,enum=BattleEventType" json:"type,omitempty"`
 	// 行动单位编号
@@ -811,14 +815,14 @@ type BattleEvent struct {
 	HpAfter int64 `protobuf:"varint,11,opt,name=hp_after,json=hpAfter,proto3" json:"hp_after,omitempty"`
 	// 目标单位编号列表
 	TargetIds []string `protobuf:"bytes,13,rep,name=target_ids,json=targetIds,proto3" json:"target_ids,omitempty"`
-	// 动作开始逻辑帧，仅技能使用事件填写
-	// 服务端发出技能使用事件时已计算命中和结束逻辑帧，随事件一起下发，
+	// 动作开始战斗经过毫秒，仅技能使用事件填写
+	// 服务端发出技能使用事件时已计算命中和结束战斗经过毫秒，随事件一起下发，
 	// 客户端收到事件即可播放攻击动作，无需等待行动结束事件
-	StartTick int64 `protobuf:"varint,14,opt,name=start_tick,json=startTick,proto3" json:"start_tick,omitempty"`
-	// 动作命中逻辑帧，仅技能使用事件填写
-	ImpactTick int64 `protobuf:"varint,15,opt,name=impact_tick,json=impactTick,proto3" json:"impact_tick,omitempty"`
-	// 动作结束逻辑帧，仅技能使用事件填写
-	EndTick int64 `protobuf:"varint,16,opt,name=end_tick,json=endTick,proto3" json:"end_tick,omitempty"`
+	StartMs int64 `protobuf:"varint,14,opt,name=start_ms,json=startMs,proto3" json:"start_ms,omitempty"`
+	// 动作命中战斗经过毫秒，仅技能使用事件填写
+	ImpactMs int64 `protobuf:"varint,15,opt,name=impact_ms,json=impactMs,proto3" json:"impact_ms,omitempty"`
+	// 动作结束战斗经过毫秒，仅技能使用事件填写
+	EndMs int64 `protobuf:"varint,16,opt,name=end_ms,json=endMs,proto3" json:"end_ms,omitempty"`
 	// 技能效果类型；以下字段按事件类型填写，未涉及的字段保持枚举零值或布尔假值
 	EffectType EffectType `protobuf:"varint,17,opt,name=effect_type,json=effectType,proto3,enum=EffectType" json:"effect_type,omitempty"`
 	// 状态类型
@@ -833,14 +837,17 @@ type BattleEvent struct {
 	Outcome BattleOutcome `protobuf:"varint,22,opt,name=outcome,proto3,enum=BattleOutcome" json:"outcome,omitempty"`
 	// 状态实例编号，施加、刷新、周期生效及移除事件携带
 	StatusInstanceId uint64 `protobuf:"varint,23,opt,name=status_instance_id,json=statusInstanceId,proto3" json:"status_instance_id,omitempty"`
-	// 状态到期逻辑帧，按回合持续时为零
-	StatusExpireTick int64 `protobuf:"varint,24,opt,name=status_expire_tick,json=statusExpireTick,proto3" json:"status_expire_tick,omitempty"`
+	// 状态到期战斗经过毫秒，按回合持续时为零
+	StatusExpireMs int64 `protobuf:"varint,24,opt,name=status_expire_ms,json=statusExpireMs,proto3" json:"status_expire_ms,omitempty"`
 	// 状态刷新版本，较旧版本的到期任务不再生效
 	StatusVersion uint64 `protobuf:"varint,25,opt,name=status_version,json=statusVersion,proto3" json:"status_version,omitempty"`
 	// 入场事件携带新成员的完整单位快照。
-	JoinedUnit    *BattleUnitResult `protobuf:"bytes,26,opt,name=joined_unit,json=joinedUnit,proto3" json:"joined_unit,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	JoinedUnit     *BattleUnitResult `protobuf:"bytes,26,opt,name=joined_unit,json=joinedUnit,proto3" json:"joined_unit,omitempty"`
+	Grant          *BattleGrant      `protobuf:"bytes,27,opt,name=grant,proto3" json:"grant,omitempty"`
+	UpdatedUnit    *BattleUnitResult `protobuf:"bytes,28,opt,name=updated_unit,json=updatedUnit,proto3" json:"updated_unit,omitempty"`
+	UpdatedControl *BattleControl    `protobuf:"bytes,29,opt,name=updated_control,json=updatedControl,proto3" json:"updated_control,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BattleEvent) Reset() {
@@ -887,9 +894,9 @@ func (x *BattleEvent) GetAction() uint64 {
 	return 0
 }
 
-func (x *BattleEvent) GetTick() int64 {
+func (x *BattleEvent) GetElapsedMs() int64 {
 	if x != nil {
-		return x.Tick
+		return x.ElapsedMs
 	}
 	return 0
 }
@@ -957,23 +964,23 @@ func (x *BattleEvent) GetTargetIds() []string {
 	return nil
 }
 
-func (x *BattleEvent) GetStartTick() int64 {
+func (x *BattleEvent) GetStartMs() int64 {
 	if x != nil {
-		return x.StartTick
+		return x.StartMs
 	}
 	return 0
 }
 
-func (x *BattleEvent) GetImpactTick() int64 {
+func (x *BattleEvent) GetImpactMs() int64 {
 	if x != nil {
-		return x.ImpactTick
+		return x.ImpactMs
 	}
 	return 0
 }
 
-func (x *BattleEvent) GetEndTick() int64 {
+func (x *BattleEvent) GetEndMs() int64 {
 	if x != nil {
-		return x.EndTick
+		return x.EndMs
 	}
 	return 0
 }
@@ -1027,9 +1034,9 @@ func (x *BattleEvent) GetStatusInstanceId() uint64 {
 	return 0
 }
 
-func (x *BattleEvent) GetStatusExpireTick() int64 {
+func (x *BattleEvent) GetStatusExpireMs() int64 {
 	if x != nil {
-		return x.StatusExpireTick
+		return x.StatusExpireMs
 	}
 	return 0
 }
@@ -1048,6 +1055,27 @@ func (x *BattleEvent) GetJoinedUnit() *BattleUnitResult {
 	return nil
 }
 
+func (x *BattleEvent) GetGrant() *BattleGrant {
+	if x != nil {
+		return x.Grant
+	}
+	return nil
+}
+
+func (x *BattleEvent) GetUpdatedUnit() *BattleUnitResult {
+	if x != nil {
+		return x.UpdatedUnit
+	}
+	return nil
+}
+
+func (x *BattleEvent) GetUpdatedControl() *BattleControl {
+	if x != nil {
+		return x.UpdatedControl
+	}
+	return nil
+}
+
 // 一个单位的最终生命结果
 type BattleUnitResult struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1062,9 +1090,11 @@ type BattleUnitResult struct {
 	// 是否存活
 	Alive bool `protobuf:"varint,5,opt,name=alive,proto3" json:"alive,omitempty"`
 	// 玩家控制单位所属 UID，机器人单位为零。
-	OwnerUid      uint64 `protobuf:"varint,6,opt,name=owner_uid,json=ownerUid,proto3" json:"owner_uid,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	OwnerUid uint64 `protobuf:"varint,6,opt,name=owner_uid,json=ownerUid,proto3" json:"owner_uid,omitempty"`
+	// 本场已领取记录；状态是否仍生效以状态快照为准。
+	ReceivedGrants []*BattleGrant `protobuf:"bytes,7,rep,name=received_grants,json=receivedGrants,proto3" json:"received_grants,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BattleUnitResult) Reset() {
@@ -1139,6 +1169,239 @@ func (x *BattleUnitResult) GetOwnerUid() uint64 {
 	return 0
 }
 
+func (x *BattleUnitResult) GetReceivedGrants() []*BattleGrant {
+	if x != nil {
+		return x.ReceivedGrants
+	}
+	return nil
+}
+
+// 玩法服确认的一次发放，同场同单位的发放编号唯一。
+type BattleGrant struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	GrantId string                 `protobuf:"bytes,1,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	// Types that are valid to be assigned to Effect:
+	//
+	//	*BattleGrant_EquipConfigId
+	//	*BattleGrant_TalentNodeId
+	//	*BattleGrant_StatusConfigId
+	Effect        isBattleGrant_Effect `protobuf_oneof:"effect"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BattleGrant) Reset() {
+	*x = BattleGrant{}
+	mi := &file_cspb_battle_struct_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BattleGrant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BattleGrant) ProtoMessage() {}
+
+func (x *BattleGrant) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_battle_struct_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BattleGrant.ProtoReflect.Descriptor instead.
+func (*BattleGrant) Descriptor() ([]byte, []int) {
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *BattleGrant) GetGrantId() string {
+	if x != nil {
+		return x.GrantId
+	}
+	return ""
+}
+
+func (x *BattleGrant) GetEffect() isBattleGrant_Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return nil
+}
+
+func (x *BattleGrant) GetEquipConfigId() int32 {
+	if x != nil {
+		if x, ok := x.Effect.(*BattleGrant_EquipConfigId); ok {
+			return x.EquipConfigId
+		}
+	}
+	return 0
+}
+
+func (x *BattleGrant) GetTalentNodeId() int32 {
+	if x != nil {
+		if x, ok := x.Effect.(*BattleGrant_TalentNodeId); ok {
+			return x.TalentNodeId
+		}
+	}
+	return 0
+}
+
+func (x *BattleGrant) GetStatusConfigId() int32 {
+	if x != nil {
+		if x, ok := x.Effect.(*BattleGrant_StatusConfigId); ok {
+			return x.StatusConfigId
+		}
+	}
+	return 0
+}
+
+type isBattleGrant_Effect interface {
+	isBattleGrant_Effect()
+}
+
+type BattleGrant_EquipConfigId struct {
+	EquipConfigId int32 `protobuf:"varint,2,opt,name=equip_config_id,json=equipConfigId,proto3,oneof"`
+}
+
+type BattleGrant_TalentNodeId struct {
+	TalentNodeId int32 `protobuf:"varint,3,opt,name=talent_node_id,json=talentNodeId,proto3,oneof"`
+}
+
+type BattleGrant_StatusConfigId struct {
+	StatusConfigId int32 `protobuf:"varint,4,opt,name=status_config_id,json=statusConfigId,proto3,oneof"`
+}
+
+func (*BattleGrant_EquipConfigId) isBattleGrant_Effect() {}
+
+func (*BattleGrant_TalentNodeId) isBattleGrant_Effect() {}
+
+func (*BattleGrant_StatusConfigId) isBattleGrant_Effect() {}
+
+// 可控单位及其可用技能。
+type BattleControl struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 只有拥有者的控制快照携带可领取掉落。
+	AvailableGrants []*BattleGrant `protobuf:"bytes,7,rep,name=available_grants,json=availableGrants,proto3" json:"available_grants,omitempty"`
+	// 当前服务端结算属性和行动间隔。
+	Attack            int64    `protobuf:"varint,8,opt,name=attack,proto3" json:"attack,omitempty"`
+	Defense           int64    `protobuf:"varint,9,opt,name=defense,proto3" json:"defense,omitempty"`
+	Speed             int64    `protobuf:"varint,10,opt,name=speed,proto3" json:"speed,omitempty"`
+	ActionIntervalMs  int64    `protobuf:"varint,11,opt,name=action_interval_ms,json=actionIntervalMs,proto3" json:"action_interval_ms,omitempty"`
+	UnitId            string   `protobuf:"bytes,1,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
+	BasicSkill        string   `protobuf:"bytes,2,opt,name=basic_skill,json=basicSkill,proto3" json:"basic_skill,omitempty"`
+	ActiveSkills      []string `protobuf:"bytes,3,rep,name=active_skills,json=activeSkills,proto3" json:"active_skills,omitempty"`
+	LastInputSequence uint64   `protobuf:"varint,5,opt,name=last_input_sequence,json=lastInputSequence,proto3" json:"last_input_sequence,omitempty"`
+	NextReadyMs       int64    `protobuf:"varint,6,opt,name=next_ready_ms,json=nextReadyMs,proto3" json:"next_ready_ms,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *BattleControl) Reset() {
+	*x = BattleControl{}
+	mi := &file_cspb_battle_struct_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BattleControl) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BattleControl) ProtoMessage() {}
+
+func (x *BattleControl) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_battle_struct_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BattleControl.ProtoReflect.Descriptor instead.
+func (*BattleControl) Descriptor() ([]byte, []int) {
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *BattleControl) GetAvailableGrants() []*BattleGrant {
+	if x != nil {
+		return x.AvailableGrants
+	}
+	return nil
+}
+
+func (x *BattleControl) GetAttack() int64 {
+	if x != nil {
+		return x.Attack
+	}
+	return 0
+}
+
+func (x *BattleControl) GetDefense() int64 {
+	if x != nil {
+		return x.Defense
+	}
+	return 0
+}
+
+func (x *BattleControl) GetSpeed() int64 {
+	if x != nil {
+		return x.Speed
+	}
+	return 0
+}
+
+func (x *BattleControl) GetActionIntervalMs() int64 {
+	if x != nil {
+		return x.ActionIntervalMs
+	}
+	return 0
+}
+
+func (x *BattleControl) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *BattleControl) GetBasicSkill() string {
+	if x != nil {
+		return x.BasicSkill
+	}
+	return ""
+}
+
+func (x *BattleControl) GetActiveSkills() []string {
+	if x != nil {
+		return x.ActiveSkills
+	}
+	return nil
+}
+
+func (x *BattleControl) GetLastInputSequence() uint64 {
+	if x != nil {
+		return x.LastInputSequence
+	}
+	return 0
+}
+
+func (x *BattleControl) GetNextReadyMs() int64 {
+	if x != nil {
+		return x.NextReadyMs
+	}
+	return 0
+}
+
 var File_cspb_battle_struct_proto protoreflect.FileDescriptor
 
 const file_cspb_battle_struct_proto_rawDesc = "" +
@@ -1163,11 +1426,12 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x06equips\x18\a \x03(\v2\n" +
 	".RoleEquipR\x06equips\x12:\n" +
 	"\x1asoul_jade_effect_affix_ids\x18\t \x03(\x05R\x16soulJadeEffectAffixIds\x121\n" +
-	"\fgrowth_bonus\x18\b \x01(\v2\x0e.GrowthBonusesR\vgrowthBonus\"\xdd\x06\n" +
+	"\fgrowth_bonus\x18\b \x01(\v2\x0e.GrowthBonusesR\vgrowthBonus\"\xeb\a\n" +
 	"\vBattleEvent\x12\x1a\n" +
 	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12\x16\n" +
-	"\x06action\x18\x02 \x01(\x04R\x06action\x12\x12\n" +
-	"\x04tick\x18\x03 \x01(\x03R\x04tick\x12$\n" +
+	"\x06action\x18\x02 \x01(\x04R\x06action\x12\x1d\n" +
+	"\n" +
+	"elapsed_ms\x18\x03 \x01(\x03R\telapsedMs\x12$\n" +
 	"\x04type\x18\x04 \x01(\x0e2\x10.BattleEventTypeR\x04type\x12\x19\n" +
 	"\bactor_id\x18\x05 \x01(\tR\aactorId\x12\x1b\n" +
 	"\ttarget_id\x18\x06 \x01(\tR\btargetId\x12\x19\n" +
@@ -1178,12 +1442,10 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	" \x01(\x03R\bhpBefore\x12\x19\n" +
 	"\bhp_after\x18\v \x01(\x03R\ahpAfter\x12\x1d\n" +
 	"\n" +
-	"target_ids\x18\r \x03(\tR\ttargetIds\x12\x1d\n" +
-	"\n" +
-	"start_tick\x18\x0e \x01(\x03R\tstartTick\x12\x1f\n" +
-	"\vimpact_tick\x18\x0f \x01(\x03R\n" +
-	"impactTick\x12\x19\n" +
-	"\bend_tick\x18\x10 \x01(\x03R\aendTick\x12,\n" +
+	"target_ids\x18\r \x03(\tR\ttargetIds\x12\x19\n" +
+	"\bstart_ms\x18\x0e \x01(\x03R\astartMs\x12\x1b\n" +
+	"\timpact_ms\x18\x0f \x01(\x03R\bimpactMs\x12\x15\n" +
+	"\x06end_ms\x18\x10 \x01(\x03R\x05endMs\x12,\n" +
 	"\veffect_type\x18\x11 \x01(\x0e2\v.EffectTypeR\n" +
 	"effectType\x12,\n" +
 	"\vstatus_type\x18\x12 \x01(\x0e2\v.StatusTypeR\n" +
@@ -1192,11 +1454,14 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\fbasic_attack\x18\x14 \x01(\bR\vbasicAttack\x12*\n" +
 	"\x06reason\x18\x15 \x01(\x0e2\x12.BattleEventReasonR\x06reason\x12(\n" +
 	"\aoutcome\x18\x16 \x01(\x0e2\x0e.BattleOutcomeR\aoutcome\x12,\n" +
-	"\x12status_instance_id\x18\x17 \x01(\x04R\x10statusInstanceId\x12,\n" +
-	"\x12status_expire_tick\x18\x18 \x01(\x03R\x10statusExpireTick\x12%\n" +
+	"\x12status_instance_id\x18\x17 \x01(\x04R\x10statusInstanceId\x12(\n" +
+	"\x10status_expire_ms\x18\x18 \x01(\x03R\x0estatusExpireMs\x12%\n" +
 	"\x0estatus_version\x18\x19 \x01(\x04R\rstatusVersion\x122\n" +
 	"\vjoined_unit\x18\x1a \x01(\v2\x11.BattleUnitResultR\n" +
-	"joinedUnit\"\xae\x01\n" +
+	"joinedUnit\x12\"\n" +
+	"\x05grant\x18\x1b \x01(\v2\f.BattleGrantR\x05grant\x124\n" +
+	"\fupdated_unit\x18\x1c \x01(\v2\x11.BattleUnitResultR\vupdatedUnit\x127\n" +
+	"\x0fupdated_control\x18\x1d \x01(\v2\x0e.BattleControlR\x0eupdatedControl\"\xe5\x01\n" +
 	"\x10BattleUnitResult\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x1f\n" +
@@ -1204,7 +1469,28 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x02hp\x18\x03 \x01(\x03R\x02hp\x12\x15\n" +
 	"\x06max_hp\x18\x04 \x01(\x03R\x05maxHp\x12\x14\n" +
 	"\x05alive\x18\x05 \x01(\bR\x05alive\x12\x1b\n" +
-	"\towner_uid\x18\x06 \x01(\x04R\bownerUid*\x98\x01\n" +
+	"\towner_uid\x18\x06 \x01(\x04R\bownerUid\x125\n" +
+	"\x0freceived_grants\x18\a \x03(\v2\f.BattleGrantR\x0ereceivedGrants\"\xb0\x01\n" +
+	"\vBattleGrant\x12\x19\n" +
+	"\bgrant_id\x18\x01 \x01(\tR\agrantId\x12(\n" +
+	"\x0fequip_config_id\x18\x02 \x01(\x05H\x00R\requipConfigId\x12&\n" +
+	"\x0etalent_node_id\x18\x03 \x01(\x05H\x00R\ftalentNodeId\x12*\n" +
+	"\x10status_config_id\x18\x04 \x01(\x05H\x00R\x0estatusConfigIdB\b\n" +
+	"\x06effect\"\x83\x03\n" +
+	"\rBattleControl\x127\n" +
+	"\x10available_grants\x18\a \x03(\v2\f.BattleGrantR\x0favailableGrants\x12\x16\n" +
+	"\x06attack\x18\b \x01(\x03R\x06attack\x12\x18\n" +
+	"\adefense\x18\t \x01(\x03R\adefense\x12\x14\n" +
+	"\x05speed\x18\n" +
+	" \x01(\x03R\x05speed\x12,\n" +
+	"\x12action_interval_ms\x18\v \x01(\x03R\x10actionIntervalMs\x12\x17\n" +
+	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12\x1f\n" +
+	"\vbasic_skill\x18\x02 \x01(\tR\n" +
+	"basicSkill\x12#\n" +
+	"\ractive_skills\x18\x03 \x03(\tR\factiveSkills\x12.\n" +
+	"\x13last_input_sequence\x18\x05 \x01(\x04R\x11lastInputSequence\x12\"\n" +
+	"\rnext_ready_ms\x18\x06 \x01(\x03R\vnextReadyMsJ\x04\b\x04\x10\x05R\n" +
+	"ready_tick*\x98\x01\n" +
 	"\n" +
 	"BattleType\x12\x1b\n" +
 	"\x17BATTLE_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
@@ -1245,7 +1531,7 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x13STATUS_TYPE_SILENCE\x10\x02\x12\x13\n" +
 	"\x0fSTATUS_TYPE_DOT\x10\x03\x12\x13\n" +
 	"\x0fSTATUS_TYPE_HOT\x10\x04\x12\"\n" +
-	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\xbb\x03\n" +
+	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\xe0\x03\n" +
 	"\x0fBattleEventType\x12!\n" +
 	"\x1dBATTLE_EVENT_TYPE_UNSPECIFIED\x10\x00\x12$\n" +
 	" BATTLE_EVENT_TYPE_ACTION_STARTED\x10\x01\x12 \n" +
@@ -1259,7 +1545,8 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\"BATTLE_EVENT_TYPE_ACTION_CANCELLED\x10\t\x12$\n" +
 	" BATTLE_EVENT_TYPE_STATUS_REMOVED\x10\n" +
 	"\x12!\n" +
-	"\x1dBATTLE_EVENT_TYPE_UNIT_JOINED\x10\v*\xc8\x01\n" +
+	"\x1dBATTLE_EVENT_TYPE_UNIT_JOINED\x10\v\x12#\n" +
+	"\x1fBATTLE_EVENT_TYPE_GRANT_APPLIED\x10\f*\xc8\x01\n" +
 	"\x11BattleEventReason\x12#\n" +
 	"\x1fBATTLE_EVENT_REASON_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eBATTLE_EVENT_REASON_ACTOR_DEAD\x10\x01\x12\x1f\n" +
@@ -1280,7 +1567,7 @@ func file_cspb_battle_struct_proto_rawDescGZIP() []byte {
 }
 
 var file_cspb_battle_struct_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_cspb_battle_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_cspb_battle_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_cspb_battle_struct_proto_goTypes = []any{
 	(BattleType)(0),                 // 0: BattleType
 	(BattleTeam)(0),                 // 1: BattleTeam
@@ -1295,24 +1582,31 @@ var file_cspb_battle_struct_proto_goTypes = []any{
 	(*Role)(nil),                    // 10: Role
 	(*BattleEvent)(nil),             // 11: BattleEvent
 	(*BattleUnitResult)(nil),        // 12: BattleUnitResult
-	(*pb_common.GrowthBonuses)(nil), // 13: GrowthBonuses
+	(*BattleGrant)(nil),             // 13: BattleGrant
+	(*BattleControl)(nil),           // 14: BattleControl
+	(*pb_common.GrowthBonuses)(nil), // 15: GrowthBonuses
 }
 var file_cspb_battle_struct_proto_depIdxs = []int32{
 	8,  // 0: Role.skills:type_name -> RoleSkill
 	9,  // 1: Role.equips:type_name -> RoleEquip
-	13, // 2: Role.growth_bonus:type_name -> GrowthBonuses
+	15, // 2: Role.growth_bonus:type_name -> GrowthBonuses
 	6,  // 3: BattleEvent.type:type_name -> BattleEventType
 	4,  // 4: BattleEvent.effect_type:type_name -> EffectType
 	5,  // 5: BattleEvent.status_type:type_name -> StatusType
 	7,  // 6: BattleEvent.reason:type_name -> BattleEventReason
 	2,  // 7: BattleEvent.outcome:type_name -> BattleOutcome
 	12, // 8: BattleEvent.joined_unit:type_name -> BattleUnitResult
-	1,  // 9: BattleUnitResult.team:type_name -> BattleTeam
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	13, // 9: BattleEvent.grant:type_name -> BattleGrant
+	12, // 10: BattleEvent.updated_unit:type_name -> BattleUnitResult
+	14, // 11: BattleEvent.updated_control:type_name -> BattleControl
+	1,  // 12: BattleUnitResult.team:type_name -> BattleTeam
+	13, // 13: BattleUnitResult.received_grants:type_name -> BattleGrant
+	13, // 14: BattleControl.available_grants:type_name -> BattleGrant
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_cspb_battle_struct_proto_init() }
@@ -1320,13 +1614,18 @@ func file_cspb_battle_struct_proto_init() {
 	if File_cspb_battle_struct_proto != nil {
 		return
 	}
+	file_cspb_battle_struct_proto_msgTypes[5].OneofWrappers = []any{
+		(*BattleGrant_EquipConfigId)(nil),
+		(*BattleGrant_TalentNodeId)(nil),
+		(*BattleGrant_StatusConfigId)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_battle_struct_proto_rawDesc), len(file_cspb_battle_struct_proto_rawDesc)),
 			NumEnums:      8,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

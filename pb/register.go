@@ -52,8 +52,10 @@ func init() {
 		&pb_battle.BattleResultConfirmedNtf{},
 		&pb_battle.BattleInputAck{},
 		&pb_battle.BattleAdmissionFailedNtf{},
+		&pb_battle.ClaimBattleGrantAck{},
 		&pb_battle.StartBattleReq{},
 		&pb_battle.BattleInputReq{},
+		&pb_battle.ClaimBattleGrantReq{},
 		&pb_chat.ChatAck{},
 		&pb_chat.ChatReq{},
 		&pb_common.AssetsNtf{},
@@ -105,6 +107,8 @@ func init() {
 		&pb_pf.QueryOrderReq{},
 		&sspb.NatsMsgAck{},
 		&sspb.NatsMsgNtf{},
+		&sspb.ApplyBattleGrantReq{},
+		&sspb.ApplyBattleGrantAck{},
 		&sspb.NatsMsgReq{},
 	)
 }

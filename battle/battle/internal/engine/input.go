@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"container/heap"
 	"github.com/gogu-x/gogs/battle/robot/strategy"
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
@@ -16,42 +17,62 @@ type inputState struct {
 func (b *Battle) Controls() []*pb.BattleControl {
 	var controls []*pb.BattleControl
 	for _, actor := range b.units {
-		config := actor.Config
-		control := &pb.BattleControl{UnitId: config.InstanceID, BasicSkill: config.BasicSkill.ID}
-		if state := b.inputs[config.InstanceID]; state != nil {
-			control.NextReadyTick = state.ready
-			control.LastInputSequence = state.last.GetSequence()
-		}
-		for _, skill := range config.ActiveSkills {
-			control.ActiveSkills = append(control.ActiveSkills, skill.ID)
-		}
+		control := b.control(actor)
 		controls = append(controls, control)
 	}
 	return controls
 }
 
-// AdvanceClock 仅处理已到期的限时状态任务。
+// control 生成指定单位当前出手时间、序号及动作的快照。
+func (b *Battle) control(actor *unit) *pb.BattleControl {
+	config := actor.Config
+	control := &pb.BattleControl{
+		UnitId: config.InstanceID, BasicSkill: config.BasicSkill.ID,
+		Attack: b.unitAttack(actor), Defense: b.unitDefense(actor),
+		Speed: b.unitSpeed(actor), ActionIntervalMs: b.attackInterval(actor),
+	}
+	if state := b.inputs[config.InstanceID]; state != nil {
+		control.NextReadyMs = state.ready
+		control.LastInputSequence = state.last.GetSequence()
+	}
+	for _, skill := range config.ActiveSkills {
+		control.ActiveSkills = append(control.ActiveSkills, skill.ID)
+	}
+	return control
+}
+
+// AdvanceClock 推进已到期的状态，在截止时刻停止接受动作并结算。
 func (b *Battle) AdvanceClock(now int64) []*pb.BattleEvent {
-	var events []*pb.BattleEvent
+	start := b.emitted
 	for {
-		next, ok := b.NextTick()
+		next, ok := b.NextDueMS()
 		if !ok || next > now {
 			break
 		}
-		events = append(events, b.Advance()...)
+		if next == b.setup.Rules.MaxDurationMS {
+			b.elapsedMS = next
+			b.done = true
+			b.finalOutcome = pb.BattleOutcome_BATTLE_OUTCOME_DRAW
+			break
+		}
+		item := heap.Pop(&b.timeline).(*timelineItem)
+		b.elapsedMS = next
+		b.handleStatusTask(item)
+		b.checkInputEnd()
+		b.emitted = len(b.events)
 	}
 	if !b.done {
-		b.tick = max(b.tick, now)
+		b.elapsedMS = max(b.elapsedMS, now)
 	}
-	return events
+	return b.events[start:b.emitted]
 }
 
-// InputDone 表示输入驱动战斗已决出结果或耗尽行动次数。
+// InputDone 表示输入驱动战斗已决出结果或达到时长上限。
 func (b *Battle) InputDone() bool { return b.done }
 
 // ApplyInput 校验动作所属阵营、序号、冷却和目标并即时结算。
 func (b *Battle) ApplyInput(req *pb.BattleInputReq, team pb.BattleTeam) *pb.BattleInputAck {
-	ack := &pb.BattleInputAck{Uid: req.GetUID(), Code: pb_common.ErrCode_INVALID_BATTLE_REQUEST, BattleId: b.ID(), UnitId: req.GetUnitId(), Sequence: req.GetSequence(), CurrentTick: b.tick}
+	ack := &pb.BattleInputAck{Uid: req.GetUID(), Code: pb_common.ErrCode_INVALID_BATTLE_REQUEST, BattleId: b.ID(), UnitId: req.GetUnitId(), Sequence: req.GetSequence(), CurrentMs: b.elapsedMS}
 	state := b.inputs[req.GetUnitId()]
 	if state == nil || req.GetBattleId() != b.ID() || state.actor.Config.Team != team || req.GetSequence() == 0 {
 		return ack
@@ -65,11 +86,11 @@ func (b *Battle) ApplyInput(req *pb.BattleInputReq, team pb.BattleTeam) *pb.Batt
 		}
 	}
 	state.last = ack
-	ack.ReadyTick = state.ready
+	ack.ReadyMs = state.ready
 	if b.done || !state.actor.alive() {
 		return ack
 	}
-	if b.tick < state.ready || b.startedActions >= b.setup.Rules.MaxActions {
+	if b.elapsedMS < state.ready {
 		return ack
 	}
 	actor := state.actor
@@ -104,15 +125,13 @@ func (b *Battle) ApplyInput(req *pb.BattleInputReq, team pb.BattleTeam) *pb.Batt
 	if len(targets) == 0 {
 		return ack
 	}
-	b.nextAction++
 	b.startedActions++
-	b.action = b.nextAction
-	b.activeActions++
-	action := &scheduledAction{ID: b.action, Actor: actor, Skill: skill, Targets: targets, TargetIDs: targetIDs(targets), StartTick: b.tick, ImpactTick: b.tick, EndTick: b.tick, Basic: skill.ID == actor.Config.BasicSkill.ID}
-	state.ready = b.tick + b.attackInterval(actor)
+	b.action = uint64(b.startedActions)
+	action := &battleAction{Actor: actor, Skill: skill, Targets: targets, TargetIDs: targetIDs(targets), Basic: skill.ID == actor.Config.BasicSkill.ID}
+	state.ready = b.elapsedMS + b.attackInterval(actor)
 	ack.Code = pb_common.ErrCode_OK
-	ack.Action = action.ID
-	ack.ReadyTick = state.ready
+	ack.Action = b.action
+	ack.ReadyMs = state.ready
 	b.tickCooldowns(actor)
 	b.emitActionEvent(action, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_STARTED)
 	b.tickPeriodic(actor)
@@ -126,20 +145,17 @@ func (b *Battle) ApplyInput(req *pb.BattleInputReq, team pb.BattleTeam) *pb.Batt
 		b.impactAction(action)
 	}
 	b.endAction(action)
+	ack.ReadyMs = state.ready
 	b.checkInputEnd()
 	return ack
 }
 
+// checkInputEnd 检查即时战斗是否已满足结束条件。
 func (b *Battle) checkInputEnd() {
 	if outcome, done := b.outcome(); done {
 		b.finalOutcome = outcome
-		b.terminal = true
 		b.done = true
 		return
-	}
-	if b.startedActions >= b.setup.Rules.MaxActions && b.activeActions == 0 {
-		b.finalOutcome = pb.BattleOutcome_BATTLE_OUTCOME_DRAW
-		b.done = true
 	}
 }
 
@@ -151,10 +167,10 @@ func (b *Battle) RobotSequence(unitID string) []string {
 	return nil
 }
 
-// UnitPosition 返回配置站位，用于同帧机器人决策排序。
+// UnitPosition 返回配置站位，用于同一时刻机器人决策排序。
 func (b *Battle) UnitPosition(unitID string) int32 { return b.inputs[unitID].actor.Config.Position }
 
-// RobotFirstDelay 返回机器人策略配置的开场等待帧数。
+// RobotFirstDelay 返回机器人策略配置的开场等待毫秒数。
 func (b *Battle) RobotFirstDelay(unitID string) int64 {
 	return b.inputs[unitID].actor.Config.RobotFirstDelay
 }

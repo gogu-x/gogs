@@ -334,6 +334,91 @@ func (x *InitialBattleMember) GetNodeId() uint32 {
 	return 0
 }
 
+// 选择服务端已经为当前单位登记的掉落。
+type ClaimBattleGrantReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UID           uint64                 `protobuf:"varint,101,opt,name=uID,proto3" json:"uID,omitempty"`
+	ServerID      uint32                 `protobuf:"varint,102,opt,name=serverID,proto3" json:"serverID,omitempty"`
+	SessionID     string                 `protobuf:"bytes,103,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+	BattleId      string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
+	UnitId        string                 `protobuf:"bytes,2,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
+	GrantId       string                 `protobuf:"bytes,3,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClaimBattleGrantReq) Reset() {
+	*x = ClaimBattleGrantReq{}
+	mi := &file_cspb_battle_req_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClaimBattleGrantReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClaimBattleGrantReq) ProtoMessage() {}
+
+func (x *ClaimBattleGrantReq) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_battle_req_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClaimBattleGrantReq.ProtoReflect.Descriptor instead.
+func (*ClaimBattleGrantReq) Descriptor() ([]byte, []int) {
+	return file_cspb_battle_req_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ClaimBattleGrantReq) GetUID() uint64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *ClaimBattleGrantReq) GetServerID() uint32 {
+	if x != nil {
+		return x.ServerID
+	}
+	return 0
+}
+
+func (x *ClaimBattleGrantReq) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *ClaimBattleGrantReq) GetBattleId() string {
+	if x != nil {
+		return x.BattleId
+	}
+	return ""
+}
+
+func (x *ClaimBattleGrantReq) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *ClaimBattleGrantReq) GetGrantId() string {
+	if x != nil {
+		return x.GrantId
+	}
+	return ""
+}
+
 var File_cspb_battle_req_proto protoreflect.FileDescriptor
 
 const file_cspb_battle_req_proto_rawDesc = "" +
@@ -369,7 +454,14 @@ const file_cspb_battle_req_proto_rawDesc = "" +
 	"\x03uid\x18\x01 \x01(\x04R\x03uid\x12\x19\n" +
 	"\x04role\x18\x02 \x01(\v2\x05.RoleR\x04role\x12\x1b\n" +
 	"\tserver_id\x18\x03 \x01(\rR\bserverId\x12\x17\n" +
-	"\anode_id\x18\x04 \x01(\rR\x06nodeIdB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
+	"\anode_id\x18\x04 \x01(\rR\x06nodeId\"\xb2\x01\n" +
+	"\x13ClaimBattleGrantReq\x12\x10\n" +
+	"\x03uID\x18e \x01(\x04R\x03uID\x12\x1a\n" +
+	"\bserverID\x18f \x01(\rR\bserverID\x12\x1c\n" +
+	"\tsessionID\x18g \x01(\tR\tsessionID\x12\x1b\n" +
+	"\tbattle_id\x18\x01 \x01(\tR\bbattleId\x12\x17\n" +
+	"\aunit_id\x18\x02 \x01(\tR\x06unitId\x12\x19\n" +
+	"\bgrant_id\x18\x03 \x01(\tR\agrantIdB*Z(github.com/gogu-x/gogs/pb/cspb/pb_battleb\x06proto3"
 
 var (
 	file_cspb_battle_req_proto_rawDescOnce sync.Once
@@ -383,20 +475,21 @@ func file_cspb_battle_req_proto_rawDescGZIP() []byte {
 	return file_cspb_battle_req_proto_rawDescData
 }
 
-var file_cspb_battle_req_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_cspb_battle_req_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_cspb_battle_req_proto_goTypes = []any{
 	(*StartBattleReq)(nil),      // 0: StartBattleReq
 	(*BattleInputReq)(nil),      // 1: BattleInputReq
 	(*InitialBattleMember)(nil), // 2: InitialBattleMember
-	(BattleType)(0),             // 3: BattleType
-	(*Role)(nil),                // 4: Role
+	(*ClaimBattleGrantReq)(nil), // 3: ClaimBattleGrantReq
+	(BattleType)(0),             // 4: BattleType
+	(*Role)(nil),                // 5: Role
 }
 var file_cspb_battle_req_proto_depIdxs = []int32{
-	3, // 0: StartBattleReq.battle_type:type_name -> BattleType
-	4, // 1: StartBattleReq.attacker_roles:type_name -> Role
-	4, // 2: StartBattleReq.defender_roles:type_name -> Role
+	4, // 0: StartBattleReq.battle_type:type_name -> BattleType
+	5, // 1: StartBattleReq.attacker_roles:type_name -> Role
+	5, // 2: StartBattleReq.defender_roles:type_name -> Role
 	2, // 3: StartBattleReq.initial_members:type_name -> InitialBattleMember
-	4, // 4: InitialBattleMember.role:type_name -> Role
+	5, // 4: InitialBattleMember.role:type_name -> Role
 	5, // [5:5] is the sub-list for method output_type
 	5, // [5:5] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
@@ -416,7 +509,7 @@ func file_cspb_battle_req_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_battle_req_proto_rawDesc), len(file_cspb_battle_req_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

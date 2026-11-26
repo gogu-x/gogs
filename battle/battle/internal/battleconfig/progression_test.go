@@ -10,6 +10,7 @@ import (
 	"github.com/gogu-x/gogs/pb/cspb/pb_common"
 )
 
+// TestGrowthAppliesAfterEquipmentExactlyOnce 验证成长系数在装备加成后仅应用一次。
 func TestGrowthAppliesAfterEquipmentExactlyOnce(t *testing.T) {
 	role := &glconf.BattleRoleCfg{MaxHP: 1000, Attack: 100, Defense: 50, Speed: 100}
 	equips := []*glconf.BattleEquipCfg{{Modifier: []*pb_common.TypIDVal{{Typ: "battle_attribute", Id: 1, Val: 200}, {Typ: "battle_attribute", Id: 2, Val: 20}}}}
@@ -27,16 +28,17 @@ func TestGrowthAppliesAfterEquipmentExactlyOnce(t *testing.T) {
 	}
 }
 
+// TestCompiledBattleIgnoresLaterRequestAndConfigurationMutations 验证编译完成后的战斗数据独立于原请求和配置。
 func TestCompiledBattleIgnoresLaterRequestAndConfigurationMutations(t *testing.T) {
 	roleConfig := &glconf.BattleRoleCfg{CfgID: 1, MaxHP: 1000, Attack: 100, Defense: 50, Speed: 100, DefaultPosition: 1, BasicSkillID: 1}
 	equipConfig := &glconf.BattleEquipCfg{CfgID: 77, Modifier: []*pb_common.TypIDVal{{Typ: "battle_attribute", Id: 1, Val: 200}, {Typ: "battle_attribute", Id: 2, Val: 20}, {Typ: "battle_attribute", Id: 3, Val: 10}, {Typ: "battle_attribute", Id: 4, Val: 5}}}
 	if err := glconf.SetBattleConfigsForTest(
 		[]*glconf.BattleRoleCfg{roleConfig},
-		[]*glconf.BattleSkillCfg{{CfgID: 1, TargetRule: int32(pb.TargetRule_TARGET_RULE_ENEMY_SINGLE), WindupTicks: 1, RecoveryTicks: 1, Effects: []*pb_common.TypIDVal{{Typ: "battle_damage", Pro: 1000}}}},
+		[]*glconf.BattleSkillCfg{{CfgID: 1, TargetRule: int32(pb.TargetRule_TARGET_RULE_ENEMY_SINGLE), Effects: []*pb_common.TypIDVal{{Typ: "battle_damage", Pro: 1000}}}},
 		[]*glconf.BattleEquipCfg{equipConfig},
 		[]*glconf.BattleMonsterCfg{{CfgID: 1, MaxHP: 1000, Attack: 100, Defense: 50, Speed: 100, BasicSkillID: 1}},
 		[]*glconf.BattleMonsterGroupCfg{{CfgID: 1, Members: []*pb_common.TypIDVal{{Typ: "battle_monster", Id: 1, Val: 1}}}},
-		[]*glconf.BattleRuleCfg{{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 1000, MaxActions: 30, CritMultiplierPermille: 1500}},
+		[]*glconf.BattleRuleCfg{{BattleType: int32(pb.BattleType_BATTLE_TYPE_TOWER), ATBThreshold: 1000, CritMultiplierPermille: 1500}},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -104,6 +106,7 @@ func TestCompiledBattleIgnoresLaterRequestAndConfigurationMutations(t *testing.T
 	}
 }
 
+// TestGrowthRejectsInvalidValuesAndOverflow 验证成长属性计算拒绝非法数值与溢出。
 func TestGrowthRejectsInvalidValuesAndOverflow(t *testing.T) {
 	if _, err := scaleGrowth(100, -1); err == nil {
 		t.Fatal("negative modifier accepted")

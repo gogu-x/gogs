@@ -10,6 +10,7 @@ import (
 	pb "github.com/gogu-x/gogs/pb/cspb/pb_battle"
 )
 
+// buildRoleUnit 根据角色配置和参战数据构建单位。
 func (c *Compiler) buildRoleUnit(role *pb.Role, team pb.BattleTeam) (engine.UnitConfig, error) {
 	if role == nil || role.GetRoleId() == "" || role.GetRoleConfigId() == 0 {
 		return engine.UnitConfig{}, fmt.Errorf("role id and role config id are required")
@@ -41,6 +42,7 @@ func (c *Compiler) buildRoleUnit(role *pb.Role, team pb.BattleTeam) (engine.Unit
 	return engine.UnitConfig{InstanceID: role.GetRoleId(), Team: team, Position: config.DefaultPosition, MaxHP: attributes.MaxHP, Attack: attributes.Attack, Defense: attributes.Defense, Speed: attributes.Speed, BasicSkill: basic, ActiveSkills: active, InitialStatus: statuses, PassiveCharges: charges}, nil
 }
 
+// buildRoleSkills 编译角色携带的技能。
 func (c *Compiler) buildRoleSkills(role *pb.Role, config *glconf.BattleRoleCfg) ([]engine.SkillConfig, error) {
 	skills := role.GetSkills()
 	if len(skills) == 0 {
@@ -75,6 +77,7 @@ func (c *Compiler) buildRoleSkills(role *pb.Role, config *glconf.BattleRoleCfg) 
 	return active, nil
 }
 
+// applyRoleEquips 读取装备配置并计算角色参战属性。
 func (c *Compiler) applyRoleEquips(role *pb.Role, config *glconf.BattleRoleCfg) (RoleAttributes, error) {
 	equips := make([]*glconf.BattleEquipCfg, 0, len(role.GetEquips()))
 	for _, roleEquip := range role.GetEquips() {
@@ -93,6 +96,7 @@ func (c *Compiler) applyRoleEquips(role *pb.Role, config *glconf.BattleRoleCfg) 
 	return c.roleStats.Calculate(role, config, equips)
 }
 
+// buildMonsterUnit 根据怪物配置构建参战单位。
 func (c *Compiler) buildMonsterUnit(monsterID, position int32) (engine.UnitConfig, error) {
 	config := glconf.GetBattleMonsterCfg(monsterID)
 	if config == nil {
@@ -118,6 +122,7 @@ func (c *Compiler) buildMonsterUnit(monsterID, position int32) (engine.UnitConfi
 	return engine.UnitConfig{InstanceID: instanceID, Team: pb.BattleTeam_BATTLE_TEAM_DEFENDER, Position: position, MaxHP: config.MaxHP, Attack: config.Attack, Defense: config.Defense, Speed: config.Speed, BasicSkill: basic, ActiveSkills: active, InitialStatus: statuses}, nil
 }
 
+// buildSkill 将技能配置编译为引擎技能。
 func (c *Compiler) buildSkill(id int32) (engine.SkillConfig, error) {
 	config := glconf.GetBattleSkillCfg(id)
 	if config == nil {
@@ -156,12 +161,10 @@ func (c *Compiler) buildSkill(id int32) (engine.SkillConfig, error) {
 		}
 		effects = append(effects, compiledEffect)
 	}
-	if config.WindupTicks <= 0 || config.RecoveryTicks <= 0 {
-		return engine.SkillConfig{}, fmt.Errorf("skill battle config id=%d requires positive windup_ticks and recovery_ticks", id)
-	}
-	return engine.SkillConfig{ID: strconv.Itoa(int(config.CfgID)), Cooldown: int(config.Cooldown), TargetRule: pb.TargetRule(config.TargetRule), Effects: effects, Charges: charges, WindupTicks: int64(config.WindupTicks), RecoveryTicks: int64(config.RecoveryTicks)}, nil
+	return engine.SkillConfig{ID: strconv.Itoa(int(config.CfgID)), Cooldown: int(config.Cooldown), TargetRule: pb.TargetRule(config.TargetRule), Effects: effects, Charges: charges}, nil
 }
 
+// buildInitialStatuses 编译单位入场时携带的状态。
 func (c *Compiler) buildInitialStatuses(ids []int32) ([]engine.StatusConfig, error) {
 	statuses := make([]engine.StatusConfig, 0, len(ids))
 	for _, id := range ids {
@@ -174,6 +177,7 @@ func (c *Compiler) buildInitialStatuses(ids []int32) ([]engine.StatusConfig, err
 	return statuses, nil
 }
 
+// buildStatus 将状态配置转换为引擎状态。
 func (c *Compiler) buildStatus(id int32) (engine.StatusConfig, error) {
 	config := glconf.GetBattleStatusCfg(id)
 	if config == nil {
@@ -225,7 +229,7 @@ func configureMonsterAI(monsterID int32, unit *engine.UnitConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("缺少怪物配置 %d", monsterID)
 	}
-	if cfg.AIFirstDelayTicks < 0 {
+	if cfg.AIFirstDelayMS < 0 {
 		return fmt.Errorf("怪物 %d 的首次出手延迟不能为负数", monsterID)
 	}
 	allowed := map[string]bool{unit.BasicSkill.ID: true}
@@ -246,7 +250,7 @@ func configureMonsterAI(monsterID int32, unit *engine.UnitConfig) error {
 	}
 	unit.CastRules = rules
 	unit.RobotSequence = sequence
-	unit.RobotFirstDelay = int64(cfg.AIFirstDelayTicks)
+	unit.RobotFirstDelay = int64(cfg.AIFirstDelayMS)
 	return nil
 }
 
