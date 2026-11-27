@@ -27,6 +27,7 @@ func (b *Battle) Controls() []*pb.BattleControl {
 func (b *Battle) control(actor *unit) *pb.BattleControl {
 	config := actor.Config
 	control := &pb.BattleControl{
+		CanGuard: config.GuardEnabled, GuardReadyMs: actor.guardReady,
 		UnitId: config.InstanceID, BasicSkill: config.BasicSkill.ID,
 		Attack: b.unitAttack(actor), Defense: b.unitDefense(actor),
 		Speed: b.unitSpeed(actor), ActionIntervalMs: b.attackInterval(actor),
@@ -41,7 +42,7 @@ func (b *Battle) control(actor *unit) *pb.BattleControl {
 	return control
 }
 
-// AdvanceClock 推进已到期的状态，在截止时刻停止接受动作并结算。
+// AdvanceClock 先推进到期状态与已锁定的重击，在截止时刻停止接受动作。
 func (b *Battle) AdvanceClock(now int64) []*pb.BattleEvent {
 	start := b.emitted
 	for {
@@ -57,7 +58,11 @@ func (b *Battle) AdvanceClock(now int64) []*pb.BattleEvent {
 		}
 		item := heap.Pop(&b.timeline).(*timelineItem)
 		b.elapsedMS = next
-		b.handleStatusTask(item)
+		if item.Phase == phaseStrikeImpact {
+			b.landStrike(item.Strike)
+		} else {
+			b.handleStatusTask(item)
+		}
 		b.checkInputEnd()
 		b.emitted = len(b.events)
 	}
@@ -90,7 +95,11 @@ func (b *Battle) ApplyInput(req *pb.BattleInputReq, team pb.BattleTeam) *pb.Batt
 	if b.done || !state.actor.alive() {
 		return ack
 	}
-	if b.elapsedMS < state.ready {
+	if req.GetSkillId() == guardSkillID {
+		b.startGuard(state, req, ack)
+		return ack
+	}
+	if b.elapsedMS < state.ready || state.actor.windup != nil {
 		return ack
 	}
 	actor := state.actor
@@ -125,9 +134,8 @@ func (b *Battle) ApplyInput(req *pb.BattleInputReq, team pb.BattleTeam) *pb.Batt
 	if len(targets) == 0 {
 		return ack
 	}
-	b.startedActions++
-	b.action = uint64(b.startedActions)
-	action := &battleAction{Actor: actor, Skill: skill, Targets: targets, TargetIDs: targetIDs(targets), Basic: skill.ID == actor.Config.BasicSkill.ID}
+	b.beginAction()
+	action := &battleAction{Number: b.action, Actor: actor, Skill: skill, Targets: targets, TargetIDs: targetIDs(targets), Basic: skill.ID == actor.Config.BasicSkill.ID}
 	state.ready = b.elapsedMS + b.attackInterval(actor)
 	ack.Code = pb_common.ErrCode_OK
 	ack.Action = b.action
@@ -142,6 +150,11 @@ func (b *Battle) ApplyInput(req *pb.BattleInputReq, team pb.BattleTeam) *pb.Batt
 			actor.Cooldowns[skill.ID] = skill.Cooldown
 		}
 		b.emitSkillUsed(action)
+		if skill.WindupMS > 0 {
+			b.startWindup(state, action)
+			ack.ReadyMs = state.ready
+			return ack
+		}
 		b.impactAction(action)
 	}
 	b.endAction(action)

@@ -110,22 +110,23 @@ func (c *Compiler) Compile(battleID string, seed uint64, request *pb.StartBattle
 	if c == nil {
 		return engine.Setup{}, fmt.Errorf("battle config compiler is not initialized")
 	}
-	rule, ok := c.modes[request.GetBattleType()]
+	battleType := request.GetBattleType()
+	rule, ok := c.modes[battleType]
 	if !ok {
-		return engine.Setup{}, fmt.Errorf("unsupported battle type=%d", request.GetBattleType())
+		return engine.Setup{}, fmt.Errorf("unsupported battle type=%d", battleType)
 	}
 	scenario, err := rule.Resolve(request)
 	if err != nil {
 		return engine.Setup{}, err
 	}
-	battleRule := glconf.GetBattleRuleCfg(int32(request.GetBattleType()))
+	battleRule := glconf.GetBattleRuleCfg(int32(battleType))
 	if battleRule == nil {
-		return engine.Setup{}, fmt.Errorf("battle rule config not found: battle_type=%d", request.GetBattleType())
+		return engine.Setup{}, fmt.Errorf("battle rule config not found: battle_type=%d", battleType)
 	}
 	units := make([]engine.UnitConfig, 0, len(scenario.Attackers)+len(scenario.Defenders)+4)
 	attackerPositions := make(map[int32]struct{}, len(scenario.Attackers))
 	for _, role := range scenario.Attackers {
-		unit, err := c.BuildJoinedRole(role)
+		unit, err := c.BuildEncounterRole(role, battleType)
 		if err != nil {
 			return engine.Setup{}, err
 		}
@@ -148,7 +149,7 @@ func (c *Compiler) Compile(battleID string, seed uint64, request *pb.StartBattle
 			}
 			position := member.GetPosition()
 			opponentPositions[position] = struct{}{}
-			unit, err := c.buildMonsterUnit(member.GetID(), position)
+			unit, err := c.buildMonsterUnit(member.GetID(), position, battleType)
 			if err != nil {
 				return engine.Setup{}, err
 			}
@@ -170,7 +171,7 @@ func (c *Compiler) Compile(battleID string, seed uint64, request *pb.StartBattle
 		units = append(units, unit)
 	}
 
-	return engine.Setup{BattleID: battleID, BattleType: request.GetBattleType(), Seed: seed, Rules: engine.Rules{
+	return engine.Setup{BattleID: battleID, BattleType: battleType, Seed: seed, Rules: engine.Rules{
 		ATBThreshold: battleRule.ATBThreshold, MaxDurationMS: int64(battleRule.MaxDurationMS),
 		DamageVariancePermille: battleRule.DamageVariancePermille, CritChancePermille: battleRule.CritChancePermille,
 		CritMultiplierPermille: battleRule.CritMultiplierPermille,

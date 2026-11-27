@@ -418,6 +418,8 @@ const (
 	BattleEventType_BATTLE_EVENT_TYPE_UNIT_JOINED BattleEventType = 11
 	// 战中增益已入账，携带最新单位与控制信息。
 	BattleEventType_BATTLE_EVENT_TYPE_GRANT_APPLIED BattleEventType = 12
+	// 架势已生效，附带站姿与行动间隔更新后的快照。
+	BattleEventType_BATTLE_EVENT_TYPE_GUARD_STARTED BattleEventType = 13
 )
 
 // Enum value maps for BattleEventType.
@@ -436,6 +438,7 @@ var (
 		10: "BATTLE_EVENT_TYPE_STATUS_REMOVED",
 		11: "BATTLE_EVENT_TYPE_UNIT_JOINED",
 		12: "BATTLE_EVENT_TYPE_GRANT_APPLIED",
+		13: "BATTLE_EVENT_TYPE_GUARD_STARTED",
 	}
 	BattleEventType_value = map[string]int32{
 		"BATTLE_EVENT_TYPE_UNSPECIFIED":      0,
@@ -451,6 +454,7 @@ var (
 		"BATTLE_EVENT_TYPE_STATUS_REMOVED":   10,
 		"BATTLE_EVENT_TYPE_UNIT_JOINED":      11,
 		"BATTLE_EVENT_TYPE_GRANT_APPLIED":    12,
+		"BATTLE_EVENT_TYPE_GUARD_STARTED":    13,
 	}
 )
 
@@ -846,8 +850,12 @@ type BattleEvent struct {
 	Grant          *BattleGrant      `protobuf:"bytes,27,opt,name=grant,proto3" json:"grant,omitempty"`
 	UpdatedUnit    *BattleUnitResult `protobuf:"bytes,28,opt,name=updated_unit,json=updatedUnit,proto3" json:"updated_unit,omitempty"`
 	UpdatedControl *BattleControl    `protobuf:"bytes,29,opt,name=updated_control,json=updatedControl,proto3" json:"updated_control,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 伤害经过目标的架势减免，目标获得一次反击。
+	Guarded bool `protobuf:"varint,30,opt,name=guarded,proto3" json:"guarded,omitempty"`
+	// 本次普攻伤害已消耗攻击者的反击机会。
+	Counter       bool `protobuf:"varint,31,opt,name=counter,proto3" json:"counter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BattleEvent) Reset() {
@@ -1076,6 +1084,102 @@ func (x *BattleEvent) GetUpdatedControl() *BattleControl {
 	return nil
 }
 
+func (x *BattleEvent) GetGuarded() bool {
+	if x != nil {
+		return x.Guarded
+	}
+	return false
+}
+
+func (x *BattleEvent) GetCounter() bool {
+	if x != nil {
+		return x.Counter
+	}
+	return false
+}
+
+// 已经举刀、尚未命中的单体重击，以战斗经过毫秒计时。
+type BattleWindup struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 与技能使用、行动结束或取消事件共用的行动序号。
+	Action uint64 `protobuf:"varint,1,opt,name=action,proto3" json:"action,omitempty"`
+	// 举刀时锁定的目标单位。
+	TargetId string `protobuf:"bytes,2,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
+	// 重击技能编号。
+	SkillId string `protobuf:"bytes,3,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	// 举刀时刻。
+	StartMs int64 `protobuf:"varint,4,opt,name=start_ms,json=startMs,proto3" json:"start_ms,omitempty"`
+	// 预定命中时刻。
+	ImpactMs      int64 `protobuf:"varint,5,opt,name=impact_ms,json=impactMs,proto3" json:"impact_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BattleWindup) Reset() {
+	*x = BattleWindup{}
+	mi := &file_cspb_battle_struct_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BattleWindup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BattleWindup) ProtoMessage() {}
+
+func (x *BattleWindup) ProtoReflect() protoreflect.Message {
+	mi := &file_cspb_battle_struct_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BattleWindup.ProtoReflect.Descriptor instead.
+func (*BattleWindup) Descriptor() ([]byte, []int) {
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *BattleWindup) GetAction() uint64 {
+	if x != nil {
+		return x.Action
+	}
+	return 0
+}
+
+func (x *BattleWindup) GetTargetId() string {
+	if x != nil {
+		return x.TargetId
+	}
+	return ""
+}
+
+func (x *BattleWindup) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
+}
+
+func (x *BattleWindup) GetStartMs() int64 {
+	if x != nil {
+		return x.StartMs
+	}
+	return 0
+}
+
+func (x *BattleWindup) GetImpactMs() int64 {
+	if x != nil {
+		return x.ImpactMs
+	}
+	return 0
+}
+
 // 一个单位的最终生命结果
 type BattleUnitResult struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1093,13 +1197,19 @@ type BattleUnitResult struct {
 	OwnerUid uint64 `protobuf:"varint,6,opt,name=owner_uid,json=ownerUid,proto3" json:"owner_uid,omitempty"`
 	// 本场已领取记录；状态是否仍生效以状态快照为准。
 	ReceivedGrants []*BattleGrant `protobuf:"bytes,7,rep,name=received_grants,json=receivedGrants,proto3" json:"received_grants,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 此单位尚在准备的重击。
+	Windup *BattleWindup `protobuf:"bytes,8,opt,name=windup,proto3" json:"windup,omitempty"`
+	// 架势截止时刻，以战斗经过毫秒计。
+	GuardUntilMs int64 `protobuf:"varint,9,opt,name=guard_until_ms,json=guardUntilMs,proto3" json:"guard_until_ms,omitempty"`
+	// 下次有效普攻可以触发反击。
+	CounterReady  bool `protobuf:"varint,10,opt,name=counter_ready,json=counterReady,proto3" json:"counter_ready,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BattleUnitResult) Reset() {
 	*x = BattleUnitResult{}
-	mi := &file_cspb_battle_struct_proto_msgTypes[4]
+	mi := &file_cspb_battle_struct_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1111,7 +1221,7 @@ func (x *BattleUnitResult) String() string {
 func (*BattleUnitResult) ProtoMessage() {}
 
 func (x *BattleUnitResult) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_struct_proto_msgTypes[4]
+	mi := &file_cspb_battle_struct_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1124,7 +1234,7 @@ func (x *BattleUnitResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleUnitResult.ProtoReflect.Descriptor instead.
 func (*BattleUnitResult) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{4}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *BattleUnitResult) GetInstanceId() string {
@@ -1176,6 +1286,27 @@ func (x *BattleUnitResult) GetReceivedGrants() []*BattleGrant {
 	return nil
 }
 
+func (x *BattleUnitResult) GetWindup() *BattleWindup {
+	if x != nil {
+		return x.Windup
+	}
+	return nil
+}
+
+func (x *BattleUnitResult) GetGuardUntilMs() int64 {
+	if x != nil {
+		return x.GuardUntilMs
+	}
+	return 0
+}
+
+func (x *BattleUnitResult) GetCounterReady() bool {
+	if x != nil {
+		return x.CounterReady
+	}
+	return false
+}
+
 // 玩法服确认的一次发放，同场同单位的发放编号唯一。
 type BattleGrant struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
@@ -1192,7 +1323,7 @@ type BattleGrant struct {
 
 func (x *BattleGrant) Reset() {
 	*x = BattleGrant{}
-	mi := &file_cspb_battle_struct_proto_msgTypes[5]
+	mi := &file_cspb_battle_struct_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1204,7 +1335,7 @@ func (x *BattleGrant) String() string {
 func (*BattleGrant) ProtoMessage() {}
 
 func (x *BattleGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_struct_proto_msgTypes[5]
+	mi := &file_cspb_battle_struct_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1217,7 +1348,7 @@ func (x *BattleGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleGrant.ProtoReflect.Descriptor instead.
 func (*BattleGrant) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{5}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *BattleGrant) GetGrantId() string {
@@ -1289,10 +1420,14 @@ type BattleControl struct {
 	// 只有拥有者的控制快照携带可领取掉落。
 	AvailableGrants []*BattleGrant `protobuf:"bytes,7,rep,name=available_grants,json=availableGrants,proto3" json:"available_grants,omitempty"`
 	// 当前服务端结算属性和行动间隔。
-	Attack            int64    `protobuf:"varint,8,opt,name=attack,proto3" json:"attack,omitempty"`
-	Defense           int64    `protobuf:"varint,9,opt,name=defense,proto3" json:"defense,omitempty"`
-	Speed             int64    `protobuf:"varint,10,opt,name=speed,proto3" json:"speed,omitempty"`
-	ActionIntervalMs  int64    `protobuf:"varint,11,opt,name=action_interval_ms,json=actionIntervalMs,proto3" json:"action_interval_ms,omitempty"`
+	Attack           int64 `protobuf:"varint,8,opt,name=attack,proto3" json:"attack,omitempty"`
+	Defense          int64 `protobuf:"varint,9,opt,name=defense,proto3" json:"defense,omitempty"`
+	Speed            int64 `protobuf:"varint,10,opt,name=speed,proto3" json:"speed,omitempty"`
+	ActionIntervalMs int64 `protobuf:"varint,11,opt,name=action_interval_ms,json=actionIntervalMs,proto3" json:"action_interval_ms,omitempty"`
+	// 再次可以使用架势的战斗经过毫秒。
+	GuardReadyMs int64 `protobuf:"varint,12,opt,name=guard_ready_ms,json=guardReadyMs,proto3" json:"guard_ready_ms,omitempty"`
+	// 此单位已解锁架势，输入技能编号为 guard。
+	CanGuard          bool     `protobuf:"varint,13,opt,name=can_guard,json=canGuard,proto3" json:"can_guard,omitempty"`
 	UnitId            string   `protobuf:"bytes,1,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
 	BasicSkill        string   `protobuf:"bytes,2,opt,name=basic_skill,json=basicSkill,proto3" json:"basic_skill,omitempty"`
 	ActiveSkills      []string `protobuf:"bytes,3,rep,name=active_skills,json=activeSkills,proto3" json:"active_skills,omitempty"`
@@ -1304,7 +1439,7 @@ type BattleControl struct {
 
 func (x *BattleControl) Reset() {
 	*x = BattleControl{}
-	mi := &file_cspb_battle_struct_proto_msgTypes[6]
+	mi := &file_cspb_battle_struct_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1316,7 +1451,7 @@ func (x *BattleControl) String() string {
 func (*BattleControl) ProtoMessage() {}
 
 func (x *BattleControl) ProtoReflect() protoreflect.Message {
-	mi := &file_cspb_battle_struct_proto_msgTypes[6]
+	mi := &file_cspb_battle_struct_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1329,7 +1464,7 @@ func (x *BattleControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BattleControl.ProtoReflect.Descriptor instead.
 func (*BattleControl) Descriptor() ([]byte, []int) {
-	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{6}
+	return file_cspb_battle_struct_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *BattleControl) GetAvailableGrants() []*BattleGrant {
@@ -1365,6 +1500,20 @@ func (x *BattleControl) GetActionIntervalMs() int64 {
 		return x.ActionIntervalMs
 	}
 	return 0
+}
+
+func (x *BattleControl) GetGuardReadyMs() int64 {
+	if x != nil {
+		return x.GuardReadyMs
+	}
+	return 0
+}
+
+func (x *BattleControl) GetCanGuard() bool {
+	if x != nil {
+		return x.CanGuard
+	}
+	return false
 }
 
 func (x *BattleControl) GetUnitId() string {
@@ -1426,7 +1575,7 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x06equips\x18\a \x03(\v2\n" +
 	".RoleEquipR\x06equips\x12:\n" +
 	"\x1asoul_jade_effect_affix_ids\x18\t \x03(\x05R\x16soulJadeEffectAffixIds\x121\n" +
-	"\fgrowth_bonus\x18\b \x01(\v2\x0e.GrowthBonusesR\vgrowthBonus\"\xeb\a\n" +
+	"\fgrowth_bonus\x18\b \x01(\v2\x0e.GrowthBonusesR\vgrowthBonus\"\x9f\b\n" +
 	"\vBattleEvent\x12\x1a\n" +
 	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\x04R\x06action\x12\x1d\n" +
@@ -1461,7 +1610,15 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"joinedUnit\x12\"\n" +
 	"\x05grant\x18\x1b \x01(\v2\f.BattleGrantR\x05grant\x124\n" +
 	"\fupdated_unit\x18\x1c \x01(\v2\x11.BattleUnitResultR\vupdatedUnit\x127\n" +
-	"\x0fupdated_control\x18\x1d \x01(\v2\x0e.BattleControlR\x0eupdatedControl\"\xe5\x01\n" +
+	"\x0fupdated_control\x18\x1d \x01(\v2\x0e.BattleControlR\x0eupdatedControl\x12\x18\n" +
+	"\aguarded\x18\x1e \x01(\bR\aguarded\x12\x18\n" +
+	"\acounter\x18\x1f \x01(\bR\acounter\"\x96\x01\n" +
+	"\fBattleWindup\x12\x16\n" +
+	"\x06action\x18\x01 \x01(\x04R\x06action\x12\x1b\n" +
+	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x19\n" +
+	"\bskill_id\x18\x03 \x01(\tR\askillId\x12\x19\n" +
+	"\bstart_ms\x18\x04 \x01(\x03R\astartMs\x12\x1b\n" +
+	"\timpact_ms\x18\x05 \x01(\x03R\bimpactMs\"\xd7\x02\n" +
 	"\x10BattleUnitResult\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x1f\n" +
@@ -1470,20 +1627,26 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x06max_hp\x18\x04 \x01(\x03R\x05maxHp\x12\x14\n" +
 	"\x05alive\x18\x05 \x01(\bR\x05alive\x12\x1b\n" +
 	"\towner_uid\x18\x06 \x01(\x04R\bownerUid\x125\n" +
-	"\x0freceived_grants\x18\a \x03(\v2\f.BattleGrantR\x0ereceivedGrants\"\xb0\x01\n" +
+	"\x0freceived_grants\x18\a \x03(\v2\f.BattleGrantR\x0ereceivedGrants\x12%\n" +
+	"\x06windup\x18\b \x01(\v2\r.BattleWindupR\x06windup\x12$\n" +
+	"\x0eguard_until_ms\x18\t \x01(\x03R\fguardUntilMs\x12#\n" +
+	"\rcounter_ready\x18\n" +
+	" \x01(\bR\fcounterReady\"\xb0\x01\n" +
 	"\vBattleGrant\x12\x19\n" +
 	"\bgrant_id\x18\x01 \x01(\tR\agrantId\x12(\n" +
 	"\x0fequip_config_id\x18\x02 \x01(\x05H\x00R\requipConfigId\x12&\n" +
 	"\x0etalent_node_id\x18\x03 \x01(\x05H\x00R\ftalentNodeId\x12*\n" +
 	"\x10status_config_id\x18\x04 \x01(\x05H\x00R\x0estatusConfigIdB\b\n" +
-	"\x06effect\"\x83\x03\n" +
+	"\x06effect\"\xc6\x03\n" +
 	"\rBattleControl\x127\n" +
 	"\x10available_grants\x18\a \x03(\v2\f.BattleGrantR\x0favailableGrants\x12\x16\n" +
 	"\x06attack\x18\b \x01(\x03R\x06attack\x12\x18\n" +
 	"\adefense\x18\t \x01(\x03R\adefense\x12\x14\n" +
 	"\x05speed\x18\n" +
 	" \x01(\x03R\x05speed\x12,\n" +
-	"\x12action_interval_ms\x18\v \x01(\x03R\x10actionIntervalMs\x12\x17\n" +
+	"\x12action_interval_ms\x18\v \x01(\x03R\x10actionIntervalMs\x12$\n" +
+	"\x0eguard_ready_ms\x18\f \x01(\x03R\fguardReadyMs\x12\x1b\n" +
+	"\tcan_guard\x18\r \x01(\bR\bcanGuard\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12\x1f\n" +
 	"\vbasic_skill\x18\x02 \x01(\tR\n" +
 	"basicSkill\x12#\n" +
@@ -1531,7 +1694,7 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	"\x13STATUS_TYPE_SILENCE\x10\x02\x12\x13\n" +
 	"\x0fSTATUS_TYPE_DOT\x10\x03\x12\x13\n" +
 	"\x0fSTATUS_TYPE_HOT\x10\x04\x12\"\n" +
-	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\xe0\x03\n" +
+	"\x1eSTATUS_TYPE_ATTRIBUTE_MODIFIER\x10\x05*\x85\x04\n" +
 	"\x0fBattleEventType\x12!\n" +
 	"\x1dBATTLE_EVENT_TYPE_UNSPECIFIED\x10\x00\x12$\n" +
 	" BATTLE_EVENT_TYPE_ACTION_STARTED\x10\x01\x12 \n" +
@@ -1546,7 +1709,8 @@ const file_cspb_battle_struct_proto_rawDesc = "" +
 	" BATTLE_EVENT_TYPE_STATUS_REMOVED\x10\n" +
 	"\x12!\n" +
 	"\x1dBATTLE_EVENT_TYPE_UNIT_JOINED\x10\v\x12#\n" +
-	"\x1fBATTLE_EVENT_TYPE_GRANT_APPLIED\x10\f*\xc8\x01\n" +
+	"\x1fBATTLE_EVENT_TYPE_GRANT_APPLIED\x10\f\x12#\n" +
+	"\x1fBATTLE_EVENT_TYPE_GUARD_STARTED\x10\r*\xc8\x01\n" +
 	"\x11BattleEventReason\x12#\n" +
 	"\x1fBATTLE_EVENT_REASON_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eBATTLE_EVENT_REASON_ACTOR_DEAD\x10\x01\x12\x1f\n" +
@@ -1567,7 +1731,7 @@ func file_cspb_battle_struct_proto_rawDescGZIP() []byte {
 }
 
 var file_cspb_battle_struct_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_cspb_battle_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_cspb_battle_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_cspb_battle_struct_proto_goTypes = []any{
 	(BattleType)(0),                 // 0: BattleType
 	(BattleTeam)(0),                 // 1: BattleTeam
@@ -1581,32 +1745,34 @@ var file_cspb_battle_struct_proto_goTypes = []any{
 	(*RoleEquip)(nil),               // 9: RoleEquip
 	(*Role)(nil),                    // 10: Role
 	(*BattleEvent)(nil),             // 11: BattleEvent
-	(*BattleUnitResult)(nil),        // 12: BattleUnitResult
-	(*BattleGrant)(nil),             // 13: BattleGrant
-	(*BattleControl)(nil),           // 14: BattleControl
-	(*pb_common.GrowthBonuses)(nil), // 15: GrowthBonuses
+	(*BattleWindup)(nil),            // 12: BattleWindup
+	(*BattleUnitResult)(nil),        // 13: BattleUnitResult
+	(*BattleGrant)(nil),             // 14: BattleGrant
+	(*BattleControl)(nil),           // 15: BattleControl
+	(*pb_common.GrowthBonuses)(nil), // 16: GrowthBonuses
 }
 var file_cspb_battle_struct_proto_depIdxs = []int32{
 	8,  // 0: Role.skills:type_name -> RoleSkill
 	9,  // 1: Role.equips:type_name -> RoleEquip
-	15, // 2: Role.growth_bonus:type_name -> GrowthBonuses
+	16, // 2: Role.growth_bonus:type_name -> GrowthBonuses
 	6,  // 3: BattleEvent.type:type_name -> BattleEventType
 	4,  // 4: BattleEvent.effect_type:type_name -> EffectType
 	5,  // 5: BattleEvent.status_type:type_name -> StatusType
 	7,  // 6: BattleEvent.reason:type_name -> BattleEventReason
 	2,  // 7: BattleEvent.outcome:type_name -> BattleOutcome
-	12, // 8: BattleEvent.joined_unit:type_name -> BattleUnitResult
-	13, // 9: BattleEvent.grant:type_name -> BattleGrant
-	12, // 10: BattleEvent.updated_unit:type_name -> BattleUnitResult
-	14, // 11: BattleEvent.updated_control:type_name -> BattleControl
+	13, // 8: BattleEvent.joined_unit:type_name -> BattleUnitResult
+	14, // 9: BattleEvent.grant:type_name -> BattleGrant
+	13, // 10: BattleEvent.updated_unit:type_name -> BattleUnitResult
+	15, // 11: BattleEvent.updated_control:type_name -> BattleControl
 	1,  // 12: BattleUnitResult.team:type_name -> BattleTeam
-	13, // 13: BattleUnitResult.received_grants:type_name -> BattleGrant
-	13, // 14: BattleControl.available_grants:type_name -> BattleGrant
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	14, // 13: BattleUnitResult.received_grants:type_name -> BattleGrant
+	12, // 14: BattleUnitResult.windup:type_name -> BattleWindup
+	14, // 15: BattleControl.available_grants:type_name -> BattleGrant
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_cspb_battle_struct_proto_init() }
@@ -1614,7 +1780,7 @@ func file_cspb_battle_struct_proto_init() {
 	if File_cspb_battle_struct_proto != nil {
 		return
 	}
-	file_cspb_battle_struct_proto_msgTypes[5].OneofWrappers = []any{
+	file_cspb_battle_struct_proto_msgTypes[6].OneofWrappers = []any{
 		(*BattleGrant_EquipConfigId)(nil),
 		(*BattleGrant_TalentNodeId)(nil),
 		(*BattleGrant_StatusConfigId)(nil),
@@ -1625,7 +1791,7 @@ func file_cspb_battle_struct_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cspb_battle_struct_proto_rawDesc), len(file_cspb_battle_struct_proto_rawDesc)),
 			NumEnums:      8,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

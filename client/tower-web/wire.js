@@ -14,11 +14,12 @@ const battleWire = (() => {
     BattleActionNtf:['battle_id:s',null,'event:Event'],
     BattleInputAck:['battle_id:s','unit_id:s','sequence','code',null,'ready_ms',null,null,'current_ms'],
     BattleFinishedNtf:['battle_id:s',null,'outcome','units:*Unit'],
-    Unit:['instance_id:s','team','hp','max_hp','alive',null,'received_grants:*Grant'],
+    Unit:['instance_id:s','team','hp','max_hp','alive',null,'received_grants:*Grant','windup:Windup','guard_until_ms','counter_ready'],
+    Windup:['action','target_id:s','skill_id:s','start_ms','impact_ms'],
     Grant:['grant_id:s','equip_config_id','talent_node_id','status_config_id'],
-    Control:['unit_id:s','basic_skill:s','active_skills:*s',null,'last_input_sequence','next_ready_ms','available_grants:*Grant','attack','defense','speed','action_interval_ms'],
-    Event:['sequence',null,'elapsed_ms','type','actor_id:s','target_id:s','skill_id:s',null,'amount',null,'hp_after',
-      ...Array(14).fill(null),'joined_unit:Unit','grant:Grant','updated_unit:Unit','updated_control:Control']
+    Control:['unit_id:s','basic_skill:s','active_skills:*s',null,'last_input_sequence','next_ready_ms','available_grants:*Grant','attack','defense','speed','action_interval_ms','guard_ready_ms','can_guard'],
+    Event:['sequence','action','elapsed_ms','type','actor_id:s','target_id:s','skill_id:s',null,'amount',null,'hp_after',
+      null,'target_ids:*s','start_ms','impact_ms',...Array(10).fill(null),'joined_unit:Unit','grant:Grant','updated_unit:Unit','updated_control:Control','guarded','counter']
   };
   const ids=new Map(), names=new Map();
   for(const name of Object.keys(schemas).filter(n=>/Req$|Ack$|Ntf$/.test(n))){

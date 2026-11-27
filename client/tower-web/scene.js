@@ -9,7 +9,7 @@ function polygon(points,color){
 function swingDuration(intervalMs){
   return intervalMs>0 ? Math.min(intervalMs, 700, Math.max(300, intervalMs*0.55)) : 300;
 }
-function drawScene(enemies,target,hits,started,now,swings,inCombat=false,player=null,allies=[]){
+function drawScene(enemies,target,hits,started,now,swings,inCombat=false,player=null,allies=[],battleMs=0){
   const w=canvas.clientWidth,h=canvas.clientHeight,d=Math.min(devicePixelRatio,2);
   if(canvas.width!==Math.round(w*d)||canvas.height!==Math.round(h*d)){canvas.width=Math.round(w*d);canvas.height=Math.round(h*d)}
   ctx.setTransform(canvas.width/900,0,0,canvas.height/350,0,0);
@@ -48,8 +48,11 @@ function drawScene(enemies,target,hits,started,now,swings,inCombat=false,player=
     const wind=ease(Math.min(1,phase/.28));
     const cut=ease(Math.min(1,Math.max(0,(phase-.28)/.32)));
     const recover=ease(Math.max(0,(phase-.60)/.40));
-    const swing=(-.38*wind+1.38*cut)*(1-recover);
-    const blade=(-1.25*wind+2.7*cut)*(1-recover);
+    const windup=inCombat&&unit?.hp?unit.windup:null;
+    const guarding=inCombat&&unit?.hp&&unit.guard_until_ms>battleMs;
+    const lift=windup?Math.min(1,Math.max(0,(battleMs-(windup.start_ms||0))/230)):0;
+    const swing=windup?-.46*lift:guarding?-.18:(-.38*wind+1.38*cut)*(1-recover);
+    const blade=windup?-1.55*lift:guarding?-.72:(-1.25*wind+2.7*cut)*(1-recover);
     const stagger=hits.some(hit=>hit.to===id&&!hit.heal&&now-hit.time<140);
     // 步法、重心和持剑姿势使用错开的相位，让换向时仍能看到举剑动作。
     const engaged=inCombat&&(unit?.hp>0);
@@ -59,10 +62,14 @@ function drawScene(enemies,target,hits,started,now,swings,inCombat=false,player=
     const x=home+(center-home)*close+side*(stride*11+swing*14-(stagger?4:0));
     const y=262+(hero?0:id===0?-8:8)*close-Math.abs(guard)*4
       +Math.sin(now/85+id)*3*(1-close)*approach;
-    positions.push({unit,x,y,side:approach===0?(hero?1:-1):side,swing,blade,phase,stagger,stride,guard,id});
+    positions.push({unit,x,y,side:approach===0?(hero?1:-1):side,swing,blade,phase,stagger,stride,guard,id,windup,guarding});
   }
-  for(const {x,y,side,swing,blade,phase,stagger,stride,guard,id} of [...positions].sort((a,b)=>a.y-b.y)){
+  for(const {unit,x,y,side,swing,blade,phase,stagger,stride,guard,id,windup,guarding} of [...positions].sort((a,b)=>a.y-b.y)){
     if(id>=0&&!enemies[id].hp&&!hits.some(hit=>hit.to===id&&now-hit.time<200))continue;
+    if(inCombat&&enemies.some(e=>e.hp&&e.windup&&e.windup.target_id===unit?.instance_id)){
+      ctx.save();ctx.strokeStyle='#ff9b76';ctx.lineWidth=3;
+      ctx.beginPath();ctx.ellipse(x,y+3,22,6,0,0,Math.PI*2);ctx.stroke();ctx.restore();
+    }
     const color=id<0?'#8cd9c6':'#d99372';
     ctx.save();ctx.translate(x,y);ctx.scale(side,1);
     polygon([[-12,-15],[-4,-15],[-10-stride*7,1],[-19-stride*7,1]],'#162b30');
@@ -90,15 +97,25 @@ function drawScene(enemies,target,hits,started,now,swings,inCombat=false,player=
     const handX=9+swing*7,handY=6+blade*4;
     polygon([[-4,-3],[2,-4],[5,3],[handX,handY-2],[handX+1,handY+2],[2,10],[-5,4]],armor);
     ctx.translate(handX,handY);ctx.rotate(-.78+guard*.12+blade);
-    if(phase>.28&&phase<.7){
+    if(!windup&&!guarding&&phase>.28&&phase<.7){
       ctx.save();ctx.globalAlpha=.65*Math.sin(Math.PI*(phase-.28)/.42);
       ctx.strokeStyle=trim;ctx.lineWidth=3;ctx.beginPath();
       ctx.arc(0,0,42,-.95,0);ctx.stroke();ctx.restore();
     }
     polygon([[-6,-2],[6,-2],[6,2],[-6,2]],'#473f36');
     polygon([[4,-6],[7,-5],[8,5],[5,6]],trim);
-    polygon([[7,-2],[39,-3],[48,-6],[41,1],[7,3]],'#e5efdf');
+    polygon([[7,-2],[39,-3],[48,-6],[41,1],[7,3]],windup?'#ffab77':guarding?'#adf3e5':'#e5efdf');
     ctx.restore();
+    if(guarding){
+      ctx.save();ctx.strokeStyle='#9ee6d5';ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(x,y-32,22,side>0?-1.2:Math.PI-1.2,side>0?1.2:Math.PI+1.2);ctx.stroke();ctx.restore();
+    }
+    if(windup){
+      const start=windup.start_ms||0;
+      const progress=Math.min(1,Math.max(0,(battleMs-start)/Math.max(1,windup.impact_ms-start)));
+      ctx.fillStyle='#492a2a';ctx.fillRect(x-23,y+7,46,6);
+      ctx.fillStyle='#ffab77';ctx.fillRect(x-22,y+8,44*progress,4);
+    }
     if(id>=0&&id===target)polygon([[x-5,y-79],[x+5,y-79],[x,y-72]],'#ffdc93');
   }
   for(const hit of hits){

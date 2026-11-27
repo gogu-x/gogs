@@ -17,12 +17,15 @@ const (
 	phaseStatusExpire timelinePhase = iota
 	// 周期效果在该时刻动作之前执行，按回合效果仍沿用原有时机。
 	phaseStatusTick
+	// 已到期的重击在同刻状态任务后、新输入前结算。
+	phaseStrikeImpact
 )
 
 type timelineItem struct {
 	ElapsedMs int64
 	Phase     timelinePhase
 	Actor     *unit
+	Strike    *battleAction // 重击任务持有举刀时锁定的技能和目标。
 
 	StatusID      uint64 // 状态任务关联的实例编号。
 	StatusVersion uint64 // 入队时的版本，刷新后旧任务自动失效。

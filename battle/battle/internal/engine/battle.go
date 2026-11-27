@@ -9,12 +9,16 @@ import (
 type activeStatus = StatusInstance
 
 type unit struct {
-	grants    []*pb.BattleGrant // 按入账顺序保存，供去重及快照使用。
-	Config    UnitConfig
-	HP        int64
-	Cooldowns map[string]int
-	Statuses  []activeStatus
-	charges   map[pb.EffectType]int64
+	windup       *pb.BattleWindup  // 本单位已锁定目标但尚未落刀的重击。
+	guardUntil   int64             // 架势有效期末端，命中时刻严格小于此值才可格挡。
+	guardReady   int64             // 架势自身冷却的到期时间。
+	counterReady bool              // 已经格挡成功，等待下一次有效普攻。
+	grants       []*pb.BattleGrant // 按入账顺序保存，供去重及快照使用。
+	Config       UnitConfig
+	HP           int64
+	Cooldowns    map[string]int
+	Statuses     []activeStatus
+	charges      map[pb.EffectType]int64
 }
 
 // alive 根据当前生命值判断单位是否存活。
@@ -269,6 +273,7 @@ func (b *Battle) impactAction(action *battleAction) {
 		)
 		return
 	}
+	counter := action.Basic && actor.counterReady
 	successfulHits := 0
 	for _, target := range action.Targets {
 		if !target.alive() {
@@ -293,12 +298,27 @@ func (b *Battle) impactAction(action *battleAction) {
 			)
 			continue
 		}
+		blocked := action.Skill.WindupMS > 0 && b.elapsedMS < target.guardUntil
 		damaged := false
 		for _, result := range results {
-			if b.applyResolution(
+			if result.Kind == pb.EffectType_EFFECT_TYPE_DAMAGE {
+				result.Amount = strikeDamage(result.Amount, blocked, counter)
+			}
+			if event := b.applyResolution(
 				actor, target, action.Skill, result,
-			) > 0 {
+			); event != nil {
 				damaged = true
+				if blocked {
+					target.guardUntil = 0
+					target.counterReady = true
+					event.Guarded = true
+					event.UpdatedUnit = target.healthSnapshot()
+				}
+				if counter {
+					actor.counterReady = false
+					event.Counter = true
+					event.UpdatedUnit = actor.healthSnapshot()
+				}
 			}
 		}
 		if damaged {
@@ -310,14 +330,14 @@ func (b *Battle) impactAction(action *battleAction) {
 	}
 }
 
-// applyResolution 将已计算的技能效果应用到战斗状态。
+// applyResolution 应用技能效果并返回有效扣血事件，供格挡及反击标注最终结果。
 func (b *Battle) applyResolution(
 	actor, target *unit, skill SkillConfig, resolution EffectResolution,
-) int64 {
+) *pb.BattleEvent {
 	if !target.alive() {
-		return 0
+		return nil
 	}
-	before := target.HP
+	var damage *pb.BattleEvent
 	err := b.strategies.Effects.Apply(EffectApplyContext{
 		ActorID: actor.Config.InstanceID, SkillID: skill.ID, Target: effectTarget{unit: target}, Statuses: b.strategies.Statuses,
 		ApplyStatus: func(config StatusConfig) error {
@@ -331,12 +351,15 @@ func (b *Battle) applyResolution(
 			if result.Status != nil {
 				info.StatusType = result.Status.Kind
 			}
-			b.emit(
+			event := b.emit(
 				kind,
 				actor.Config.InstanceID, target.Config.InstanceID, skill.ID, statusID,
 				amount, before, after,
 				info, nil,
 			)
+			if resolution.Kind == pb.EffectType_EFFECT_TYPE_DAMAGE && kind == pb.BattleEventType_BATTLE_EVENT_TYPE_DAMAGE && after < before {
+				damage = event
+			}
 		},
 	}, resolution)
 	if err != nil {
@@ -346,12 +369,9 @@ func (b *Battle) applyResolution(
 			0, target.HP, target.HP,
 			eventInfo{Reason: pb.BattleEventReason_BATTLE_EVENT_REASON_EFFECT_ERROR}, nil,
 		)
-		return 0
+		return nil
 	}
-	if resolution.Kind == pb.EffectType_EFFECT_TYPE_DAMAGE && target.HP < before {
-		return before - target.HP
-	}
-	return 0
+	return damage
 }
 
 // applyCharges 在原技能的全部目标结算后，按有效命中数积攒并触发效果。
@@ -453,7 +473,7 @@ func (b *Battle) endAction(action *battleAction) {
 	b.emitActionEvent(action, pb.BattleEventType_BATTLE_EVENT_TYPE_ACTION_ENDED)
 }
 
-// NextDueMS 返回最近的状态任务或战斗截止时刻。
+// NextDueMS 返回最近的状态任务、重击命中或战斗截止时刻。
 func (b *Battle) NextDueMS() (int64, bool) {
 	if b.done || b.finished {
 		return 0, false
@@ -534,7 +554,12 @@ func (u *unit) snapshot() *pb.BattleUnitResult {
 	return snapshot
 }
 
-// healthSnapshot 提取当前单位血量，单次增益事件只需携带此次新增记录。
+// healthSnapshot 提取血量、架势及重击状态，供事件和完整快照复用。
 func (u *unit) healthSnapshot() *pb.BattleUnitResult {
-	return &pb.BattleUnitResult{OwnerUid: u.Config.OwnerUID, InstanceId: u.Config.InstanceID, Team: u.Config.Team, Hp: u.HP, MaxHp: u.Config.MaxHP, Alive: u.alive()}
+	config := u.Config
+	return &pb.BattleUnitResult{
+		OwnerUid: config.OwnerUID, InstanceId: config.InstanceID, Team: config.Team,
+		Hp: u.HP, MaxHp: config.MaxHP, Alive: u.alive(),
+		Windup: u.windup, GuardUntilMs: u.guardUntil, CounterReady: u.counterReady,
+	}
 }

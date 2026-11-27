@@ -97,7 +97,7 @@ func (c *Compiler) applyRoleEquips(role *pb.Role, config *glconf.BattleRoleCfg) 
 }
 
 // buildMonsterUnit 根据怪物配置构建参战单位。
-func (c *Compiler) buildMonsterUnit(monsterID, position int32) (engine.UnitConfig, error) {
+func (c *Compiler) buildMonsterUnit(monsterID, position int32, battleType pb.BattleType) (engine.UnitConfig, error) {
 	config := glconf.GetBattleMonsterCfg(monsterID)
 	if config == nil {
 		return engine.UnitConfig{}, fmt.Errorf("monster battle config not found: monster_config_id=%d", monsterID)
@@ -111,6 +111,9 @@ func (c *Compiler) buildMonsterUnit(monsterID, position int32) (engine.UnitConfi
 		skill, err := c.buildSkill(id)
 		if err != nil {
 			return engine.UnitConfig{}, err
+		}
+		if supportsGuard(battleType) && isGuardableHeavyStrike(id) {
+			skill.WindupMS = heavyStrikeWindupMS
 		}
 		active = append(active, skill)
 	}

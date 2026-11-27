@@ -1,9 +1,12 @@
 const el=id=>document.getElementById(id);
 let socket,phase='offline',battle='',control=null,hero=null,allies=[],enemies=[],target=-1;
-let sequence=0,cursor=0,pending=0,clock=0,next=0,started=null,hits=[],preferred='',fallback=false;
+let sequence=0,cursor=0,clock=0,next=0,started=null,hits=[],preferred='',fallback=false;
 let automatic=false;
 let casts=0,damage=0,elapsed=0;
-let pendingBody=null;
+const inputs=new Map();
+let acknowledged=0;
+let flashText='',flashUntil=0;
+
 let attackTimer,requestTimer,claim='',offers=[],claimed=[];
 const swings=new Map();
 const queuedSwings=new Map();
@@ -15,26 +18,38 @@ function status(value,title){
   el('login').hidden=phase!=='offline';el('disconnect').hidden=phase==='offline';
 }
 function send(name,body){socket.send(battleWire.encode(name,body))}
-function clearInput(){
-  pending=0;pendingBody=null;
-  clearTimeout(requestTimer);el('retry-input').hidden=true;
+function refreshRetry(){
+  el('retry-input').hidden=![...inputs.values()].some(input=>input.timedOut);
 }
-function stopTimers(){clearTimeout(attackTimer);clearInput()}
-function transmitInput(retry){
-  if(phase!=='play'||!pendingBody)return;
-  clearTimeout(requestTimer);el('retry-input').hidden=true;
-  send('BattleInputReq',pendingBody);
-  requestTimer=setTimeout(()=>{
-    if(!pendingBody||phase!=='play')return;
-    if(!retry){message('仍在等待出手确认，正在重发同一次出招。');transmitInput(true);return}
-    el('retry-input').hidden=false;
-    message('第 '+pending+' 次出招尚未收到确认，可重试。');
+function discardInputs(upTo){
+  for(const [seq,input] of inputs){
+    if(seq<=upTo){clearTimeout(input.timer);inputs.delete(seq)}
+  }
+  refreshRetry();
+}
+function stopTimers(){
+  clearTimeout(attackTimer);clearTimeout(requestTimer);discardInputs(Infinity);
+}
+function transmitInput(input,retry=false){
+  clearTimeout(input.timer);input.timedOut=false;refreshRetry();
+  send('BattleInputReq',input.body);
+  input.timer=setTimeout(()=>{
+    if(!retry){transmitInput(input,true);return}
+    input.timedOut=true;refreshRetry();
+    message('第 '+input.body.sequence+' 次出招尚未收到确认，可重试。');
   },15000);
 }
-el('retry-input').onclick=()=>transmitInput(true);
+function submitInput(skill,targetId){
+  const body={battle_id:battle,unit_id:control.unit_id,sequence:++sequence,skill_id:skill,target_id:targetId};
+  const input={body};
+  inputs.set(sequence,input);transmitInput(input);render();
+}
+el('retry-input').onclick=()=>{
+  for(const input of inputs.values())if(input.timedOut)transmitInput(input,true);
+};
 function resetBattle(){
   automatic=false;swings.clear();queuedSwings.clear();casts=damage=elapsed=0;
-  stopTimers();battle='';control=null;hero=null;allies=[];enemies=[];target=-1;sequence=cursor=pending=0;
+  stopTimers();battle='';control=null;hero=null;allies=[];enemies=[];target=-1;sequence=cursor=acknowledged=0;flashText='';flashUntil=0;
   started=null;hits=[];preferred='';fallback=false;claim='';offers=[];claimed=[];render();
 }
 function disconnect(reason){
@@ -90,18 +105,25 @@ el('start').onclick=()=>{
   send('StartBattleReq',{});deadline('进战');
 };
 function attack(skill,defaultTarget=false){
-  if(phase!=='play'||pending||!hero?.hp||!control)return;
+  if(phase!=='play'||inputs.size||!hero?.hp||!control)return;
   if(performance.now()<clock+next){message('尚未到下一次出手时间。');return}
-  const body={battle_id:battle,unit_id:control.unit_id,sequence:++sequence,skill_id:skill};
-  if(skill===control.basic_skill&&enemies[target]?.hp&&!defaultTarget)body.target_id=enemies[target].instance_id;
-  pending=sequence;pendingBody=body;transmitInput(false);render();
+  const targetId=skill===control.basic_skill&&enemies[target]?.hp&&!defaultTarget?enemies[target].instance_id:undefined;
+  submitInput(skill,targetId);
 }
+function guardPending(){
+  return [...inputs.values()].some(input=>input.body.skill_id==='guard');
+}
+el('guard').onclick=()=>{
+  if(phase!=='play'||!hero?.hp||!control?.can_guard||guardPending())return;
+  if(performance.now()-clock<(control.guard_ready_ms||0))return;
+  clearTimeout(attackTimer);submitInput('guard');
+};
 function schedule(){
   clearTimeout(attackTimer);
-  if(!automatic||phase!=='play'||pending||!hero?.hp||!control)return;
+  if(!automatic||phase!=='play'||inputs.size||!hero?.hp||!control)return;
   const wait=clock+next-performance.now();
   if(wait>0){attackTimer=setTimeout(schedule,Math.ceil(wait));return}
-  attack(fallback||!preferred?control.basic_skill:preferred,fallback);
+  attack(hero.counter_ready||fallback||!preferred?control.basic_skill:preferred,fallback);
 }
 el('auto').onclick=()=>{
   if(phase!=='play')return;
@@ -136,7 +158,9 @@ function receive(name,m){
     offers=own.available_grants||[];claimed=hero.received_grants||[];
     if(!battle){preferred=own.active_skills?.[0]||'';started=performance.now()}
     battle=m.battle_id;cursor=m.snapshot_sequence||0;sequence=Math.max(sequence,own.last_input_sequence||0);
-    if(!pending||pending<=(own.last_input_sequence||0)){clearInput()}
+    clearTimeout(requestTimer);
+    acknowledged=Math.max(acknowledged,own.last_input_sequence||0);
+    discardInputs(acknowledged);
     clock=performance.now()-(m.current_ms||0);next=own.next_ready_ms||0;
     status('play','交战中');message(automatic?'自动出招中。':'点击普攻或技能出招。');render();schedule();return;
   }
@@ -156,13 +180,18 @@ function receive(name,m){
     message(m.code?'领取失败，错误码 '+m.code:'已领取');render();return;
   }
   if(name==='BattleInputAck'){
-    if(m.unit_id!==control.unit_id||m.sequence!==pending)return;
-    clearInput();
+    const input=inputs.get(m.sequence);
+    if(m.unit_id!==control.unit_id||!input||m.sequence<=acknowledged)return;
+    acknowledged=m.sequence;discardInputs(acknowledged);
     clock=performance.now()-(m.current_ms||0);next=m.ready_ms||0;
-    // 技能冷却或目标刚死亡时，下次尝试服务端默认选敌的普攻。
-    fallback=Boolean(m.code);
-    if(m.code)next=Math.max(next,(m.current_ms||0)+100);
-    if(!automatic&&m.code)message('本次出招未被接受，可尝试普攻或其他技能。');
+    if(input.body.skill_id==='guard'){
+      if(m.code)message('架势未生效。');
+    }else{
+      // 技能冷却或目标刚死亡时，下次尝试服务端默认选敌的普攻。
+      fallback=Boolean(m.code);
+      if(m.code)next=Math.max(next,(m.current_ms||0)+100);
+      if(!automatic&&m.code)message('本次出招未被接受，可尝试普攻或其他技能。');
+    }
     render();schedule();return;
   }
   if(name!=='BattleActionNtf')return;
@@ -180,17 +209,21 @@ function receive(name,m){
   const unit=idx>=0?enemies[idx]:hero?.instance_id===e.target_id?hero:allies.find(u=>u.instance_id===e.target_id);
   if((e.type===3||e.type===4)&&unit){
     unit.hp=e.hp_after||0;
+    const effect=e.guarded?'格挡 ':e.counter?'反击 ':'';
+    if((e.guarded&&unit===hero)||(e.counter&&e.actor_id===hero.instance_id)){
+      flashText=e.guarded?'格挡成功':'反击命中';flashUntil=performance.now()+850;
+    }
     hits.push({from:enemies.findIndex(u=>u.instance_id===e.actor_id),to:idx>=0?idx:unit===hero?-1:-2-allies.indexOf(unit),time:performance.now(),
-      text:(e.type===3?'−':'+')+(e.amount||0),heal:e.type===4});
+      text:effect+(e.type===3?'−':'+')+(e.amount||0),heal:e.type===4});
     selectTarget();
   }
-  if(e.updated_unit && e.updated_unit.instance_id!==hero.instance_id){
-    const updated=[...allies,...enemies].find(u=>u.instance_id===e.updated_unit.instance_id);
-    if(updated)Object.assign(updated,e.updated_unit,{hp:e.updated_unit.hp??0});
-  }
-  if(e.updated_unit?.instance_id===hero.instance_id){
-    Object.assign(hero,e.updated_unit,{hp:e.updated_unit.hp??0});
-    if(e.grant){claimed.push(e.grant);offers=offers.filter(g=>g.grant_id!==e.grant.grant_id)}
+  if(e.updated_unit){
+    const updated=findUnit(e.updated_unit.instance_id);
+    if(updated){
+      // 快照中的零值由 protobuf 省略，替换时也要清掉已经消耗的反击和格挡。
+      Object.assign(updated,{windup:null,guard_until_ms:0,counter_ready:false,hp:0},e.updated_unit);
+      if(updated===hero&&e.grant){claimed.push(e.grant);offers=offers.filter(g=>g.grant_id!==e.grant.grant_id)}
+    }
   }
   if(e.updated_control){
     const updated=e.updated_control;
@@ -202,15 +235,29 @@ function receive(name,m){
     }
   }
   if(e.type===2){
-    const enemyIndex=enemies.findIndex(u=>u.instance_id===e.actor_id);
-    const allyIndex=allies.findIndex(u=>u.instance_id===e.actor_id);
-    const self=e.actor_id===hero.instance_id;
-    const actor=self?-1:enemyIndex>=0?enemyIndex:-2-allyIndex;
-    const unit=self?hero:enemyIndex>=0?enemies[enemyIndex]:allies[allyIndex];
-    if(unit)queuedSwings.set(actor,(queuedSwings.get(actor)||0)+1);
-    message(e.actor_id+' 施放技能 '+e.skill_id);
+    const actor=findUnit(e.actor_id);
+    if(actor&&e.impact_ms>(e.start_ms||0)){
+      actor.windup={action:e.action,target_id:e.target_id||e.target_ids?.[0],skill_id:e.skill_id,start_ms:e.start_ms||0,impact_ms:e.impact_ms};
+    }else if(actor){
+      const index=sceneIndex(actor);
+      queuedSwings.set(index,(queuedSwings.get(index)||0)+1);message(e.actor_id+' 施放技能 '+e.skill_id);
+    }
+  }
+  if(e.type===7||e.type===9){
+    const actor=findUnit(e.actor_id);
+    if(actor?.windup&&actor.windup.action===e.action){
+      delete actor.windup;
+      // 服务端已结束举刀，从劈下这一帧接续播放。
+      if(e.type===7)swings.set(sceneIndex(actor),performance.now()-.28*swingDuration(actor.action_interval_ms));
+    }
   }
   if(((e.type===3||e.type===4)&&unit)||e.updated_unit||e.updated_control||e.joined_unit)render();
+}
+function findUnit(id){
+  return hero?.instance_id===id?hero:enemies.find(u=>u.instance_id===id)||allies.find(u=>u.instance_id===id);
+}
+function sceneIndex(unit){
+  return unit===hero?-1:unit.team===2?enemies.indexOf(unit):-2-allies.indexOf(unit);
 }
 function button(label,action,disabled=false){
   const b=document.createElement('button');b.textContent=label;b.onclick=action;b.disabled=disabled;return b;
@@ -239,12 +286,34 @@ function paintHud(){
     const basic=id===control.basic_skill;
     const b=button((basic?'普攻 ':automatic?'优先技能 ':'技能 ')+id,()=>{
       if(automatic){preferred=basic?'':id;render()}else attack(id);
-    },phase!=='play'||(!automatic&&Boolean(pending)));
+    },phase!=='play'||(!automatic&&inputs.size>0));
     if(automatic)b.setAttribute('aria-pressed',basic?!preferred:preferred===id);return b;
   }));
   el('grants').replaceChildren(...offers.map(g=>button('领取 '+grantName(g),()=>{
     claim=g.grant_id;send('ClaimBattleGrantReq',{battle_id:battle,unit_id:control.unit_id,grant_id:claim});render();
   },Boolean(claim))));
+}
+// 每帧只更新显示变化的读秒文字，避免重建正在点击的防守按钮。
+function paintGuard(now,battleMs){
+  const guard=el('guard'),signal=el('guard-signal');
+  guard.hidden=phase!=='play'||!control?.can_guard;
+  signal.hidden=guard.hidden;
+  if(guard.hidden)return;
+  const cooldown=(control.guard_ready_ms||0)-battleMs,pending=guardPending();
+  guard.disabled=!hero.hp||pending||cooldown>0;
+  const label=pending?'架势 · 确认中':cooldown>0?'架势 · '+(cooldown/1000).toFixed(1)+'s':'架势';
+  if(guard.textContent!==label)guard.textContent=label;
+  const threat=enemies.filter(e=>e.hp&&e.windup?.target_id===hero.instance_id)
+    .sort((a,b)=>a.windup.impact_ms-b.windup.impact_ms)[0];
+  const remaining=threat?Math.max(0,threat.windup.impact_ms-battleMs):0;
+  const withinGuardWindow=remaining>0&&remaining<=700;
+  let hint=threat?'重击锁定你 · '+(remaining/1000).toFixed(1)+' 秒':'';
+  if(withinGuardWindow&&!guard.disabled)hint+='　现在可挡';
+  if(hero.guard_until_ms>battleMs)hint+='　格挡中';
+  if(flashUntil>now)hint+='　'+flashText;
+  if(hero.counter_ready)hint+='　下一刀普攻反击';
+  if(signal.textContent!==hint)signal.textContent=hint;
+  guard.classList.toggle('threatened',withinGuardWindow&&!guard.disabled);
 }
 function animate(now){
   if(hudDirty){hudDirty=false;paintHud()}
@@ -257,7 +326,9 @@ function animate(now){
     if(count===1)queuedSwings.delete(actor);
     else queuedSwings.set(actor,count-1);
   }
-  drawScene(enemies,target,hits,started,now,swings,phase==='play',hero,allies);
+  const battleMs=now-clock;
+  paintGuard(now,battleMs);
+  drawScene(enemies,target,hits,started,now,swings,phase==='play',hero,allies,battleMs);
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);

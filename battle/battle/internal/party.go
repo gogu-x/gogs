@@ -147,7 +147,7 @@ func (a *BattleActor) addMember(m *pb.InitialBattleMember, started bool) error {
 	if compiler == nil {
 		compiler = battleconfig.NewDefault()
 	}
-	config, err := compiler.BuildJoinedRole(m.GetRole())
+	config, err := compiler.BuildEncounterRole(m.GetRole(), a.p.Request.GetBattleType())
 	if err != nil {
 		return err
 	}

@@ -36,6 +36,7 @@ type EffectConfig struct {
 
 // SkillConfig 表示运行时技能配置。
 type SkillConfig struct {
+	WindupMS   int64 // 可格挡重击从锁定单个目标到命中的毫秒数，为零表示即时技能。
 	ID         string
 	Cooldown   int
 	TargetRule pb.TargetRule
@@ -55,6 +56,7 @@ type ChargeEffectConfig struct {
 
 // UnitConfig 表示 BattleActor 已从 glconf 还原的运行时单位。
 type UnitConfig struct {
+	GuardEnabled    bool            // 玩法是否授予该玩家单位独立架势动作。
 	OwnerUID        uint64          // 玩家控制者编号，怪物为零。
 	CastRules       []strategy.Rule // 本单位按配置顺序执行的条件施法规则。
 	RobotFirstDelay int64           // 机器人首次决策距开战的毫秒数。
